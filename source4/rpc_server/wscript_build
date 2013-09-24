@@ -179,3 +179,11 @@ bld.SAMBA_BINARY(
     for_selftest=True,
     enabled=bld.AD_DC_BUILD_IS_ENABLED()
 )
+
+bld.SAMBA_MODULE('dcerpc_dfsr',
+	source='dfsr/dcesrv_dfsrrpc.c ',
+	autoproto='dfsr/proto.h',
+	subsystem='dcerpc_server',
+	init_function='dcerpc_server_frstrans_init',
+	deps='samdb DCERPC_COMMON RPC_NDR_IRPC NDR_FRSTRANS'
+	)
