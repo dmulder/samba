@@ -1,0 +1,73 @@
+#!/usr/bin/env python
+# Copyright Luke Morrison <luc785@.hotmail.com> 2013
+
+
+import os
+import fcntl
+import sys
+import tempfile
+import subprocess
+
+sys.path.insert(0, "bin/python")
+from samba.dcerpc import security
+import samba
+import optparse
+from samba import getopt as options
+from samba.gpclass import *
+from samba.netcmd import gpo as gpo_user
+
+
+#Finds all GPO Files ending in inf
+def gp_path_list(path):
+
+	GPO_LIST = []
+	for ext in gp_extensions:
+		GPO_LIST.append((ext, ext.list(path)))
+
+	return GPO_LIST
+
+#Reads the GPOs and sends them to their proper handlers
+def gpo_parser(GPO_LIST, ldb):
+	for entry in GPO_LIST:
+		(ext, thefile) = entry
+		ext.parse(thefile, ldb)
+parser = optparse.OptionParser("testsearchdn [options]")
+
+sambaopts = options.SambaOptions(parser)
+
+parser.add_option_group(sambaopts)
+parser.add_option_group(options.VersionOptions(parser))
+
+credopts = options.CredentialsOptions(parser)
+
+parser.add_option("-H", dest = "url", help="URL for the samdb")
+
+parser.add_option_group(credopts)
+
+opts, args = parser.parse_args()
+lp = sambaopts.get_loadparm()
+
+smbconf = lp.configfile
+creds = credopts.get_credentials(lp)
+
+session = system_session()
+
+if not opts.url:
+    url = lp.samdb_url()
+else:
+    url = opts.url
+
+#########################
+#Inialize Samba Database#
+#########################
+test_ldb = SamDB(url, session_info=session,
+ credentials=creds,lp=lp)
+
+schemadn = test_ldb.get_schema_basedn()
+
+basedn = test_ldb.get_default_basedn()
+
+print 'The current value of the Min password Age is %s' %  test_ldb.get_minPwdAge()
+print 'and Max age is %s' % test_ldb.get_maxPwdAge()
+print 'and Min Password length is %s' % test_ldb.get_minPwdLength()
+print 'and Password complexity is %s' % test_ldb.get_pwdProperties()

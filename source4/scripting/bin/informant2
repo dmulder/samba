@@ -1,0 +1,113 @@
+#!/usr/bin/env python
+# Copyright Luke Morrison <luc785@.hotmail.com> 2013
+
+
+import os
+import fcntl
+import sys
+import tempfile
+import subprocess
+import re
+sys.path.insert(0, "bin/python")
+from samba.dcerpc import security
+from samba.provision import (provision_paths_from_lp)
+from samba import Ldb
+import samba
+import optparse
+from samba import getopt as options
+from samba.gpclass import *
+from samba.netcmd import gpo as gpo_user
+
+
+#Finds all GPO Files ending in inf
+def gp_path_list(path):
+
+	GPO_LIST = []
+	for ext in gp_extensions:
+		GPO_LIST.append((ext, ext.list(path)))
+
+	return GPO_LIST
+
+#Reads the GPOs and sends them to their proper handlers
+def gpo_parser(GPO_LIST, ldb):
+	for entry in GPO_LIST:
+		(ext, thefile) = entry
+		ext.parse(thefile, ldb)
+parser = optparse.OptionParser("testsearchdn [options]")
+
+sambaopts = options.SambaOptions(parser)
+
+parser.add_option_group(sambaopts)
+parser.add_option_group(options.VersionOptions(parser))
+
+credopts = options.CredentialsOptions(parser)
+
+parser.add_option("-H", dest = "url", help="URL for the samdb")
+
+parser.add_option_group(credopts)
+
+opts, args = parser.parse_args()
+lp = sambaopts.get_loadparm()
+
+smbconf = lp.configfile
+creds = credopts.get_credentials(lp)
+
+session = system_session()
+
+if not opts.url:
+    url = lp.samdb_url()
+else:
+    url = opts.url
+
+#########################
+#Inialize Samba Database#
+#########################
+paths = provision_paths_from_lp(lp, lp.get("realm"))
+privilegedb = Ldb(paths.privilege, session_info=session, credentials=creds, lp=lp)
+res = privilegedb.search(expression='(objectclass=*)')
+for l in res:
+    print l.dn
+    print l
+test_ldb = SamDB(url, session_info=session,
+ credentials=creds,lp=lp)
+
+schemadn = test_ldb.get_schema_basedn()
+
+basedn = test_ldb.get_default_basedn()
+print 'This is the base dn %s' %test_ldb.get_default_basedn()
+seconds = 60
+minutes = 60
+hours = 24
+sam_add = 10000000
+days1= -int(test_ldb.get_minPwdAge())/(seconds*minutes*hours*sam_add)
+print 'The current value of the Min password Age is %s' % days1
+
+days2= -int(test_ldb.get_maxPwdAge())/(seconds*minutes*hours*sam_add)
+print 'and Max age is %s' % days2
+print 'the min password length is %s' % test_ldb.get_minPwdLength()
+a = test_ldb.get_domain_sid()
+print a
+a = test_ldb.get_serverName()
+print a
+print 'The domain name is ' + test_ldb.domain_dn()
+print 'The properties of DC PWd is : ' + test_ldb.get_pwdProperties()
+print 'The dns name of the host is' + test_ldb.domain_dns_name() + 'The dns name of the domain is ' + test_ldb.host_dns_name()
+#print test_ldb.get_nc_root(test_ldb.domaini
+'''
+container = gpo_user.get_gpo_containers(test_ldb, '{26C47ABE-688A-43F7-8BF0-4B2B4207CA77}')
+b = container.get('gPLink')
+print 'The domain gpLink is %s' % b
+b = str(b)
+b.replace('LDAP://cn=', 'v')
+b.replace('LDAP://CN=', 'v')
+print type(b)
+
+splitted = b.split(']')
+#splitted = splitted.split('[LDAP://cn=')
+#print splitted
+for i in splitted:
+	print i[11:49]
+	if i[11:49] == '{4768660C-5529-4713-82D9-8EEB704862D0}':
+		print 'carla'
+print test_ldb.get_domain_sid()
+'''
