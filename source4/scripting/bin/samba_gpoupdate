@@ -85,7 +85,7 @@ schemadn = test_ldb.get_schema_basedn()
 basedn = test_ldb.get_default_basedn()
 
 '''Will need sysvol to write a basic GUID version dynamic log file'''
-path = '%s/%s/%s' % (lp.get("path", "sysvol"), lp.get("realm"), 'Policies')
+path = '%s/%s/%s' % (lp.get("path", "sysvol"), lp.get("realm").lower(), 'Policies')
 sys_log = '%s/%s' % (lp.get("path", "sysvol"), 'syslog.txt')
 
 '''Returns dict from previous logfile, then scraps the logfile '''
