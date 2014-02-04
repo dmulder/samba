@@ -69,7 +69,7 @@ schemadn = test_ldb.get_schema_basedn()
 
 basedn = test_ldb.get_default_basedn()
 
-path = '%s/%s/%s' % (lp.get("path", "sysvol"), lp.get("realm"), 'Policies')
+path = '%s/%s/%s' % (lp.get("path", "sysvol"), lp.get("realm").lower(), 'Policies')
 guid_list = os.listdir(path)
 msg = gpo_user.get_gpo_containers(test_ldb, '{26C47ABE-688A-43F7-8BF0-4B2B4207CA77}')
 for i in msg:
