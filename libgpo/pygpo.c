@@ -37,10 +37,10 @@ staticforward PyTypeObject PyGpLink;
 /******************************************************************************************************************
 *******************************************************************************************************************/
 
-//Parameter mapping and functions for the GP_EXT struct
+/* Parameter mapping and functions for the GP_EXT struct */
 void initgpo(void);
 
-//Parse raw extension string to GP_EXT structure
+/* Parse raw extension string to GP_EXT structure */
 static PyObject *py_ads_parse_gp_ext(PyGpExtObject * self, PyObject * args)
 {
 	struct GP_EXT *gp_ext = pygp_ext_AsgpextContext((PyObject *) self);
@@ -60,14 +60,15 @@ static PyObject *py_ads_parse_gp_ext(PyGpExtObject * self, PyObject * args)
 	return (PyObject *) gp_ext;
 }
 
-//Functions here
+/* Functions here */
 static PyMethodDef py_gp_ext_methods[] = {
 	{"ads_parse_gp_ext", (PyCFunction) py_ads_parse_gp_ext, METH_VARARGS,
 	 NULL},
 	{NULL}
 };
 
-//Mapping here
+/* Mapping here */
+
 static PyObject *py_gp_ext_get_extensions(PyGpExtObject * self)
 {
 	return PyString_FromString((*self->gp_ext->extensions));
@@ -151,11 +152,11 @@ static PyTypeObject PyGpExt = {
 /*******************************************************************************************************************
 *******************************************************************************************************************/
 
-//Parameter mapping and methods for the gpi_inifile_context Struct.
+/* Parameter mapping and methods for the gpi_inifile_context Struct. */
 
-//Functions here
+/* Functions here */
 
-//static PyObject *py_gp_inifile_get_string(PyGpIniObject* self)
+/*static PyObject *py_gp_inifile_get_string(PyGpIniObject* self)*/
 
 static PyObject *py_parse_gpt_ini(PyObject * self, PyObject * args)
 {
@@ -173,8 +174,8 @@ static PyObject *py_parse_gpt_ini(PyObject * self, PyObject * args)
 	if (!NT_STATUS_IS_OK(status)) {
 		return NULL;
 	}
-	//Do not need to check for display name because it might not have one
-	//Zero cases will be handled in python
+	/* Do not need to check for display name because it might not have one.
+	   Zero cases will be handled in python. */
 	result = Py_BuildValue("[s,i]", display_name, version);
 	return result;
 
@@ -186,7 +187,7 @@ static PyMethodDef py_gp_inifile_methods[] = {
 	{NULL}
 };
 
-//Mapping Here
+/* Mapping Here */
 static PyObject *py_gp_inifile_keyval_count(PyGpIniObject * self)
 {
 	return PyInt_FromLong(self->gp_ini->keyval_count);
@@ -262,9 +263,9 @@ static PyTypeObject PyGpIni = {
 };
 
 /****************************************************************************************/
-/*Parameter mapping and methods for the GROUP POLICY OBJECT Struct.*/
+/* Parameter mapping and methods for the GROUP POLICY OBJECT Struct. */
 
-/*Functions here*/
+/* Functions here */
 
 static PyObject *py_gpo_get_unix_path(PyGpObject * self, PyObject * args)
 {
@@ -293,7 +294,7 @@ static PyMethodDef py_gpo_local_methods[] = {
 	{NULL}
 };
 
-/*Mapping here*/
+/* Mapping here */
 static PyObject *py_options(PyGpObject * self)
 {
 	return PyInt_FromLong(self->gpo->options);
@@ -397,9 +398,9 @@ static PyTypeObject PyGpO = {
 
 /******************************************************************************************************************************
 ******************************************************************************************************************************/
-//Parameter mapping and methods for the GP_LINK Struct.
+/* Parameter mapping and methods for the GP_LINK Struct. */
 
-/*Gets a GP_LINK structure from a linkdn*/
+/* Gets a GP_LINK structure from a linkdn */
 
 /*What is a linkdn?
 how do I initialize the AD structure*/
@@ -453,7 +454,7 @@ static PyObject py_ads_add_gpo_link(PyGpLinkObject *self, PyObject *args)
 	*/
 
 static PyMethodDef py_gp_link_methods[] = {
-//{"ads_get_gpo_link", (PyCFunction)py_ads_get_gpo_link, METH_VARARGS, NULL},
+/*{"ads_get_gpo_link", (PyCFunction)py_ads_get_gpo_link, METH_VARARGS, NULL},*/
 	{NULL}
 };
 
@@ -541,7 +542,7 @@ static PyTypeObject PyGpLink = {
 };
 
 /*****************************************************************************************************************************/
-/*Global methods aka do not need a special pyobject type*/
+/* Global methods aka do not need a special pyobject type */
 
 static PyObject *py_gpo_get_sysvol_gpt_version(PyObject * self, PyObject * args)
 {
@@ -565,7 +566,7 @@ static PyObject *py_gpo_get_sysvol_gpt_version(PyObject * self, PyObject * args)
 	return result;
 }
 
-/*Verify that the GUID is not a client side extension*/
+/* Verify that the GUID is not a client side extension */
 static PyObject *py_cse_gpo_name_to_guid_string(PyObject * self,
 						PyObject * args)
 {
@@ -614,7 +615,7 @@ static PyMethodDef py_gpo_methods[] = {
 	{NULL}
 };
 
-/* will be called by python when loading this module*/
+/* will be called by python when loading this module */
 void initgpo(void)
 {
 	PyObject *m;
