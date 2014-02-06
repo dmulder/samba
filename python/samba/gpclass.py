@@ -152,12 +152,14 @@ class gp_sec_ext(gp_ext):
             self.read_inf(afile)
 
 class samba4_gpo_hierarchy(object):
-        #:param SamDB: An instance of the live samba database
-       # :param sysvol_guid_list: The complete list of all GPO GUID's listed in sysvol folder
-      #  :param DC_OU: The respective distinguished name of the Domain Controller
-     #   :param GLOBAL_DN: The Domain DN that Samba is a part of
 
     def __init__(self, SamDB, sysvol_guid_list, DC_OU, GLOBAL_DN):
+        """
+        :param SamDB: An instance of the live samba database
+        :param sysvol_guid_list: The complete list of all GPO GUID's listed in sysvol folder
+        :param DC_OU: The respective distinguished name of the Domain Controller
+        :param GLOBAL_DN: The Domain DN that Samba is a part of
+	"""
 	self.SamDB = SamDB
 	self.GUID_L = sysvol_guid_list
 	self.DC_OU = DC_OU
@@ -168,7 +170,7 @@ class samba4_gpo_hierarchy(object):
 	self.unapplied_gpo = 0
 
     def update_unapplied_gpo(self):
-	self.update_unapplied_gpo +=1
+	self.update_unapplied_gpo += 1
 
     '''Returns list of int indexes to where the dn changes'''
     def container_indexes(self):
