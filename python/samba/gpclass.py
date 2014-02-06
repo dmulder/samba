@@ -79,15 +79,15 @@ class inf_to_ldb(object):
     '''ldap value : samba setter'''
     def mapper(self):
         return { "minPwdAge" : (self.ch_minPwdAge, self.nttime2unix),
-             "maxPwdAge" : (self.ch_maxPwdAge, self.nttime2unix),
-             "minPwdLength" : (self.ch_minPwdLength, self.explicit), #Could be none, but I like the method assignment in update_samba
-             "pwdProperties" : (self.ch_pwdProperties, self.explicit),
+                 "maxPwdAge" : (self.ch_maxPwdAge, self.nttime2unix),
+                 "minPwdLength" : (self.ch_minPwdLength, self.explicit), # Could be none, but I like the method assignment in update_samba
+                 "pwdProperties" : (self.ch_pwdProperties, self.explicit),
 
-		}
+               }
 
     def update_samba(self):
         (upd_sam, value) = self.mapper().get(self.attribute)
-        upd_sam( value() )     #or val = value() then update(val)
+        upd_sam( value() )     # or val = value() then update(val)
 
 
 '''This class does 2 things. 1) Identifies the GPO if it has a certain kind of filepath, 2) Finally parses it. '''
@@ -113,11 +113,11 @@ class gp_sec_ext(gp_ext):
 
     def populate_inf(self):
         return {"System Access": {"MinimumPasswordAge": ("minPwdAge", inf_to_ldb),
-                                "MaximumPasswordAge": ("maxPwdAge", inf_to_ldb),
-				"MinimumPasswordLength": ("minPwdLength",inf_to_ldb),
-				"PasswordComplexity": ("pwdProperties", inf_to_ldb),
-				 }
-	        }
+                                  "MaximumPasswordAge": ("maxPwdAge", inf_to_ldb),
+                                  "MinimumPasswordLength": ("minPwdLength",inf_to_ldb),
+                                  "PasswordComplexity": ("pwdProperties", inf_to_ldb),
+                                 }
+               }
 #FIXME. EACH gpo should have a parser, and a creater. Essentially a gpo is just a file. Possibly a method and class to link it to organization unit (if that already does not exist) so that GPO's can be created arithmetically, possibly with a hashtable for certain GPO, then linked if desired. Also could store a backup folder of gpo's and then configure them without necessarily deploying it.
 
     def read_inf(self, path):
@@ -131,18 +131,18 @@ class gp_sec_ext(gp_ext):
             line = line.strip()
             if line[0] == '[':
                 section = line[1: -1]
-		current_section = inftable.get(section.encode('ascii','ignore'))
+                current_section = inftable.get(section.encode('ascii','ignore'))
 
             else:
-		#We must be in a section
-		if not current_section:
-		    continue
-		(key, value) = line.split("=")
-		key = key.strip()
-		if current_section.get(key):
-		    (att, setter) = current_section.get(key)
+                # We must be in a section
+                if not current_section:
+                    continue
+                (key, value) = line.split("=")
+                key = key.strip()
+                if current_section.get(key):
+                    (att, setter) = current_section.get(key)
                     value = value.encode('ascii', 'ignore')
-		    setter(self.ldb, self.dn, att, value).update_samba()
+                    setter(self.ldb, self.dn, att, value).update_samba()
     #FIXME read registry files (.pol). Can they ever apply? Define read_registry():
 
     def parse(self, afile, ldb):
@@ -159,27 +159,27 @@ class samba4_gpo_hierarchy(object):
         :param sysvol_guid_list: The complete list of all GPO GUID's listed in sysvol folder
         :param DC_OU: The respective distinguished name of the Domain Controller
         :param GLOBAL_DN: The Domain DN that Samba is a part of
-	"""
-	self.SamDB = SamDB
-	self.GUID_L = sysvol_guid_list
-	self.DC_OU = DC_OU
-	self.GL_DN = GLOBAL_DN
-	self.sorted_containers = []
-	self.sorted_full = []
-	self.indexed_places = []
-	self.unapplied_gpo = 0
+        """
+        self.SamDB = SamDB
+        self.GUID_L = sysvol_guid_list
+        self.DC_OU = DC_OU
+        self.GL_DN = GLOBAL_DN
+        self.sorted_containers = []
+        self.sorted_full = []
+        self.indexed_places = []
+        self.unapplied_gpo = 0
 
     def update_unapplied_gpo(self):
-	self.update_unapplied_gpo += 1
+        self.update_unapplied_gpo += 1
 
     '''Returns list of int indexes to where the dn changes'''
     def container_indexes(self):
         count = 0
         container_indexes = []
         while count < (len(self.GUID_L)-1):
-	    if self.sorted_containers[count][2] != self.sorted_containers[count+1][2]:
-	        container_indexes.append(count+1)
-	    count += 1
+            if self.sorted_containers[count][2] != self.sorted_containers[count+1][2]:
+                container_indexes.append(count+1)
+            count += 1
         container_indexes.append(len(self.sorted_containers))
         return container_indexes
 
@@ -189,38 +189,38 @@ class samba4_gpo_hierarchy(object):
         count_unapplied_GPO = 0
         for GUID in self.GUID_L:
             container_iteration = 0
-            applied = False #Assume first it is not applied
-	    gpo_realm = False #Realm only written on last call, if the GPO is linked to multiple places
-	    '''Get all of the linked information'''
-	    GPO_CONTAINERS = gpo_user.get_gpo_containers(self.SamDB, GUID)
-	    for GPO_CONTAINER in GPO_CONTAINERS:
+            applied = False # Assume first it is not applied
+            gpo_realm = False # Realm only written on last call, if the GPO is linked to multiple places
+            '''Get all of the linked information'''
+            GPO_CONTAINERS = gpo_user.get_gpo_containers(self.SamDB, GUID)
+            for GPO_CONTAINER in GPO_CONTAINERS:
 
                 container_iteration +=1
 
                 if self.DC_OU == str(GPO_CONTAINER.get('dn')):
                     applied = True
-		    insert_gpo = [GUID, applied, str(GPO_CONTAINER.get('dn'))]
-		    self.sorted_containers.append(insert_gpo)
-		    break
+                    insert_gpo = [GUID, applied, str(GPO_CONTAINER.get('dn'))]
+                    self.sorted_containers.append(insert_gpo)
+                    break
 
                 if self.GL_DN == str(GPO_CONTAINER.get('dn')) and (len(GPO_CONTAINERS) == 1):
-		    gpo_realm = True
-		    applied = True
-		    #REALM_GPO = [GUID, applied, str(GPO_CONTAINER.get('dn'))]
-		    #final_list.insert(count_unapplied_GPO, REALM_GPO)
+                    gpo_realm = True
+                    applied = True
+                    #REALM_GPO = [GUID, applied, str(GPO_CONTAINER.get('dn'))]
+                    #final_list.insert(count_unapplied_GPO, REALM_GPO)
 
                 if self.GL_DN == str(GPO_CONTAINER.get('dn')) and (len(GPO_CONTAINERS) > 1):
-		    gpo_realm = True
-		    applied = True
+                    gpo_realm = True
+                    applied = True
 
-	        if container_iteration == len(GPO_CONTAINERS):
-		    if gpo_realm == False:
-		        insert_dud = [GUID, applied, str(GPO_CONTAINER.get('dn'))]
-		        self.sorted_containers.insert(0, insert_dud)
-		        self.count_unapplied_GPO()
-		    else :
-		        REALM_GPO = [GUID, applied, str(GPO_CONTAINER.get('dn'))]
-		        self.sorted_containers.insert(count_unapplied_GPO, REALM_GPO)
+                if container_iteration == len(GPO_CONTAINERS):
+                    if gpo_realm == False:
+                        insert_dud = [GUID, applied, str(GPO_CONTAINER.get('dn'))]
+                        self.sorted_containers.insert(0, insert_dud)
+                        self.count_unapplied_GPO()
+                    else :
+                        REALM_GPO = [GUID, applied, str(GPO_CONTAINER.get('dn'))]
+                        self.sorted_containers.insert(count_unapplied_GPO, REALM_GPO)
 
         '''After GPO are sorted into containers, sort the containers themselves. But first append non-applicable GPO.'''
         self.indexed_places = self.container_indexes()
@@ -234,9 +234,9 @@ class samba4_gpo_hierarchy(object):
 
         count = 0
         self.sorted_full += unapplied_gpo
-        while count < (len(self.indexed_places)-1): #Already accounted for one in empties
+        while count < (len(self.indexed_places)-1): # Already accounted for one in empties
             self.sorted_full += (sort_linked(self.SamDB, self.sorted_containers, self.indexed_places[count], self.indexed_places[count + 1]))
-            count +=1
+            count += 1
 
 
 def scan_log(sysvol_path):
@@ -282,12 +282,12 @@ def sort_linked(SAMDB, guid_list, start, end):
         count -= 1
     return ret_list
 
-   #Accepts sysvol parameters to return a hierarchically sorted list, with application flag indicators.
+   # Accepts sysvol parameters to return a hierarchically sorted list, with application flag indicators.
 
 
 #A GPO may have a single or multiple links. Get all of the containers (OU, SITE, etc..) and return them'''
     #def get_gpo_containers( ) :
-    #	return gpo_netcmd_user.get_gpo_containers(self.SamDB, self.GUID)
+    #   return gpo_netcmd_user.get_gpo_containers(self.SamDB, self.GUID)
 
   #  def
 
@@ -297,40 +297,40 @@ def establish_hierarchy(SamDB, GUID_LIST, DC_OU, global_dn):
     count_unapplied_GPO = 0
     for GUID in GUID_LIST:
         container_iteration = 0
-	applied = False #Assume first it is not applied
-	gpo_realm = False #Realm only written on last call, if the GPO is linked to multiple places
-	'''A very important call. This gets all of the linked information'''
-	GPO_CONTAINERS = gpo_user.get_gpo_containers(SamDB, GUID)
-	for GPO_CONTAINER in GPO_CONTAINERS:
+        applied = False # Assume first it is not applied
+        gpo_realm = False # Realm only written on last call, if the GPO is linked to multiple places
+        '''A very important call. This gets all of the linked information'''
+        GPO_CONTAINERS = gpo_user.get_gpo_containers(SamDB, GUID)
+        for GPO_CONTAINER in GPO_CONTAINERS:
 
-            container_iteration +=1
+            container_iteration += 1
 
             if DC_OU == str(GPO_CONTAINER.get('dn')):
-		applied = True
-		insert_gpo = [GUID, applied, str(GPO_CONTAINER.get('dn'))]
-		final_list.append(insert_gpo)
-		break
+                applied = True
+                insert_gpo = [GUID, applied, str(GPO_CONTAINER.get('dn'))]
+                final_list.append(insert_gpo)
+                break
 
             if global_dn == str(GPO_CONTAINER.get('dn')) and (len(GPO_CONTAINERS) == 1):
-		gpo_realm = True
-		applied = True
-		#REALM_GPO = [GUID, applied, str(GPO_CONTAINER.get('dn'))]
-		#final_list.insert(count_unapplied_GPO, REALM_GPO)
+                gpo_realm = True
+                applied = True
+                #REALM_GPO = [GUID, applied, str(GPO_CONTAINER.get('dn'))]
+                #final_list.insert(count_unapplied_GPO, REALM_GPO)
 
 
             if global_dn == str(GPO_CONTAINER.get('dn')) and (len(GPO_CONTAINERS) > 1):
-		gpo_realm = True
-		applied = True
+                gpo_realm = True
+                applied = True
 
 
-	    if container_iteration == len(GPO_CONTAINERS):
-		if gpo_realm == False:
-		    insert_dud = [GUID, applied, str(GPO_CONTAINER.get('dn'))]
-		    final_list.insert(0, insert_dud)
-		    count_unapplied_GPO += 1
-		else :
-		    REALM_GPO = [GUID, applied, str(GPO_CONTAINER.get('dn'))]
-		    final_list.insert(count_unapplied_GPO, REALM_GPO)
+            if container_iteration == len(GPO_CONTAINERS):
+                if gpo_realm == False:
+                    insert_dud = [GUID, applied, str(GPO_CONTAINER.get('dn'))]
+                    final_list.insert(0, insert_dud)
+                    count_unapplied_GPO += 1
+                else :
+                    REALM_GPO = [GUID, applied, str(GPO_CONTAINER.get('dn'))]
+                    final_list.insert(count_unapplied_GPO, REALM_GPO)
     '''After GPO are sorted into containers, let's sort the containers themselves. But first we can get the GPO that we don't care about out of the way'''
     indexed_places = container_indexes(final_list)
     count = 0
@@ -346,5 +346,5 @@ def establish_hierarchy(SamDB, GUID_LIST, DC_OU, global_dn):
     '''A single container call gets the linked order for all GPO in container. So we need one call per container - > index of the Original list'''
     while count < (len(indexed_places)-1):
         sorted_gpo_list += (sort_linked(SamDB, final_list, indexed_places[count], indexed_places[count + 1]))
-        count +=1
+        count += 1
     return sorted_gpo_list
