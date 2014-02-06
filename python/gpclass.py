@@ -85,16 +85,16 @@ class gp_sec_ext(gp_ext):
 		return {"System Access": {"MinimumPasswordAge": ("minPwdAge", inf_to_ldb),
 					  "MaximumPasswordAge": ("maxPwdAge", inf_to_ldb),
 					  "MinimumPasswordLength": ("minPwdLength",inf_to_ldb),
-					  "PasswordComplexity":None
+					  "PasswordComplexity": None
 					 }
-					 }
+			 }
 
 	def read_inf(self, path):
 		inftable = self.populate_inf()
-		#The inf file to be mapped
+		# The inf file to be mapped
 		policy = codecs.open(path, encoding='utf-16')
 		if not policy:
-		#42
+		# 42
 			return None
 		current_section = None
 		for line in policy.readlines():
@@ -123,7 +123,7 @@ class gp_sec_ext(gp_ext):
 		if afile.endswith('inf'):
 			self.read_inf(afile)
 
-#Finds all GPO Files ending in inf
+# Finds all GPO Files ending in inf
 def gp_path_list(path):
 
 	GPO_LIST = []
@@ -132,7 +132,7 @@ def gp_path_list(path):
 
 	return GPO_LIST
 
-#Reads the GPOs and sends them to their proper handlers
+# Reads the GPOs and sends them to their proper handlers
 def gpo_parser(GPO_LIST, ldb):
 	for entry in GPO_LIST:
 		(ext, thefile) = entry
