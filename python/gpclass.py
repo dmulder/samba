@@ -83,10 +83,10 @@ class gp_sec_ext(gp_ext):
 
     def populate_inf(self):
         return {"System Access": {"MinimumPasswordAge": ("minPwdAge", inf_to_ldb),
-                   "MaximumPasswordAge": ("maxPwdAge", inf_to_ldb),
-                   "MinimumPasswordLength": ("minPwdLength",inf_to_ldb),
-                   "PasswordComplexity": None
-                   }
+                                  "MaximumPasswordAge": ("maxPwdAge", inf_to_ldb),
+                                  "MinimumPasswordLength": ("minPwdLength",inf_to_ldb),
+                                  "PasswordComplexity": None
+                                  }
                }
 
     def read_inf(self, path):
