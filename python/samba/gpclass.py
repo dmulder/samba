@@ -97,19 +97,16 @@ class gp_sec_ext(gp_ext):
         return "Security GPO extension"
 
     def list(self, rootpath):
-        path = "%s/%s" % (rootpath, "/Machine/Microsoft/Windows NT/SecEdit/GptTmpl.inf")
-        if os.path.exists(path):
-                return path
+        path = "%s%s" % (rootpath, "MACHINE/Microsoft/Windows NT/SecEdit/GptTmpl.inf")
+        return path
 
     def listmachpol(self, rootpath):
-        path = "%s/%s" % (rootpath, "Machine/Registry.pol")
-        if os.path.exists(path):
-            return path
+        path = "%s%s" % (rootpath, "Machine/Registry.pol")
+        return path
 
     def listuserpol(self, rootpath):
-        path = "%s/%s" % (rootpath, "User/Registry.pol")
-        if os.path.exists(path):
-            return path
+        path = "%s%s" % (rootpath, "User/Registry.pol")
+        return path
 
     def populate_inf(self):
         return {"System Access": {"MinimumPasswordAge": ("minPwdAge", inf_to_ldb),
@@ -120,14 +117,16 @@ class gp_sec_ext(gp_ext):
                }
 #FIXME. EACH gpo should have a parser, and a creater. Essentially a gpo is just a file. Possibly a method and class to link it to organization unit (if that already does not exist) so that GPO's can be created arithmetically, possibly with a hashtable for certain GPO, then linked if desired. Also could store a backup folder of gpo's and then configure them without necessarily deploying it.
 
-    def read_inf(self, path):
+    def read_inf(self, path, conn):
         inftable = self.populate_inf()
         '''The inf file to be mapped'''
-        policy = codecs.open(path, encoding='utf-16')
-        if not policy:
+        #policy = codecs.open(path, encoding='utf-16')
+	try:
+            policy = conn.loadfile(path).decode('utf-16')
+        except:
             return None
         current_section = None
-        for line in policy.readlines():
+        for line in policy.splitlines():
             line = line.strip()
             if line[0] == '[':
                 section = line[1: -1]
@@ -145,11 +144,11 @@ class gp_sec_ext(gp_ext):
                     setter(self.ldb, self.dn, att, value).update_samba()
     #FIXME read registry files (.pol). Can they ever apply? Define read_registry():
 
-    def parse(self, afile, ldb):
+    def parse(self, afile, ldb, conn):
         self.ldb = ldb
         self.dn = ldb.get_default_basedn()
         if afile.endswith('inf'):
-            self.read_inf(afile)
+            self.read_inf(afile, conn)
 
 class samba4_gpo_hierarchy(object):
 
