@@ -17,6 +17,9 @@ import samba
 import optparse
 from samba import getopt as options
 from samba.gpclass import *
+from samba.net import Net
+from samba.dcerpc import nbt
+from samba import smb
 
 # Finds all GPO Files ending in inf
 def gp_path_list(path):
@@ -24,15 +27,13 @@ def gp_path_list(path):
     GPO_LIST = []
     for ext in gp_extensions:
         GPO_LIST.append((ext, ext.list(path)))
-
     return GPO_LIST
 
 # Reads the GPOs and sends them to their proper handlers
-def gpo_parser(GPO_LIST, ldb):
+def gpo_parser(GPO_LIST, ldb, conn):
     for entry in GPO_LIST:
         (ext, thefile) = entry
-        ext.parse(thefile, ldb)
-
+        ext.parse(thefile, ldb, conn)
 
 parser = optparse.OptionParser("testsearchdn [options]")
 
@@ -51,7 +52,7 @@ opts, args = parser.parse_args()
 lp = sambaopts.get_loadparm()
 
 smbconf = lp.configfile
-creds = credopts.get_credentials(lp)
+creds = credopts.get_credentials(lp, fallback_machine=True)
 
 session = system_session()
 
@@ -72,7 +73,8 @@ schemadn = test_ldb.get_schema_basedn()
 basedn = test_ldb.get_default_basedn()
 
 '''Will need sysvol to write a basic GUID version dynamic log file'''
-path = '%s/%s/%s' % (lp.get("path", "sysvol"), lp.get("realm").lower(), 'Policies')
+#path = '%s/%s/%s' % (lp.get("path", "sysvol"), lp.get("realm").lower(), 'Policies')
+path = '%s/Policies' % lp.get("realm").lower()
 sys_log = '%s/%s' % (lp.get("path", "sysvol"), 'syslog.txt')
 
 '''Returns dict from previous logfile, then scraps the logfile '''
@@ -87,7 +89,23 @@ specific_ou = "OU=Domain Controllers"
 global_dn = test_ldb.domain_dn()
 print 'The global DN for this domain is ' + global_dn
 DC_OU = specific_ou + ',' + global_dn
-guid_list = os.listdir(path)
+
+net = Net(creds=creds, lp=lp)
+
+# We need to know writable DC to setup SMB connection
+flags = (nbt.NBT_SERVER_LDAP |
+	 nbt.NBT_SERVER_DS |
+	 nbt.NBT_SERVER_WRITABLE)
+cldap_ret = net.finddc(domain=lp.get('realm'), flags=flags)
+dc_hostname = cldap_ret.pdc_dns_name
+
+try:
+    conn = smb.SMB(dc_hostname, 'sysvol', lp=lp, creds=creds)
+except Exception, e:
+    raise Exception("Error connecting to '%s' using SMB" % dc_hostname, e)
+
+guid_list = [x['name'] for x in conn.list(path)]
+#guid_list = os.listdir(path)
 #guid_list = establish_hierarchy(test_ldb, guid_list, DC_OU, global_dn)
 
 hierarchy_gpos = samba4_gpo_hierarchy(test_ldb, guid_list, DC_OU, global_dn)
@@ -106,8 +124,9 @@ for guid_eval in hierarchy_gpos.sorted_full:
     '''If an important GPO parse it. Will not parse if it has not changed, is empty, or is not in the right container'''
     if guid_eval[1]:
         if gpolist[0][1]:
-            if (version != previous_scanned_version.get(guid)) and (version != 0):
-                print ('GPO %s has changed' % guid)
-                gpo_parser(gpolist, test_ldb)
+            #print version, previous_scanned_version.get(guid)
+            #if (version != previous_scanned_version.get(guid)) and (version != 0):
+            #    print ('GPO %s has changed' % guid)
+            gpo_parser(gpolist, test_ldb, conn)
 
     sys_log.write('%s %i\n' % (guid,version))
