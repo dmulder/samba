@@ -94,7 +94,6 @@ flags = (nbt.NBT_SERVER_LDAP |
 	 nbt.NBT_SERVER_WRITABLE)
 cldap_ret = net.finddc(domain=lp.get('realm'), flags=flags)
 dc_hostname = cldap_ret.pdc_dns_name
-url = 'ldap://' + dc_hostname
 
 try:
     conn = smb.SMB(dc_hostname, 'sysvol', lp=lp, creds=creds)
