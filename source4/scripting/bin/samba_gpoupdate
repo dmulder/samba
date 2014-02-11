@@ -126,7 +126,7 @@ for guid_eval in hierarchy_gpos.sorted_full:
     guid = guid_eval[0]
     gp_extensions = [gp_sec_ext()]
     local_path = path + '/' + guid + '/'
-    version = gpo.gpo_get_sysvol_gpt_version(local_path)[1]
+    version = gpo.gpo_get_sysvol_gpt_version(lp.get("path", "sysvol") + '/' + local_path)[1]
 
     gpolist = gp_path_list(local_path)
     print local_path
@@ -134,6 +134,8 @@ for guid_eval in hierarchy_gpos.sorted_full:
     '''If an important GPO parse it. Will not parse if it has not changed, is empty, or is not in the right container'''
     if guid_eval[1]:
         if gpolist[0][1]:
-            gpo_parser(gpolist, test_ldb, conn)
+            if (version != previous_scanned_version.get(guid)) and (version != 0):
+                print ('GPO %s has changed' % guid)
+                gpo_parser(gpolist, test_ldb, conn)
 
     sys_log.write('%s %i\n' % (guid,version))
