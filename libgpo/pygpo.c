@@ -47,10 +47,11 @@ static PyObject *py_ads_parse_gp_ext(PyGpExtObject *self, PyObject *args)
 {
 	struct GP_EXT *gp_ext = pygp_ext_AsgpextContext((PyObject *)self);
 	bool verify;
-	TALLOC_CTX *tmp_ctx;
-	tmp_ctx = talloc_new(NULL);
 	const char *extension_raw;
-	if (!PyArg_ParseTuple(args, "s" , &extension_raw)) {
+	TALLOC_CTX *tmp_ctx;
+
+	tmp_ctx = talloc_new(NULL);
+	if (!PyArg_ParseTuple(args, "s", &extension_raw)) {
 		return NULL;
 		}
 	verify = ads_parse_gp_ext(tmp_ctx, extension_raw, &gp_ext);
@@ -163,7 +164,9 @@ static PyObject *py_parse_gpt_ini(PyObject *self, PyObject *args)
 	uint32_t *version = 0;
 	NTSTATUS status;
 	char **display_name = NULL;
-	if (!PyArg_ParseTuple(args, "s", &filename)){
+	PyObject *result = NULL;
+
+	if (!PyArg_ParseTuple(args, "s", &filename)) {
 		return NULL;
 		}
 	status = parse_gpt_ini(tmp_ctx, filename, version, display_name);
@@ -172,7 +175,7 @@ static PyObject *py_parse_gpt_ini(PyObject *self, PyObject *args)
 		}
 	//Do not need to check for display name because it might not have one
 	//Zero cases will be handled in python
-	PyObject *result = Py_BuildValue("[s,i]", display_name, version);
+	result = Py_BuildValue("[s,i]", display_name, version);
 	return result;
 
 }
@@ -584,9 +587,11 @@ static PyObject *py_ads_init(PyGpObject *self, PyObject *args)
 {
 	const char *realm = NULL;
 	const char *workgroup = NULL;
-	const char * ldap_server = NULL;
+	const char *ldap_server = NULL;
+	ADS_STRUCT *ads = NULL;
+
 	printf("Before the as content statement\n");
-	ADS_STRUCT *ads =pygpoads_AsgpoadsContext(self->ads);
+	ads = pygpoads_AsgpoadsContext(self->ads);
 
 	if (!PyArg_ParseTuple(args, "ss" , &realm, &workgroup)) {
                    return NULL;
