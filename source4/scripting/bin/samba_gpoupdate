@@ -34,11 +34,18 @@ def gp_path_list(path):
     for ext in gp_extensions:
         GPO_LIST.append((ext, ext.list(path)))
     return GPO_LIST
+'''The API method to parse the GPO
+:param GPO_LIST:
+:param ldb: Live instance of an LDB object AKA Samba
+:param conn: Live instance of a CIFS connection
+:param attr_log: backlog path for GPO and attribute to be written
+no return except a newly updated Samba
+'''
+def gpo_parser(GPO_LIST, ldb, conn, attr_log):
 
-def gpo_parser(GPO_LIST, ldb, conn):
     for entry in GPO_LIST:
         (ext, thefile) = entry
-        ext.parse(thefile, ldb, conn)
+        ext.parse(thefile, ldb, conn, attr_log)
 
 class GPOServiceSetup:
 	def __init__(self):
@@ -138,8 +145,10 @@ creds =  GPOService.Get_Creds()
 #Read the Readable BackLog into a Hashmap then open Writable BackLog in same location
 BackLoggedGPO = None
 sys_log = '%s/%s' % (lp.get("path", "sysvol"), 'syslog.txt')
+attr_log = '%s/%s' % (lp.get("path", "sysvol"), 'attrlog.txt')
 BackLoggedGPO  = GetBackLog(sys_log)
 BackLog = open(sys_log, "w")
+
 
 
 
@@ -164,30 +173,37 @@ DC_OU = "OU=Domain Controllers" + ',' + global_dn
 #Set up a List of the GUID for all GPO's
 guid_list = [x['name'] for x in conn.list('%s/Policies' % lp.get("realm").lower() )]
 
-##############################3UP UNTIL LAST EDITING
-#Establish the Hierarchy for the GPO
-hierarchy_gpos = samba4_gpo_hierarchy(test_ldb, guid_list, DC_OU, global_dn)
-hierarchy_gpos.establish_hierarchy()
-	
-	
-#TODO Make this a method in itself 
-#Write applicable GPO
+#Power through the Microsoft Hierarchy with Linking Order included 
+#FIXME could be SO much more efficient if we get the dn if the DC, then use that to get all its containers
+#Then use the acquired containers of DC dn, to get all GPO in a convenient linking order with linking order already taken into account 
+hierarchy_gpos = establish_hierarchy(test_ldb, guid_list, DC_OU, global_dn)
 
-for guid_eval in hierarchy_gpos.sorted_full:
+#At this point we have a list of hierarchically applied GPOS
+#Say for example a GPO was deleted, we can either 
+#1)Reset ALL Defaults and then call script to apply all GPO
+#2)Find which attribute, fall back on previous attribute. THat way when we call this script, it only still applies the GPO that has changed
+#2 is more favorable because we are minimally changing Samba
+
+for guid_eval in hierarchy_gpos:
 	guid = guid_eval[0]
 	gp_extensions = [gp_sec_ext()]
 	local_path = '%s/Policies' % lp.get("realm").lower() + '/' + guid + '/'
 	version = gpo.gpo_get_sysvol_gpt_version(lp.get("path", "sysvol") + '/' + local_path)[1]
 
 	gpolist = gp_path_list(local_path)
-	print local_path
+
 
 	'''If an important GPO parse it. Will not parse if it has not changed, is empty, or is not in the right container'''
+	#If the GPO has a dn that is applicable to Samba
 	if guid_eval[1]:
+		#If it has a GPO file that could apply to Samba
 	    if gpolist[0][1]:
+	    	#If it we have not read it before and is not empty
+	        #We need to rewrite
 	        if (version != BackLoggedGPO.get(guid)) and (version != 0):
 	            print ('GPO %s has changed' % guid)
-	            gpo_parser(gpolist, test_ldb, conn)
+	            #Apply to Samba
+	            gpo_parser(gpolist, test_ldb, conn, attr_log)
 
 	BackLog.write('%s %i\n' % (guid,version))
 
