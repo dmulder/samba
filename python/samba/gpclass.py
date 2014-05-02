@@ -28,6 +28,7 @@ import samba.getopt as options
 from samba.samdb import SamDB
 from samba.netcmd import gpo as gpo_user
 import codecs
+from samba import NTSTATUSError
 
 class gp_ext(object):
     def list(self, rootpath):
@@ -123,10 +124,7 @@ class gp_sec_ext(gp_ext):
         ret = False
         inftable = self.populate_inf()
 
-        try:
-            policy = conn.loadfile(path).decode('utf-16')
-        except:
-            return None
+        policy = conn.loadfile(path).decode('utf-16')
         current_section = None
         LOG = open(attr_log, "a")
         LOG.write(str(path.split('/')[2]) + '\n')
@@ -159,8 +157,23 @@ class gp_sec_ext(gp_ext):
     def parse(self, afile, ldb, conn, attr_log):
         self.ldb = ldb
         self.dn = ldb.get_default_basedn()
+
+        # Fixing the bug where only some Linux Boxes capitalize MACHINE
         if afile.endswith('inf'):
-            self.read_inf(afile, conn, attr_log)
+            try:
+                blist = afile.split('/')
+                idx = afile.lower().split('/').index('machine')
+                for case in [blist[idx].upper(), blist[idx].capitalize(), blist[idx].lower()]:
+                    bfile = '/'.join(blist[:idx]) + '/' + case + '/' + '/'.join(blist[idx+1:])
+                    try:
+                        return self.read_inf(bfile, conn, attr_log)
+                    except NTSTATUSError:
+                        continue
+            except ValueError:
+                try:
+                    return self.read_inf(afile, conn, attr_log)
+                except:
+                    return None
 
 
 def scan_log(sysvol_path):
