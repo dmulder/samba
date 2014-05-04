@@ -45,24 +45,16 @@ class inf_to_ldb(object):
         self.val = val
 
     def ch_minPwdAge(self, val):
-        #print 'Old value of Minimum Password age = %s' % self.ldb.get_minPwdAge()
         self.ldb.set_minPwdAge(val)
-        #print 'New value of Minimum Password age = %s' % self.ldb.get_minPwdAge()
 
     def ch_maxPwdAge(self, val):
-        #print 'Old value of Maximum Password age = %s' % self.ldb.get_maxPwdAge()
         self.ldb.set_maxPwdAge(val)
-        #print 'New value of Maximum Password age = %s' % self.ldb.get_maxPwdAge()
 
     def ch_minPwdLength(self, val):
-        #print 'Password Min length before is %s ' % ldb.get_minPwdLength()
         self.ldb.set_minPwdLength(val)
-        #print 'Password Min length after is %s ' % ldb.get_minPwdLength()
 
     def ch_pwdProperties(self, val):
-        #print 'Old value of Minimum Password age = %s' % self.ldb.get_minPwdAge()
         self.ldb.set_pwdProperties(val)
-        #print 'New value of Minimum Password age = %s' % self.ldb.get_minPwdAge()
 
     def explicit(self):
         return self.val
@@ -115,20 +107,25 @@ class gp_sec_ext(gp_ext):
                                   "PasswordComplexity": ("pwdProperties", inf_to_ldb),
                                  }
                }
-#FIXME. EACH gpo should have a parser, and a creater. Essentially a gpo is just a file. Possibly a method and class to link it to organization unit (if that already does not exist) so that GPO's can be created arithmetically, possibly with a hashtable for certain GPO, then linked if desired. Also could store a backup folder of gpo's and then configure them without necessarily deploying it.
 
     def read_inf(self, path, conn, attr_log):
+        ret = False
         inftable = self.populate_inf()
+		
 	try:
             policy = conn.loadfile(path).decode('utf-16')
         except:
             return None
         current_section = None
-        print attr_log
-        #LOG2 = open(attr_log, "w")
         LOG = open(attr_log, "a")
-        print path.split('/')[2]
         LOG.write(str(path.split('/')[2]) + '\n')
+        '''
+        So here we would declare a boolean
+        that would get changed to TRUE
+        IF at any point in time
+        A GPO was applied 
+        then we return that boolean at the end'''
+        
         for line in policy.splitlines():
             line = line.strip()
             if line[0] == '[':
@@ -144,27 +141,28 @@ class gp_sec_ext(gp_ext):
                 if current_section.get(key):
                     (att, setter) = current_section.get(key)
                     value = value.encode('ascii', 'ignore')
-                    #so value is the value that it contains, and the att is the attribute 
-                    LOG.write(att + ' ' + value + '\n')
-                    #copy and paste this logic to backwalk deleted GPO
+                    ret = True
                     setter(self.ldb, self.dn, att, value).update_samba()
+   	return ret               
     
     def parse(self, afile, ldb, conn, attr_log):
         self.ldb = ldb
         self.dn = ldb.get_default_basedn()
+        ret = False
         #Fixing the bug where only some Linux Boxes Capitalize MACHINE
         blist = afile.split('/')
         
         bfile = blist[0] + '/' + blist[1] + '/' + 'Machine' + '/Microsoft/Windows NT/SecEdit/GptTmpl.inf'
         if bfile.endswith('inf'):
-            self.read_inf(bfile, conn, attr_log)
+            ret = self.read_inf(bfile, conn, attr_log)
             
         bfile = blist[0] + '/' + blist[1] + '/' + 'machine' + '/Microsoft/Windows NT/SecEdit/GptTmpl.inf'
         if bfile.endswith('inf'):
-            self.read_inf(bfile, conn, attr_log)    
+            ret = self.read_inf(bfile, conn, attr_log)    
             
         if afile.endswith('inf'):
-            self.read_inf(afile, conn, attr_log)
+            ret = self.read_inf(afile, conn, attr_log)
+        return ret
 
 def scan_log(sysvol_path):
     a = open(sysvol_path, "r")
@@ -175,6 +173,18 @@ def scan_log(sysvol_path):
         data[guid] = int(version)
     return data
 
+def Reset_Defaults(test_ldb):
+	test_ldb.set_minPwdAge(str(-25920000000000))
+	test_ldb.set_maxPwdAge(str(-38016000000000))
+	test_ldb.set_minPwdLength(str(7))
+	test_ldb.set_pwdProperties(str(1))
+
+def check_deleted(guid_list, backloggpo):
+	for guid in backloggpo:
+		if guid not in guid_list:
+			return True	        
+	return False
+	        
 ########################################################################################################################################
 '''The hierarchy is as per MS http://msdn.microsoft.com/en-us/library/windows/desktop/aa374155%28v=vs.85%29.aspx. It does not care about local GPO, because GPO and snap ins are not made in Linux yet. It follows the linking order and children GPO are last written format. Also, couple further testing with call scripts entitled informant and informant2 that show the explicit returned hierarchically sorted list'''
 
@@ -198,7 +208,6 @@ def sort_linked(SAMDB, guid_list, start, end):
         if right_container.get('dn') == guid_list[start][2]:
             break
     gplink = str(right_container.get('gPLink'))
-    #print str(right_container.get('gPLink'))
     gplink_split = gplink.split('[')
     linked_order = []
     ret_list = []
@@ -257,14 +266,15 @@ def establish_hierarchy(SamDB, GUID_LIST, DC_OU, global_dn):
     unapplied_gpo = []
     '''Sorted by container'''
     sorted_gpo_list = []
-    '''Since the unapplied GPO are put at the front of the list, just once again append them to the linked container sorted list'''
-    while count < indexed_places[0]:
+    '''Unapplied GPO live at start of list, append them to final list'''
+    while final_list[0][1] == False:
         unapplied_gpo.append(final_list[count])
         count += 1
     count = 0
     sorted_gpo_list += unapplied_gpo
     '''A single container call gets the linked order for all GPO in container. So we need one call per container - > index of the Original list'''
+    indexed_places.insert(0,0)
     while count < (len(indexed_places)-1):
-        sorted_gpo_list += (sort_linked(SamDB, final_list, indexed_places[count], indexed_places[count + 1]))
+        sorted_gpo_list += (sort_linked(SamDB, final_list, indexed_places[count], indexed_places[count+1]))
         count += 1
     return sorted_gpo_list

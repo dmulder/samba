@@ -42,11 +42,21 @@ def gp_path_list(path):
 no return except a newly updated Samba
 '''
 def gpo_parser(GPO_LIST, ldb, conn, attr_log):
+	ret = False
+	for entry in GPO_LIST:
+		(ext, thefile) = entry
+		if ret == False:
+			ret = ext.parse(thefile, ldb, conn, attr_log)
+		else:
+			temp = ext.parse(thefile, ldb, conn, attr_log)
+	return ret
+'''
+def gpo_parser(GPO_LIST, ldb, conn, attr_log):
 
     for entry in GPO_LIST:
         (ext, thefile) = entry
         ext.parse(thefile, ldb, conn, attr_log)
-
+'''
 class GPOServiceSetup:
 	def __init__(self):
 		"""Initialize all components necessary to return instances of 
@@ -61,7 +71,7 @@ class GPOServiceSetup:
 		self.creds = None
 		self.url = None
 		
-	#Initializers 
+	#Setters or Initializers 
 	def init_parser(self):
 		'''Get the command line options'''
 		self.parser.add_option_group(self.sambaopts)
@@ -147,6 +157,8 @@ BackLoggedGPO = None
 sys_log = '%s/%s' % (lp.get("path", "sysvol"), 'syslog.txt')
 attr_log = '%s/%s' % (lp.get("path", "sysvol"), 'attrlog.txt')
 BackLoggedGPO  = GetBackLog(sys_log)
+
+
 BackLog = open(sys_log, "w")
 
 
@@ -172,43 +184,126 @@ DC_OU = "OU=Domain Controllers" + ',' + global_dn
   
 #Set up a List of the GUID for all GPO's
 guid_list = [x['name'] for x in conn.list('%s/Policies' % lp.get("realm").lower() )]
+SYSV_PATH = '%s/%s/%s' % (lp.get("path", "sysvol"), lp.get("realm"), 'Policies')
 
-#Power through the Microsoft Hierarchy with Linking Order included 
-#FIXME could be SO much more efficient if we get the dn if the DC, then use that to get all its containers
-#Then use the acquired containers of DC dn, to get all GPO in a convenient linking order with linking order already taken into account 
 hierarchy_gpos = establish_hierarchy(test_ldb, guid_list, DC_OU, global_dn)
+change_backlog = False
 
-#At this point we have a list of hierarchically applied GPOS
-#Say for example a GPO was deleted, we can either 
-#1)Reset ALL Defaults and then call script to apply all GPO
-#2)Find which attribute, fall back on previous attribute. THat way when we call this script, it only still applies the GPO that has changed
-#2 is more favorable because we are minimally changing Samba
+#Take a local list of all current GPO list and run it against previous GPO's to see if something has changed. If so reset default and re-apply GPO
+Applicable_GPO = []
+for i in hierarchy_gpos:
+	Applicable_GPO += i
+
+#Flag gets set when 
+GPO_Changed = False
+GPO_Deleted = check_deleted(Applicable_GPO, BackLoggedGPO)
+if (GPO_Deleted):
+	#Null the backlog
+	BackLoggedGPO = {}
+	#Reset Defaults then overwrite them 
+	Reset_Defaults(test_ldb)
+	GPO_Changed = False
 
 for guid_eval in hierarchy_gpos:
 	guid = guid_eval[0]
 	gp_extensions = [gp_sec_ext()]
 	local_path = '%s/Policies' % lp.get("realm").lower() + '/' + guid + '/'
 	version = gpo.gpo_get_sysvol_gpt_version(lp.get("path", "sysvol") + '/' + local_path)[1]
-
 	gpolist = gp_path_list(local_path)
-
-
-	'''If an important GPO parse it. Will not parse if it has not changed, is empty, or is not in the right container'''
+	if(version != BackLoggedGPO.get(guid)):
+		GPO_Changed = True
 	#If the GPO has a dn that is applicable to Samba
 	if guid_eval[1]:
 		#If it has a GPO file that could apply to Samba
 	    if gpolist[0][1]:
 	    	#If it we have not read it before and is not empty
-	        #We need to rewrite
-	        if (version != BackLoggedGPO.get(guid)) and (version != 0):
-	            print ('GPO %s has changed' % guid)
-	            #Apply to Samba
-	            gpo_parser(gpolist, test_ldb, conn, attr_log)
+	        #Rewrite entire logfile here 
+	        if  (version != 0) and GPO_Changed == True:
+	            change_backlog = gpo_parser(gpolist, test_ldb, conn, attr_log)
 
 	BackLog.write('%s %i\n' % (guid,version))
 
 
+
+'''
+def ResetAttributeLog(gpolist, hierarchy_gpos, attr_log):
+	log = open(attr_log, "w")
+	
+	for guid_eval in hierarchy_gpos:
+		guid = guid_eval[0]
+		gp_extensions = [gp_sec_ext()]
+		local_path = '%s/Policies' % lp.get("realm").lower() + '/' + guid + '/'
+		version = gpo.gpo_get_sysvol_gpt_version(lp.get("path", "sysvol") + '/' + local_path)[1]
+
+		gpolist = gp_path_list(local_path)
+
+		#If the GPO has a dn that is applicable to Samba
+		if guid_eval[1]:
+			#If it has a GPO file that could apply to Samba
+			if gpolist[0][1]:
+				#If it we have not read it before and is not empty
+			    #Rewrite entire logfile here 
+			    BackLogger(gpolist, 
+def gpo_player(GPO_LIST, ldb, conn, attr_log):
+	ret = False
+	for entry in GPO_LIST:
+		(ext, thefile) = entry
+		if ret == False:
+			ret = ext.parse(thefile, ldb, conn, attr_log)
+		else:
+			temp = ext.parse(thefile, ldb, conn, attr_log)
+	return ret
+
+
+def Backer(afile, attr_log):
+    #Fixing the bug where only some Linux Boxes Capitalize MACHINE
+    blist = afile.split('/')
+    
+    bfile = blist[0] + '/' + blist[1] + '/' + 'Machine' + '/Microsoft/Windows NT/SecEdit/GptTmpl.inf'
+    if bfile.endswith('inf'):
+        BackLogger(afile, attr_log)
+        
+    bfile = blist[0] + '/' + blist[1] + '/' + 'machine' + '/Microsoft/Windows NT/SecEdit/GptTmpl.inf'
+    if bfile.endswith('inf'):
+        BackLogger(bfile, attr_log)  
+        
+    if afile.endswith('inf'):
+        BackLogger(bfile, attr_log):
+    return ret
+	        
+def BackLogger(path, attr_log):
+    #We need to get that inftable
+    temp = gp_sec_ext()
+    inftable = temp.populate_inf()
+	
+try:
+        policy = conn.loadfile(path).decode('utf-16')
+    except:
+        return None
+    current_section = None
+    LOG = open(attr_log, "a")
+    print path.split('/')[2]
+    LOG.write(str(path.split('/')[2]) + '\n')
+    
+
+    for line in policy.splitlines():
+        line = line.strip()
+        if line[0] == '[':
+            section = line[1: -1]
+            current_section = inftable.get(section.encode('ascii','ignore'))
+
+        else:
+            # We must be in a section
+            if not current_section:
+                continue
+            (key, value) = line.split("=")
+            key = key.strip()
+            if current_section.get(key):
+                (att, setter) = current_section.get(key)
+                value = value.encode('ascii', 'ignore')
+					log.write(att + str(value)
+
 #NOTE Version: *A GPO will :
 	#1)Change Version Number if edited content (policy added or removed)
 	#2)Have a Version Number = 0 if Completely empty of content
-#Obviously we will only Apply GPO that do not fall either of these catagories
+#Obviously we will only Apply GPO that do not fall either of these catagories'''
