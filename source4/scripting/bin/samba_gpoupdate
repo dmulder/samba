@@ -37,6 +37,7 @@ from samba.net import Net
 from samba.dcerpc import nbt
 from samba import smb
 
+
 # Finds all GPO Files ending in inf
 def gp_path_list(path):
 
@@ -44,6 +45,7 @@ def gp_path_list(path):
     for ext in gp_extensions:
         GPO_LIST.append((ext, ext.list(path)))
     return GPO_LIST
+
 
 def gpo_parser(GPO_LIST, ldb, conn, attr_log):
     '''The API method to parse the GPO
@@ -54,9 +56,14 @@ def gpo_parser(GPO_LIST, ldb, conn, attr_log):
     no return except a newly updated Samba
     '''
 
+    ret = False
     for entry in GPO_LIST:
         (ext, thefile) = entry
-        ext.parse(thefile, ldb, conn, attr_log)
+        if ret == False:
+            ret = ext.parse(thefile, ldb, conn, attr_log)
+        else:
+            temp = ext.parse(thefile, ldb, conn, attr_log)
+    return ret
 
 
 class GPOServiceSetup:
@@ -165,6 +172,8 @@ BackLoggedGPO = None
 sys_log = '%s/%s' % (lp.get("path", "sysvol"), 'syslog.txt')
 attr_log = '%s/%s' % (lp.get("path", "sysvol"), 'attrlog.txt')
 BackLoggedGPO = GetBackLog(sys_log)
+
+
 BackLog = open(sys_log, "w")
 
 
@@ -186,38 +195,43 @@ DC_OU = "OU=Domain Controllers" + ',' + global_dn
 
 # Set up a List of the GUID for all GPO's
 guid_list = [x['name'] for x in conn.list('%s/Policies' % lp.get("realm").lower())]
+SYSV_PATH = '%s/%s/%s' % (lp.get("path", "sysvol"), lp.get("realm"), 'Policies')
 
-#Power through the Microsoft Hierarchy with Linking Order included
-#FIXME could be SO much more efficient if we get the dn if the DC, then use that to get all its containers
-#Then use the acquired containers of DC dn, to get all GPO in a convenient linking order with linking order already taken into account
 hierarchy_gpos = establish_hierarchy(test_ldb, guid_list, DC_OU, global_dn)
+change_backlog = False
 
-#At this point we have a list of hierarchically applied GPOS
-#Say for example a GPO was deleted, we can either
-#1)Reset ALL Defaults and then call script to apply all GPO
-#2)Find which attribute, fall back on previous attribute. THat way when we call this script, it only still applies the GPO that has changed
-#2 is more favorable because we are minimally changing Samba
+# Take a local list of all current GPO list and run it against previous GPO's
+# to see if something has changed. If so reset default and re-apply GPO.
+Applicable_GPO = []
+for i in hierarchy_gpos:
+    Applicable_GPO += i
+
+# Flag gets set when
+GPO_Changed = False
+GPO_Deleted = check_deleted(Applicable_GPO, BackLoggedGPO)
+if (GPO_Deleted):
+    # Null the backlog
+    BackLoggedGPO = {}
+    # Reset defaults then overwrite them
+    Reset_Defaults(test_ldb)
+    GPO_Changed = False
 
 for guid_eval in hierarchy_gpos:
     guid = guid_eval[0]
     gp_extensions = [gp_sec_ext()]
     local_path = '%s/Policies' % lp.get("realm").lower() + '/' + guid + '/'
     version = gpo.gpo_get_sysvol_gpt_version(lp.get("path", "sysvol") + '/' + local_path)[1]
-
     gpolist = gp_path_list(local_path)
-
-
-    '''If an important GPO parse it. Will not parse if it has not changed, is empty, or is not in the right container'''
+    if(version != BackLoggedGPO.get(guid)):
+        GPO_Changed = True
     # If the GPO has a dn that is applicable to Samba
     if guid_eval[1]:
         # If it has a GPO file that could apply to Samba
         if gpolist[0][1]:
             # If it we have not read it before and is not empty
-            #We need to rewrite
-            if (version != BackLoggedGPO.get(guid)) and (version != 0):
-                print ('GPO %s has changed' % guid)
-                #Apply to Samba
-                gpo_parser(gpolist, test_ldb, conn, attr_log)
+            # Rewrite entire logfile here
+            if  (version != 0) and GPO_Changed == True:
+                change_backlog = gpo_parser(gpolist, test_ldb, conn, attr_log)
 
     BackLog.write('%s %i\n' % (guid, version))
 
