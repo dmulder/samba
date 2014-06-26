@@ -36,8 +36,12 @@ class gp_ext(object):
     def __str__(self):
         return "default_gp_ext"
 
-'''This class takes the .inf file parameter (Essentially a GPO file mapped to a GUID), hashmaps it to the Samba parameter, which then uses an ldb object to update the parameter to Samba4. Non Registry oriented whatsoever'''
 class inf_to_ldb(object):
+    '''This class takes the .inf file parameter (essentially a GPO file mapped to a GUID),
+    hashmaps it to the Samba parameter, which then uses an ldb object to update the
+    parameter to Samba4. Not registry oriented whatsoever.
+    '''
+
     def __init__(self, ldb, dn, attribute, val):
         self.ldb = ldb
         self.dn = dn
@@ -80,11 +84,15 @@ class inf_to_ldb(object):
 
     def update_samba(self):
         (upd_sam, value) = self.mapper().get(self.attribute)
-        upd_sam( value() )     # or val = value() then update(val)
+        upd_sam(value())     # or val = value() then update(val)
 
 
-'''This class does 2 things. 1) Identifies the GPO if it has a certain kind of filepath, 2) Finally parses it. '''
 class gp_sec_ext(gp_ext):
+    '''This class does the following two things:
+        1) Identifies the GPO if it has a certain kind of filepath,
+        2) Finally parses it.
+    '''
+
     count = 0
 
     def __str__(self):
@@ -121,12 +129,12 @@ class gp_sec_ext(gp_ext):
         current_section = None
         LOG = open(attr_log, "a")
         LOG.write(str(path.split('/')[2]) + '\n')
-        '''
-        So here we would declare a boolean
-        that would get changed to TRUE
-        IF at any point in time
-        A GPO was applied
-        then we return that boolean at the end'''
+
+        # So here we would declare a boolean,
+        # that would get changed to TRUE.
+        #
+        # If at any point in time a GPO was applied,
+        # then we return that boolean at the end.
 
         for line in policy.splitlines():
             line = line.strip()
@@ -151,7 +159,8 @@ class gp_sec_ext(gp_ext):
         self.ldb = ldb
         self.dn = ldb.get_default_basedn()
         ret = False
-        #Fixing the bug where only some Linux Boxes Capitalize MACHINE
+
+        # Fixing the bug where only some Linux Boxes capitalize MACHINE
         blist = afile.split('/')
 
         bfile = blist[0] + '/' + blist[1] + '/' + 'Machine' + '/Microsoft/Windows NT/SecEdit/GptTmpl.inf'
@@ -232,7 +241,8 @@ def establish_hierarchy(SamDB, GUID_LIST, DC_OU, global_dn):
         applied = False
         # Realm only written on last call, if the GPO is linked to multiple places
         gpo_realm = False
-        '''A very important call. This gets all of the linked information'''
+
+        # A very important call. This gets all of the linked information.
         GPO_CONTAINERS = gpo_user.get_gpo_containers(SamDB, GUID)
         for GPO_CONTAINER in GPO_CONTAINERS:
 
@@ -264,19 +274,24 @@ def establish_hierarchy(SamDB, GUID_LIST, DC_OU, global_dn):
                 else:
                     REALM_GPO = [GUID, applied, str(GPO_CONTAINER.get('dn'))]
                     final_list.insert(count_unapplied_GPO, REALM_GPO)
-    '''After GPO are sorted into containers, let's sort the containers themselves. But first we can get the GPO that we don't care about out of the way'''
+
+    # After GPO are sorted into containers, let's sort the containers themselves.
+    # But first we can get the GPO that we don't care about, out of the way.
     indexed_places = container_indexes(final_list)
     count = 0
     unapplied_gpo = []
-    '''Sorted by container'''
+    # Sorted by container
     sorted_gpo_list = []
-    '''Unapplied GPO live at start of list, append them to final list'''
+
+    # Unapplied GPO live at start of list, append them to final list
     while final_list[0][1] == False:
         unapplied_gpo.append(final_list[count])
         count += 1
     count = 0
     sorted_gpo_list += unapplied_gpo
-    '''A single container call gets the linked order for all GPO in container. So we need one call per container - > index of the Original list'''
+
+    # A single container call gets the linked order for all GPO in container.
+    # So we need one call per container - > index of the Original list
     indexed_places.insert(0, 0)
     while count < (len(indexed_places)-1):
         sorted_gpo_list += (sort_linked(SamDB, final_list, indexed_places[count], indexed_places[count+1]))
