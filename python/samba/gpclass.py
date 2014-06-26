@@ -33,7 +33,7 @@ class gp_ext(object):
     def list(self, rootpath):
         return None
 
-    def __str__(self): 
+    def __str__(self):
         return "default_gp_ext"
 
 '''This class takes the .inf file parameter (Essentially a GPO file mapped to a GUID), hashmaps it to the Samba parameter, which then uses an ldb object to update the parameter to Samba4. Non Registry oriented whatsoever'''
@@ -72,7 +72,8 @@ class inf_to_ldb(object):
     def mapper(self):
         return { "minPwdAge" : (self.ch_minPwdAge, self.nttime2unix),
                  "maxPwdAge" : (self.ch_maxPwdAge, self.nttime2unix),
-                 "minPwdLength" : (self.ch_minPwdLength, self.explicit), # Could be none, but I like the method assignment in update_samba
+                 # Could be none, but I like the method assignment in update_samba
+                 "minPwdLength" : (self.ch_minPwdLength, self.explicit),
                  "pwdProperties" : (self.ch_pwdProperties, self.explicit),
 
                }
@@ -85,6 +86,7 @@ class inf_to_ldb(object):
 '''This class does 2 things. 1) Identifies the GPO if it has a certain kind of filepath, 2) Finally parses it. '''
 class gp_sec_ext(gp_ext):
     count = 0
+
     def __str__(self):
         return "Security GPO extension"
 
@@ -103,7 +105,7 @@ class gp_sec_ext(gp_ext):
     def populate_inf(self):
         return {"System Access": {"MinimumPasswordAge": ("minPwdAge", inf_to_ldb),
                                   "MaximumPasswordAge": ("maxPwdAge", inf_to_ldb),
-                                  "MinimumPasswordLength": ("minPwdLength",inf_to_ldb),
+                                  "MinimumPasswordLength": ("minPwdLength", inf_to_ldb),
                                   "PasswordComplexity": ("pwdProperties", inf_to_ldb),
                                  }
                }
@@ -111,8 +113,8 @@ class gp_sec_ext(gp_ext):
     def read_inf(self, path, conn, attr_log):
         ret = False
         inftable = self.populate_inf()
-		
-	try:
+
+        try:
             policy = conn.loadfile(path).decode('utf-16')
         except:
             return None
@@ -123,14 +125,14 @@ class gp_sec_ext(gp_ext):
         So here we would declare a boolean
         that would get changed to TRUE
         IF at any point in time
-        A GPO was applied 
+        A GPO was applied
         then we return that boolean at the end'''
-        
+
         for line in policy.splitlines():
             line = line.strip()
             if line[0] == '[':
                 section = line[1: -1]
-                current_section = inftable.get(section.encode('ascii','ignore'))
+                current_section = inftable.get(section.encode('ascii', 'ignore'))
 
             else:
                 # We must be in a section
@@ -143,23 +145,23 @@ class gp_sec_ext(gp_ext):
                     value = value.encode('ascii', 'ignore')
                     ret = True
                     setter(self.ldb, self.dn, att, value).update_samba()
-   	return ret               
-    
+    return ret
+
     def parse(self, afile, ldb, conn, attr_log):
         self.ldb = ldb
         self.dn = ldb.get_default_basedn()
         ret = False
         #Fixing the bug where only some Linux Boxes Capitalize MACHINE
         blist = afile.split('/')
-        
+
         bfile = blist[0] + '/' + blist[1] + '/' + 'Machine' + '/Microsoft/Windows NT/SecEdit/GptTmpl.inf'
         if bfile.endswith('inf'):
             ret = self.read_inf(bfile, conn, attr_log)
-            
+
         bfile = blist[0] + '/' + blist[1] + '/' + 'machine' + '/Microsoft/Windows NT/SecEdit/GptTmpl.inf'
         if bfile.endswith('inf'):
-            ret = self.read_inf(bfile, conn, attr_log)    
-            
+            ret = self.read_inf(bfile, conn, attr_log)
+
         if afile.endswith('inf'):
             ret = self.read_inf(afile, conn, attr_log)
         return ret
@@ -169,22 +171,22 @@ def scan_log(sysvol_path):
     data = {}
     for line in a.readlines():
         line = line.strip()
-        (guid,version) = line.split(" ")
+        (guid, version) = line.split(" ")
         data[guid] = int(version)
     return data
 
 def Reset_Defaults(test_ldb):
-	test_ldb.set_minPwdAge(str(-25920000000000))
-	test_ldb.set_maxPwdAge(str(-38016000000000))
-	test_ldb.set_minPwdLength(str(7))
-	test_ldb.set_pwdProperties(str(1))
+    test_ldb.set_minPwdAge(str(-25920000000000))
+    test_ldb.set_maxPwdAge(str(-38016000000000))
+    test_ldb.set_minPwdLength(str(7))
+    test_ldb.set_pwdProperties(str(1))
 
 def check_deleted(guid_list, backloggpo):
-	for guid in backloggpo:
-		if guid not in guid_list:
-			return True	        
-	return False
-	        
+    for guid in backloggpo:
+        if guid not in guid_list:
+            return True
+    return False
+
 ########################################################################################################################################
 '''The hierarchy is as per MS http://msdn.microsoft.com/en-us/library/windows/desktop/aa374155%28v=vs.85%29.aspx. It does not care about local GPO, because GPO and snap ins are not made in Linux yet. It follows the linking order and children GPO are last written format. Also, couple further testing with call scripts entitled informant and informant2 that show the explicit returned hierarchically sorted list'''
 
@@ -226,8 +228,10 @@ def establish_hierarchy(SamDB, GUID_LIST, DC_OU, global_dn):
     for GUID in GUID_LIST:
 
         container_iteration = 0
-        applied = False # Assume first it is not applied
-        gpo_realm = False # Realm only written on last call, if the GPO is linked to multiple places
+        # Assume first it is not applied
+        applied = False
+        # Realm only written on last call, if the GPO is linked to multiple places
+        gpo_realm = False
         '''A very important call. This gets all of the linked information'''
         GPO_CONTAINERS = gpo_user.get_gpo_containers(SamDB, GUID)
         for GPO_CONTAINER in GPO_CONTAINERS:
@@ -257,7 +261,7 @@ def establish_hierarchy(SamDB, GUID_LIST, DC_OU, global_dn):
                     insert_dud = [GUID, applied, str(GPO_CONTAINER.get('dn'))]
                     final_list.insert(0, insert_dud)
                     count_unapplied_GPO += 1
-                else :
+                else:
                     REALM_GPO = [GUID, applied, str(GPO_CONTAINER.get('dn'))]
                     final_list.insert(count_unapplied_GPO, REALM_GPO)
     '''After GPO are sorted into containers, let's sort the containers themselves. But first we can get the GPO that we don't care about out of the way'''
@@ -273,7 +277,7 @@ def establish_hierarchy(SamDB, GUID_LIST, DC_OU, global_dn):
     count = 0
     sorted_gpo_list += unapplied_gpo
     '''A single container call gets the linked order for all GPO in container. So we need one call per container - > index of the Original list'''
-    indexed_places.insert(0,0)
+    indexed_places.insert(0, 0)
     while count < (len(indexed_places)-1):
         sorted_gpo_list += (sort_linked(SamDB, final_list, indexed_places[count], indexed_places[count+1]))
         count += 1
