@@ -36,6 +36,7 @@ class gp_ext(object):
     def __str__(self):
         return "default_gp_ext"
 
+
 class inf_to_ldb(object):
     '''This class takes the .inf file parameter (essentially a GPO file mapped to a GUID),
     hashmaps it to the Samba parameter, which then uses an ldb object to update the
@@ -72,8 +73,8 @@ class inf_to_ldb(object):
         val = int(val)
         return  str(-(val * seconds * minutes * hours * sam_add))
 
-    '''ldap value : samba setter'''
     def mapper(self):
+        '''ldap value : samba setter'''
         return { "minPwdAge" : (self.ch_minPwdAge, self.nttime2unix),
                  "maxPwdAge" : (self.ch_maxPwdAge, self.nttime2unix),
                  # Could be none, but I like the method assignment in update_samba
@@ -175,6 +176,7 @@ class gp_sec_ext(gp_ext):
             ret = self.read_inf(afile, conn, attr_log)
         return ret
 
+
 def scan_log(sysvol_path):
     a = open(sysvol_path, "r")
     data = {}
@@ -184,11 +186,13 @@ def scan_log(sysvol_path):
         data[guid] = int(version)
     return data
 
+
 def Reset_Defaults(test_ldb):
     test_ldb.set_minPwdAge(str(-25920000000000))
     test_ldb.set_maxPwdAge(str(-38016000000000))
     test_ldb.set_minPwdLength(str(7))
     test_ldb.set_pwdProperties(str(1))
+
 
 def check_deleted(guid_list, backloggpo):
     for guid in backloggpo:
@@ -196,12 +200,20 @@ def check_deleted(guid_list, backloggpo):
             return True
     return False
 
-########################################################################################################################################
-'''The hierarchy is as per MS http://msdn.microsoft.com/en-us/library/windows/desktop/aa374155%28v=vs.85%29.aspx. It does not care about local GPO, because GPO and snap ins are not made in Linux yet. It follows the linking order and children GPO are last written format. Also, couple further testing with call scripts entitled informant and informant2 that show the explicit returned hierarchically sorted list'''
+
+# The hierarchy is as per MS http://msdn.microsoft.com/en-us/library/windows/desktop/aa374155%28v=vs.85%29.aspx
+#
+# It does not care about local GPO, because GPO and snap-ins are not made in Linux yet.
+# It follows the linking order and children GPO are last written format.
+#
+# Also, couple further testing with call scripts entitled informant and informant2.
+# They explicitly show the returned hierarchically sorted list.
 
 
-'''So the original list will need to be seperated into containers. Returns indexed list of when the container changes after hierarchy'''
 def container_indexes(GUID_LIST):
+    '''So the original list will need to be seperated into containers.
+    Returns indexed list of when the container changes after hierarchy
+    '''
     count = 0
     container_indexes = []
     while count < (len(GUID_LIST)-1):
@@ -211,9 +223,13 @@ def container_indexes(GUID_LIST):
     container_indexes.append(len(GUID_LIST))
     return container_indexes
 
-'''So GPO in same level need to have link level. This takes a container and sorts it'''
-#Small small problem, it is backwards
+
 def sort_linked(SAMDB, guid_list, start, end):
+    '''So GPO in same level need to have link level.
+    This takes a container and sorts it.
+
+    TODO:  Small small problem, it is backwards
+    '''
     containers = gpo_user.get_gpo_containers(SAMDB, guid_list[start][0])
     for right_container in containers:
         if right_container.get('dn') == guid_list[start][2]:
@@ -230,8 +246,11 @@ def sort_linked(SAMDB, guid_list, start, end):
         count -= 1
     return ret_list
 
-'''Takes a list of GUID from gpo, and sorts them based on OU, and realm. See http://msdn.microsoft.com/en-us/library/windows/desktop/aa374155%28v=vs.85%29.aspx'''
+
 def establish_hierarchy(SamDB, GUID_LIST, DC_OU, global_dn):
+    '''Takes a list of GUID from gpo, and sorts them based on OU, and realm.
+    See http://msdn.microsoft.com/en-us/library/windows/desktop/aa374155%28v=vs.85%29.aspx
+    '''
     final_list = []
     count_unapplied_GPO = 0
     for GUID in GUID_LIST:
