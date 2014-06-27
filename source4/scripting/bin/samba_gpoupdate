@@ -2,8 +2,12 @@
 # Copyright Luke Morrison <luc785@.hotmail.com> July 2013
 # Co-Edited by Matthieu Pattou July 2013 from original August 2013
 # Edited by Garming Sam Feb. 2014
-# Edited by Luke Morrison April 2014 
-'''This script reads log file of previous GPO, gets all GPO from sysvol, sorts them by container, and applies the ones that have not been applied, have changed, or is in the right container'''
+# Edited by Luke Morrison April 2014
+
+'''This script reads a log file of previous GPO, gets all GPO from sysvol
+and sorts them by container. Then, it applies the ones that haven't been
+applied, have changed, or is in the right container'''
+
 import os
 import fcntl
 import sys
@@ -28,28 +32,32 @@ basedn = test_ldb.get_default_basedn()
 #guid_list = os.listdir(path)
 #guid_list = establish_hierarchy(test_ldb, guid_list, DC_OU, global_dn)
 """
-def gp_path_list(path):
 
+
+def gp_path_list(path):
     GPO_LIST = []
     for ext in gp_extensions:
         GPO_LIST.append((ext, ext.list(path)))
     return GPO_LIST
-'''The API method to parse the GPO
-:param GPO_LIST:
-:param ldb: Live instance of an LDB object AKA Samba
-:param conn: Live instance of a CIFS connection
-:param attr_log: backlog path for GPO and attribute to be written
-no return except a newly updated Samba
-'''
+
+
 def gpo_parser(GPO_LIST, ldb, conn, attr_log):
-	ret = False
-	for entry in GPO_LIST:
-		(ext, thefile) = entry
-		if ret == False:
-			ret = ext.parse(thefile, ldb, conn, attr_log)
-		else:
-			temp = ext.parse(thefile, ldb, conn, attr_log)
-	return ret
+    '''The API method to parse the GPO
+    :param GPO_LIST:
+    :param ldb: Live instance of an LDB object AKA Samba
+    :param conn: Live instance of a CIFS connection
+    :param attr_log: backlog path for GPO and attribute to be written
+    no return except a newly updated Samba
+    '''
+
+    ret = False
+    for entry in GPO_LIST:
+        (ext, thefile) = entry
+        if ret == False:
+            ret = ext.parse(thefile, ldb, conn, attr_log)
+        else:
+            temp = ext.parse(thefile, ldb, conn, attr_log)
+    return ret
 '''
 def gpo_parser(GPO_LIST, ldb, conn, attr_log):
 
@@ -57,225 +65,236 @@ def gpo_parser(GPO_LIST, ldb, conn, attr_log):
         (ext, thefile) = entry
         ext.parse(thefile, ldb, conn, attr_log)
 '''
+
+
 class GPOServiceSetup:
-	def __init__(self):
-		"""Initialize all components necessary to return instances of 
-		a Samba lp context (smb.conf) and Samba LDB context"""
-		self.parser = optparse.OptionParser("testsearchdn [options]")
-		self.sambaopts = options.SambaOptions(self.parser) 
-		self.credopts = None
-		self.opts = None
-		self.args = None
-		self.lp = None
-		self.smbconf = None
-		self.creds = None
-		self.url = None
-		
-	#Setters or Initializers 
-	def init_parser(self):
-		'''Get the command line options'''
-		self.parser.add_option_group(self.sambaopts)
-		self.parser.add_option_group(options.VersionOptions(self.parser))		
-		self.init_credopts()
-		self.parser.add_option("-H", dest = "url", help="URL for the samdb")
-		self.parser.add_option_group(self.credopts)	
-	
-	def init_argsopts(self):
-		'''Set the options and the arguments'''
-		(opts, args) = self.parser.parse_args()
-	
-		self.opts = opts
-		self.args = args
-		
-	def init_credopts(self):
-		'''Set Credential operations'''
-		self.credopts = options.CredentialsOptions(self.parser)
-	
-	def init_lp(self):
-		'''Set the loadparm context'''
-		self.lp = self.sambaopts.get_loadparm()	
-		self.smbconf = self.lp.configfile
-		if (not self.opts.url):
-			#Compiler says it needs another indent. Weird
-    			self.url = self.lp.samdb_url()
-		else:
-			self.url = self.opts.url
-		
-	def init_session(self):
-		'''Initialize the session'''
-		self.creds = self.credopts.get_credentials(self.lp, fallback_machine=True)
-		self.session = system_session()
-		
-	def InitializeService(self):
-		'''Inializer for the thread'''	
-		self.init_parser()
-		self.init_argsopts()
-		self.init_lp()	
-		self.init_session()	
-	#Getters	
-	def Get_LDB(self):
-		'''Return a live instance of Samba'''
-		SambaDB = SamDB(self.url, session_info = self.session, credentials = self.creds, lp = self.lp)
-		return SambaDB
-		
-	def Get_lp_Content(self):
-		'''Return an instance of a local lp context'''
-		return self.lp
-				
-	def Get_Creds(self):
-		'''Return an instance of a local creds'''
-		return self.creds
+    def __init__(self):
+        """Initialize all components necessary to return instances of
+        a Samba lp context (smb.conf) and Samba LDB context
+        """
+
+        self.parser = optparse.OptionParser("testsearchdn [options]")
+        self.sambaopts = options.SambaOptions(self.parser)
+        self.credopts = None
+        self.opts = None
+        self.args = None
+        self.lp = None
+        self.smbconf = None
+        self.creds = None
+        self.url = None
+
+    # Setters or Initializers
+    def init_parser(self):
+        '''Get the command line options'''
+        self.parser.add_option_group(self.sambaopts)
+        self.parser.add_option_group(options.VersionOptions(self.parser))
+        self.init_credopts()
+        self.parser.add_option("-H", dest="url", help="URL for the samdb")
+        self.parser.add_option_group(self.credopts)
+
+    def init_argsopts(self):
+        '''Set the options and the arguments'''
+        (opts, args) = self.parser.parse_args()
+
+        self.opts = opts
+        self.args = args
+
+    def init_credopts(self):
+        '''Set Credential operations'''
+        self.credopts = options.CredentialsOptions(self.parser)
+
+    def init_lp(self):
+        '''Set the loadparm context'''
+        self.lp = self.sambaopts.get_loadparm()
+        self.smbconf = self.lp.configfile
+        if (not self.opts.url):
+            self.url = self.lp.samdb_url()
+        else:
+            self.url = self.opts.url
+
+    def init_session(self):
+        '''Initialize the session'''
+        self.creds = self.credopts.get_credentials(self.lp,
+            fallback_machine=True)
+        self.session = system_session()
+
+    def InitializeService(self):
+        '''Inializer for the thread'''
+        self.init_parser()
+        self.init_argsopts()
+        self.init_lp()
+        self.init_session()
+
+    # Getters
+    def Get_LDB(self):
+        '''Return a live instance of Samba'''
+        SambaDB = SamDB(self.url, session_info=self.session,
+            credentials=self.creds, lp=self.lp)
+        return SambaDB
+
+    def Get_lp_Content(self):
+        '''Return an instance of a local lp context'''
+        return self.lp
+
+    def Get_Creds(self):
+        '''Return an instance of a local creds'''
+        return self.creds
+
 
 def GetBackLog(sys_log):
-	"""Reads BackLog and makes thread aware of which GPO are unchanged or empty
-	:param String sys_log: path to BackLog 
-	:return Dictionary previous_scanned_version: {Unedited GPO : Version Number}
-	*NOTE on Version below 
-	"""
-	previous_scanned_version = {}
-	if os.path.isfile(sys_log):
-		previous_scanned_version = scan_log(sys_log)
-		return previous_scanned_version
-	else:
-		return None
+    """Reads BackLog and makes thread aware of which GPO are unchanged or empty
+    :param String sys_log: path to backLog
+    :return Dictionary previous_scanned_version: {Unedited GPO: Version Number}
+    *NOTE on Version below
+    """
+    previous_scanned_version = {}
+    if os.path.isfile(sys_log):
+        previous_scanned_version = scan_log(sys_log)
+        return previous_scanned_version
+    else:
+        return None
 
-#Set up the GPO service
+# Set up the GPO service
 GPOService = GPOServiceSetup()
 GPOService.InitializeService()
 
-#Get the Samba Instance
+# Get the Samba Instance
 test_ldb = GPOService.Get_LDB()
 
-#Get The lp context
+# Get The lp context
 lp = GPOService.Get_lp_Content()
 
-#Get the CREDS
-creds =  GPOService.Get_Creds()
+# Get the CREDS
+creds = GPOService.Get_Creds()
 
-#Read the Readable BackLog into a Hashmap then open Writable BackLog in same location
+# Read the readable backLog into a hashmap
+# then open writable backLog in same location
 BackLoggedGPO = None
 sys_log = '%s/%s' % (lp.get("path", "sysvol"), 'syslog.txt')
 attr_log = '%s/%s' % (lp.get("path", "sysvol"), 'attrlog.txt')
-BackLoggedGPO  = GetBackLog(sys_log)
+BackLoggedGPO = GetBackLog(sys_log)
 
 
 BackLog = open(sys_log, "w")
 
 
-
-
 # We need to know writable DC to setup SMB connection
 net = Net(creds=creds, lp=lp)
 '''flags = (nbt.NBT_SERVER_LDAP |
-	 nbt.NBT_SERVER_DS |
-	 nbt.NBT_SERVER_WRITABLE)'''
+     nbt.NBT_SERVER_DS |
+     nbt.NBT_SERVER_WRITABLE)'''
 cldap_ret = net.finddc(domain=lp.get('realm'), flags=(nbt.NBT_SERVER_LDAP |
-	 nbt.NBT_SERVER_DS |
-	 nbt.NBT_SERVER_WRITABLE))
+    nbt.NBT_SERVER_DS |
+    nbt.NBT_SERVER_WRITABLE))
 dc_hostname = cldap_ret.pdc_dns_name
+
 try:
     conn = smb.SMB(dc_hostname, 'sysvol', lp=lp, creds=creds)
 except Exception, e:
     raise Exception("Error connecting to '%s' using SMB" % dc_hostname, e)
 
-#Get the dn of the domain, and the dn of readable/writable DC 
+# Get the dn of the domain, and the dn of readable/writable DC
 global_dn = test_ldb.domain_dn()
-DC_OU = "OU=Domain Controllers" + ',' + global_dn 
-  
-#Set up a List of the GUID for all GPO's
-guid_list = [x['name'] for x in conn.list('%s/Policies' % lp.get("realm").lower() )]
-SYSV_PATH = '%s/%s/%s' % (lp.get("path", "sysvol"), lp.get("realm"), 'Policies')
+DC_OU = "OU=Domain Controllers" + ',' + global_dn
+
+# Set up a List of the GUID for all GPO's
+guid_list = [x['name'] for x in conn.list('%s/Policies'
+                                           % lp.get("realm").lower())]
+SYSV_PATH = '%s/%s/%s' % (lp.get("path", "sysvol"), lp.get("realm"),
+                         'Policies')
 
 hierarchy_gpos = establish_hierarchy(test_ldb, guid_list, DC_OU, global_dn)
 change_backlog = False
 
-#Take a local list of all current GPO list and run it against previous GPO's to see if something has changed. If so reset default and re-apply GPO
+# Take a local list of all current GPO list and run it against previous GPO's
+# to see if something has changed. If so reset default and re-apply GPO.
 Applicable_GPO = []
 for i in hierarchy_gpos:
-	Applicable_GPO += i
+    Applicable_GPO += i
 
-#Flag gets set when 
+# Flag gets set when
 GPO_Changed = False
 GPO_Deleted = check_deleted(Applicable_GPO, BackLoggedGPO)
 if (GPO_Deleted):
-	#Null the backlog
-	BackLoggedGPO = {}
-	#Reset Defaults then overwrite them 
-	Reset_Defaults(test_ldb)
-	GPO_Changed = False
+    # Null the backlog
+    BackLoggedGPO = {}
+    # Reset defaults then overwrite them
+    Reset_Defaults(test_ldb)
+    GPO_Changed = False
 
 for guid_eval in hierarchy_gpos:
-	guid = guid_eval[0]
-	gp_extensions = [gp_sec_ext()]
-	local_path = '%s/Policies' % lp.get("realm").lower() + '/' + guid + '/'
-	version = gpo.gpo_get_sysvol_gpt_version(lp.get("path", "sysvol") + '/' + local_path)[1]
-	gpolist = gp_path_list(local_path)
-	if(version != BackLoggedGPO.get(guid)):
-		GPO_Changed = True
-	#If the GPO has a dn that is applicable to Samba
-	if guid_eval[1]:
-		#If it has a GPO file that could apply to Samba
-	    if gpolist[0][1]:
-	    	#If it we have not read it before and is not empty
-	        #Rewrite entire logfile here 
-	        if  (version != 0) and GPO_Changed == True:
-	            change_backlog = gpo_parser(gpolist, test_ldb, conn, attr_log)
+    guid = guid_eval[0]
+    gp_extensions = [gp_sec_ext()]
+    local_path = '%s/Policies' % lp.get("realm").lower() + '/' + guid + '/'
+    version = gpo.gpo_get_sysvol_gpt_version(
+                  lp.get("path", "sysvol") + '/' + local_path)[1]
+    gpolist = gp_path_list(local_path)
+    if(version != BackLoggedGPO.get(guid)):
+        GPO_Changed = True
+    # If the GPO has a dn that is applicable to Samba
+    if guid_eval[1]:
+        # If it has a GPO file that could apply to Samba
+        if gpolist[0][1]:
+            # If it we have not read it before and is not empty
+            # Rewrite entire logfile here
+            if  (version != 0) and GPO_Changed == True:
+                change_backlog = gpo_parser(gpolist, test_ldb, conn, attr_log)
 
-	BackLog.write('%s %i\n' % (guid,version))
-
+    BackLog.write('%s %i\n' % (guid, version))
 
 
 '''
 def ResetAttributeLog(gpolist, hierarchy_gpos, attr_log):
-	log = open(attr_log, "w")
-	
-	for guid_eval in hierarchy_gpos:
-		guid = guid_eval[0]
-		gp_extensions = [gp_sec_ext()]
-		local_path = '%s/Policies' % lp.get("realm").lower() + '/' + guid + '/'
-		version = gpo.gpo_get_sysvol_gpt_version(lp.get("path", "sysvol") + '/' + local_path)[1]
+    log = open(attr_log, "w")
 
-		gpolist = gp_path_list(local_path)
+    for guid_eval in hierarchy_gpos:
+        guid = guid_eval[0]
+        gp_extensions = [gp_sec_ext()]
+        local_path = '%s/Policies' % lp.get("realm").lower() + '/' + guid + '/'
+        version = gpo.gpo_get_sysvol_gpt_version(
+            lp.get("path", "sysvol") + '/' + local_path)[1]
 
-		#If the GPO has a dn that is applicable to Samba
-		if guid_eval[1]:
-			#If it has a GPO file that could apply to Samba
-			if gpolist[0][1]:
-				#If it we have not read it before and is not empty
-			    #Rewrite entire logfile here 
-			    BackLogger(gpolist, 
+        gpolist = gp_path_list(local_path)
+
+        #If the GPO has a dn that is applicable to Samba
+        if guid_eval[1]:
+            #If it has a GPO file that could apply to Samba
+            if gpolist[0][1]:
+                #If it we have not read it before and is not empty
+                #Rewrite entire logfile here
+                BackLogger(gpolist,
 def gpo_player(GPO_LIST, ldb, conn, attr_log):
-	ret = False
-	for entry in GPO_LIST:
-		(ext, thefile) = entry
-		if ret == False:
-			ret = ext.parse(thefile, ldb, conn, attr_log)
-		else:
-			temp = ext.parse(thefile, ldb, conn, attr_log)
-	return ret
+    ret = False
+    for entry in GPO_LIST:
+        (ext, thefile) = entry
+        if ret == False:
+            ret = ext.parse(thefile, ldb, conn, attr_log)
+        else:
+            temp = ext.parse(thefile, ldb, conn, attr_log)
+    return ret
 
 
 def Backer(afile, attr_log):
-    #Fixing the bug where only some Linux Boxes Capitalize MACHINE
+    # Fixing the bug where only some Linux Boxes capitalize MACHINE
     blist = afile.split('/')
-    
+
     bfile = blist[0] + '/' + blist[1] + '/' + 'Machine' + '/Microsoft/Windows NT/SecEdit/GptTmpl.inf'
     if bfile.endswith('inf'):
         BackLogger(afile, attr_log)
-        
+
     bfile = blist[0] + '/' + blist[1] + '/' + 'machine' + '/Microsoft/Windows NT/SecEdit/GptTmpl.inf'
     if bfile.endswith('inf'):
-        BackLogger(bfile, attr_log)  
-        
+        BackLogger(bfile, attr_log)
+
     if afile.endswith('inf'):
         BackLogger(bfile, attr_log):
     return ret
-	        
+
 def BackLogger(path, attr_log):
     #We need to get that inftable
     temp = gp_sec_ext()
     inftable = temp.populate_inf()
-	
+
 try:
         policy = conn.loadfile(path).decode('utf-16')
     except:
@@ -284,7 +303,7 @@ try:
     LOG = open(attr_log, "a")
     print path.split('/')[2]
     LOG.write(str(path.split('/')[2]) + '\n')
-    
+
 
     for line in policy.splitlines():
         line = line.strip()
@@ -301,9 +320,9 @@ try:
             if current_section.get(key):
                 (att, setter) = current_section.get(key)
                 value = value.encode('ascii', 'ignore')
-					log.write(att + str(value)
+                    log.write(att + str(value)
 
 #NOTE Version: *A GPO will :
-	#1)Change Version Number if edited content (policy added or removed)
-	#2)Have a Version Number = 0 if Completely empty of content
+    #1)Change Version Number if edited content (policy added or removed)
+    #2)Have a Version Number = 0 if Completely empty of content
 #Obviously we will only Apply GPO that do not fall either of these catagories'''
