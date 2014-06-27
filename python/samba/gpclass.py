@@ -154,7 +154,7 @@ class gp_sec_ext(gp_ext):
                     value = value.encode('ascii', 'ignore')
                     ret = True
                     setter(self.ldb, self.dn, att, value).update_samba()
-    return ret
+        return ret
 
     def parse(self, afile, ldb, conn, attr_log):
         self.ldb = ldb
