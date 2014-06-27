@@ -868,7 +868,7 @@ static void init_globals(struct loadparm_context *lp_ctx, bool reinit_globals)
 	lpcfg_string_set(Globals.ctx, &Globals.ncalrpc_dir,
 			 get_dyn_NCALRPCDIR());
 
-	Globals.server_services = str_list_make_v3_const(NULL, "s3fs rpc nbt wrepl ldap cldap kdc drepl winbindd ntp_signd kcc dnsupdate dns", NULL);
+	Globals.server_services = str_list_make_v3_const(NULL, "s3fs rpc nbt wrepl ldap cldap kdc drepl winbindd ntp_signd kcc dnsupdate dns gpoupdate", NULL);
 
 	Globals.dcerpc_endpoint_servers = str_list_make_v3_const(NULL, "epmapper wkssvc rpcecho samr netlogon lsarpc drsuapi dssetup unixinfo browser eventlog6 backupkey dnsserver", NULL);
 
@@ -906,6 +906,13 @@ static void init_globals(struct loadparm_context *lp_ctx, bool reinit_globals)
 		smb_panic("init_globals: ENOMEM");
 	}
 	Globals.dns_update_command = str_list_make_v3_const(NULL, s, NULL);
+	TALLOC_FREE(s);
+
+	s = talloc_asprintf(talloc_tos(), "%s/samba_gpoupdate", get_dyn_SCRIPTSBINDIR());
+	if (s == NULL) {
+		smb_panic("init_globals: ENOMEM");
+	}
+	Globals.gpo_update_command = str_list_make_v3_const(NULL, s, NULL);
 	TALLOC_FREE(s);
 
 	s = talloc_asprintf(talloc_tos(), "%s/samba_spnupdate", get_dyn_SCRIPTSBINDIR());
