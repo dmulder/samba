@@ -194,6 +194,8 @@ def Reset_Defaults(test_ldb):
 
 
 def check_deleted(guid_list, backloggpo):
+    if backloggpo is None:
+        return False
     for guid in backloggpo:
         if guid not in guid_list:
             return True
