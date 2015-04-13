@@ -1,3 +1,4 @@
 # We do not support RODC yet
 .*rodc
 .*RODC
+^samba4.ntvfs.cifs.ntlm.base.unlink
