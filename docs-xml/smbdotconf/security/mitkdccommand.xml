@@ -13,3 +13,15 @@
 
 <value type="example">/opt/mit/sbin/krb5kdc</value>
 </samba:parameter>
+
+<samba:parameter name="mit kdc config"
+                 context="G"
+                 type="string"
+                 advanced="1"
+                 xmlns:samba="http://www.samba.org/samba/DTD/samba-doc">
+<description>
+    <para>This option specifies the path to the MIT KDC config file.</para>
+</description>
+
+<value type="example">/etc/samba/kdc.conf</value>
+</samba:parameter>
