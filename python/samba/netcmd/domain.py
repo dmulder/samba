@@ -84,6 +84,10 @@ from samba.provision import (
     ProvisioningError
     )
 
+from samba.provision.kerberos_implementation import (
+    krb5_implementation,
+    kdc_default_config_dir)
+
 from samba.provision.common import (
     FILL_FULL,
     FILL_NT4SYNC,
@@ -260,11 +264,19 @@ class cmd_domain_provision(Command):
                default="auto")
     ]
 
+    kdc_options = [
+        Option("--kdc-config-dir", type="string", metavar="KDC-CONFIG-DIR",
+               help="Set the MIT KDC config directory (default='%s')" % kdc_default_config_dir),
+    ]
+
     if os.getenv('TEST_LDAP', "no") == "yes":
         takes_options.extend(openldap_options)
 
     if samba.is_ntvfs_fileserver_built():
          takes_options.extend(ntvfs_options)
+
+    if krb5_implementation is "MIT":
+        takes_options.extend(kdc_options)
 
     takes_args = []
 
@@ -300,6 +312,7 @@ class cmd_domain_provision(Command):
             ol_mmr_urls=None,
             use_xattrs=None,
             slapd_path=None,
+            kdc_config_dir=None,
             use_ntvfs=None,
             use_rfc2307=None,
             ldap_backend_nosync=None,
@@ -468,7 +481,8 @@ class cmd_domain_provision(Command):
                   use_rfc2307=use_rfc2307, skip_sysvolacl=False,
                   ldap_backend_extra_port=ldap_backend_extra_port,
                   ldap_backend_forced_uri=ldap_backend_forced_uri,
-                  nosync=ldap_backend_nosync, ldap_dryrun_mode=ldap_dryrun_mode)
+                  nosync=ldap_backend_nosync, ldap_dryrun_mode=ldap_dryrun_mode,
+                  kdcconfdir=kdc_config_dir)
 
         except ProvisioningError, e:
             raise CommandError("Provision failed", e)
