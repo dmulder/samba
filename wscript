@@ -188,6 +188,7 @@ def configure(conf):
         conf.DEFINE('WITH_NTVFS_FILESERVER', 1)
     conf.RECURSE('source3')
     conf.RECURSE('lib/texpect')
+    conf.RECURSE('python')
     if conf.env.with_ctdb:
         conf.RECURSE('ctdb')
     conf.RECURSE('lib/socket')
