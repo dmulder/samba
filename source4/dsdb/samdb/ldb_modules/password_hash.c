@@ -124,7 +124,7 @@ struct setup_password_fields_io {
 		NTTIME pwdLastSet;
 		const char *sAMAccountName;
 		const char *user_principal_name;
-		bool is_computer;
+		uint32_t sAMAccountType;
 		uint32_t restrictions;
 	} u;
 
@@ -669,6 +669,8 @@ static int setup_kerberos_keys(struct setup_password_fields_io *io)
 	krb5_data salt;
 	krb5_keyblock key;
 	krb5_data cleartext_data;
+	const char *princ_component_1 = NULL;
+	char *princ_component_2 = NULL;
 
 	ldb = ldb_module_get_ctx(io->ac->module);
 	cleartext_data.data = (char *)io->n.cleartext_utf8->data;
@@ -681,9 +683,8 @@ static int setup_kerberos_keys(struct setup_password_fields_io *io)
 	/*
 	 * Determine a salting principal
 	 */
-	if (io->u.is_computer) {
+	if (io->u.sAMAccountType == ATYPE_WORKSTATION_TRUST) {
 		char *name;
-		char *saltbody;
 
 		name = strlower_talloc(io->ac, io->u.sAMAccountName);
 		if (!name) {
@@ -694,40 +695,53 @@ static int setup_kerberos_keys(struct setup_password_fields_io *io)
 			name[strlen(name)-1] = '\0';
 		}
 
-		saltbody = talloc_asprintf(io->ac, "%s.%s", name,
+		princ_component_2 = talloc_asprintf(io->ac, "%s.%s", name,
 					   io->ac->status->domain_data.dns_domain);
-		if (!saltbody) {
+		if (!princ_component_2) {
 			return ldb_oom(ldb);
 		}
-		
-		krb5_ret = smb_krb5_make_principal(io->smb_krb5_context->krb5_context,
-					       &salt_principal,
-					       io->ac->status->domain_data.realm,
-					       "host", saltbody, NULL);
+
+		princ_component_1 = talloc_strdup(io->ac, "host");
+		if (!princ_component_1) {
+			return ldb_oom(ldb);
+		}
+
+	} else if (io->u.sAMAccountType == ATYPE_INTERDOMAIN_TRUST) {
+
+		princ_component_2 = strupper_talloc(io->ac, io->u.sAMAccountName);
+		if (!princ_component_2) {
+			return ldb_oom(ldb);
+		}
+
+		if (princ_component_2[strlen(princ_component_2)-1] == '$') {
+			princ_component_2[strlen(princ_component_2)-1] = '\0';
+		}
+
+		princ_component_1 = talloc_strdup(io->ac, "krbtgt");
+		if (!princ_component_1) {
+			return ldb_oom(ldb);
+		}
 	} else if (io->u.user_principal_name) {
-		char *user_principal_name;
 		char *p;
 
-		user_principal_name = talloc_strdup(io->ac, io->u.user_principal_name);
-		if (!user_principal_name) {
+		princ_component_1 = talloc_strdup(io->ac, io->u.user_principal_name);
+		if (!princ_component_1) {
 			return ldb_oom(ldb);
 		}
 
-		p = strchr(user_principal_name, '@');
+		p = strchr(princ_component_1, '@');
 		if (p) {
 			p[0] = '\0';
 		}
-
-		krb5_ret = smb_krb5_make_principal(io->smb_krb5_context->krb5_context,
-					       &salt_principal,
-					       io->ac->status->domain_data.realm,
-					       user_principal_name, NULL);
 	} else {
-		krb5_ret = smb_krb5_make_principal(io->smb_krb5_context->krb5_context,
-					       &salt_principal,
-					       io->ac->status->domain_data.realm,
-					       io->u.sAMAccountName, NULL);
+		princ_component_1 = io->u.sAMAccountName;
 	}
+	krb5_ret = smb_krb5_make_principal(io->smb_krb5_context->krb5_context,
+					   &salt_principal,
+				           io->ac->status->domain_data.realm,
+				           princ_component_1,
+					   princ_component_2,
+					   NULL);
 	if (krb5_ret) {
 		ldb_asprintf_errstring(ldb,
 				       "setup_kerberos_keys: "
@@ -2835,7 +2849,9 @@ static int setup_io(struct ph_context *ac,
 								      "sAMAccountName", NULL);
 	io->u.user_principal_name	= ldb_msg_find_attr_as_string(info_msg,
 								      "userPrincipalName", NULL);
-	io->u.is_computer		= ldb_msg_check_string_attribute(info_msg, "objectClass", "computer");
+	io->u.sAMAccountType = ldb_msg_find_attr_as_uint(info_msg,
+							 "sAMAccountType",
+							 ATYPE_NORMAL_ACCOUNT);
 
 	if (io->u.sAMAccountName == NULL) {
 		ldb_asprintf_errstring(ldb,
