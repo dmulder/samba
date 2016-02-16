@@ -371,6 +371,19 @@ sub setup_trust($$$$$)
 		return undef;
 	}
 
+	unless (open(KRB5CONF, ">>$localenv->{KRB5_CONFIG}")) {
+	        warn("can't open $localenv->{KRB5_CONFIG}");
+		return undef;
+	}
+
+	my $trust_dnsname = lc $localenv->{TRUST_REALM};
+	print KRB5CONF "
+	[domain_realm]
+		.$trust_dnsname = $localenv->{TRUST_REALM}
+		$trust_dnsname = $localenv->{TRUST_REALM}
+";
+	close(KRB5CONF);
+
 	return $localenv
 }
 
