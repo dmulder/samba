@@ -204,6 +204,9 @@ sub mk_krb5_conf($$)
  # Set the grace clocskew to 1 second
  # This is especially required by samba3.raw.session krb5
  clockskew = 1
+ # We are running on the same machine, do not correct
+ # system clock differences
+ kdc_timesync = 0
 
 ";
 
