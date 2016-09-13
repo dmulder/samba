@@ -36,3 +36,19 @@ test_smbclient_expect_failure() {
 	fi
 	return $status
 }
+
+kerberos_kinit() {
+	kinit_tool="${1}"
+	principal="${2}"
+	password="${3}"
+	shift 3
+	kbase=$(basename ${kinit_tool})
+	if [ ${kase} = "samba4kinit" ]; then
+		kpassfile=$(mktemp)
+		echo $password > ${kpassfile}
+		$kinit_tool --password-file=$PREFIX/tmpuserpassfile $principal $@
+		rm -f ${kpassfile}
+	else
+		echo $password | $kinit_tool $principal $@
+	fi
+}
