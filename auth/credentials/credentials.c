@@ -751,9 +751,21 @@ _PUBLIC_ void cli_credentials_parse_string(struct cli_credentials *credentials, 
 	}
 
 	if ((p = strchr_m(uname,'@'))) {
-		cli_credentials_set_principal(credentials, uname, obtained);
-		*p = 0;
-		cli_credentials_set_realm(credentials, p+1, obtained);
+		const char *realm = p + 1;
+
+		if (realm[0] == '\0') {
+			*p = 0;
+			cli_credentials_set_username(credentials,
+						     uname,
+						     obtained);
+		} else {
+			cli_credentials_set_principal(credentials,
+						      uname,
+						      obtained);
+			*p = 0;
+
+			cli_credentials_set_realm(credentials, realm, obtained);
+		}
 		return;
 	} else if ((p = strchr_m(uname,'\\'))
 		   || (p = strchr_m(uname, '/'))
