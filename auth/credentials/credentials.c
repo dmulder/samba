@@ -739,8 +739,15 @@ _PUBLIC_ void cli_credentials_parse_string(struct cli_credentials *credentials, 
 
 	uname = talloc_strdup(credentials, data); 
 	if ((p = strchr_m(uname,'%'))) {
-		*p = 0;
-		cli_credentials_set_password(credentials, p+1, obtained);
+		const char *password;
+
+		*p = '\0';
+		password = p + 1;
+		if (password[0] != '\0') {
+			cli_credentials_set_password(credentials,
+						     password,
+						     obtained);
+		}
 	}
 
 	if ((p = strchr_m(uname,'@'))) {
