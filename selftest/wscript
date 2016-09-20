@@ -232,7 +232,7 @@ def cmd_testonly(opt):
     env.OPTIONS += " --use-dns-faking"
 
     if CONFIG_GET(opt, 'USING_SYSTEM_KRB5') and CONFIG_GET(opt, 'MIT_KDC_PATH'):
-        env.OPTIONS += " --mitkrb5"
+        env.OPTIONS += " --mitkrb5 --exclude=${srcdir}/selftest/skip_mit_kdc"
 
     subunit_cache = None
     # We use the full path rather than relative path to avoid problems on some platforms (ie. solaris 8).
