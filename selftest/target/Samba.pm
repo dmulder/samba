@@ -201,6 +201,9 @@ sub mk_krb5_conf($$)
  ticket_lifetime = 24h
  forwardable = yes
  allow_weak_crypto = yes
+ # Set the grace clocskew to 1 second
+ # This is especially required by samba3.raw.session krb5
+ clockskew = 1
 
 ";
 
