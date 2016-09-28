@@ -446,6 +446,14 @@ void kdb_samba_db_audit_as_req(krb5_context context,
 		return;
 	}
 
+	/*
+	 * FIXME: This segfaulted with a FAST test
+	 * FIND_FAST: <unknown client> for <unknown server>, Unknown FAST armor type 0
+	 */
+	if (client == NULL) {
+		return;
+	}
+
 	switch (error_code) {
 	case 0:
 		mit_samba_zero_bad_password_count(client);
