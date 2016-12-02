@@ -116,6 +116,12 @@ static void krb5_ticket_refresh_handler(struct tevent_context *event_ctx,
 	time_t new_start;
 	time_t expire_time = 0;
 	struct WINBINDD_MEMORY_CREDS *cred_ptr = entry->cred_ptr;
+	const char **pwd_users = lp_winbind_password_kinit();
+	int len_pwd_users = str_list_length(pwd_users);
+	bool all_users_pwd_kinit = str_list_check(pwd_users, "*") &&
+		len_pwd_users == 1;
+	bool this_user_pwd_kinit = str_list_check(pwd_users,
+						  entry->principal_name);
 #endif
 
 	DBG_DEBUG("event called for: %s, %s\n",
@@ -134,19 +140,30 @@ static void krb5_ticket_refresh_handler(struct tevent_context *event_ctx,
 rekinit:
 		if (cred_ptr && cred_ptr->pass) {
 
-			set_effective_uid(entry->uid);
+			/* Using cached passwords to kinit can lockout a user
+			 * account if their password has changed. Check the
+			 * winbind password kinit option to see if this
+			 * behavior is enabled */
+			if (all_users_pwd_kinit || this_user_pwd_kinit) {
+				set_effective_uid(entry->uid);
 
-			ret = kerberos_kinit_password_ext(entry->principal_name,
-							  cred_ptr->pass,
-							  0, /* hm, can we do time correction here ? */
-							  &entry->refresh_time,
-							  &entry->renew_until,
-							  entry->ccname,
-							  False, /* no PAC required anymore */
-							  True,
-							  WINBINDD_PAM_AUTH_KRB5_RENEW_TIME,
-							  NULL);
-			gain_root_privilege();
+				ret = kerberos_kinit_password_ext(
+					entry->principal_name,
+					cred_ptr->pass,
+					0, /* can we do time correction here */
+					&entry->refresh_time,
+					&entry->renew_until,
+					entry->ccname,
+					False, /* no PAC required anymore */
+					True,
+					WINBINDD_PAM_AUTH_KRB5_RENEW_TIME,
+					NULL);
+				gain_root_privilege();
+			} else {
+				ret = KRB5KDC_ERR_PREAUTH_FAILED;
+				DBG_NOTICE("Skipping re-kinit for %s\n",
+					   entry->principal_name);
+			}
 
 			if (ret) {
 				DEBUG(3,("krb5_ticket_refresh_handler: "
@@ -308,6 +325,12 @@ static void krb5_ticket_gain_handler(struct tevent_context *event_ctx,
 	struct timeval t;
 	struct WINBINDD_MEMORY_CREDS *cred_ptr = entry->cred_ptr;
 	struct winbindd_domain *domain = NULL;
+	const char **pwd_users = lp_winbind_password_kinit();
+	int len_pwd_users = str_list_length(pwd_users);
+	bool all_users_pwd_kinit = str_list_check(pwd_users, "*") &&
+		len_pwd_users == 1;
+	bool this_user_pwd_kinit = str_list_check(pwd_users,
+						  entry->principal_name);
 #endif
 
 	DBG_DEBUG("event called for: %s, %s\n",
@@ -316,6 +339,12 @@ static void krb5_ticket_gain_handler(struct tevent_context *event_ctx,
 	TALLOC_FREE(entry->event);
 
 #ifdef HAVE_KRB5
+
+	if (!all_users_pwd_kinit && !this_user_pwd_kinit) {
+		DBG_NOTICE("Skipping kinit for %s\n",
+			   entry->principal_name);
+		return;
+	}
 
 	if (!cred_ptr || !cred_ptr->pass) {
 		DEBUG(10,("krb5_ticket_gain_handler: no memory creds\n"));
