@@ -687,8 +687,6 @@ _PUBLIC_ int cli_credentials_get_client_gss_creds(struct cli_credentials *cred,
 	OM_uint32 maj_stat, min_stat;
 	struct ccache_container *ccc;
 	struct gssapi_creds_container *gcc;
-	krb5_principal primary_principal = NULL;
-
 	if (cred->client_gss_creds_obtained > obtained) {
 		return 0;
 	}
@@ -704,22 +702,6 @@ _PUBLIC_ int cli_credentials_get_client_gss_creds(struct cli_credentials *cred,
 		return ret;
 	}
 
-	ret = krb5_parse_name(ccc->smb_krb5_context->krb5_context,
-			      "asn@samba.org",//cli_credentials_get_principal(cred, cred),
-			      &primary_principal);
-	if (ret != 0) {
-		return ret;
-	}
-
-	ret = krb5_cc_initialize(ccc->smb_krb5_context->krb5_context,
-				 ccc->ccache,
-				 primary_principal);
-	krb5_free_principal(ccc->smb_krb5_context->krb5_context,
-			    primary_principal);
-	if (ret != 0) {
-		return ret;
-	}
-
 	maj_stat = gss_krb5_copy_ccache(&min_stat, 
 					gssapi_cred, ccc->ccache);
 	if (maj_stat) {
@@ -729,8 +711,7 @@ _PUBLIC_ int cli_credentials_get_client_gss_creds(struct cli_credentials *cred,
 			ret = EINVAL;
 		}
 		if (ret) {
-			(*error_string) = talloc_asprintf(cred, "gss_krb5_copy_ccache failed: %s",
-							  error_message(ret));
+			(*error_string) = error_message(ENOMEM);
 		}
 	}
 
