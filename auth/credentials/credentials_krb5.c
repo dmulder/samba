@@ -1066,9 +1066,8 @@ _PUBLIC_ int cli_credentials_get_server_gss_creds(struct cli_credentials *cred,
 	struct keytab_container *ktc;
 	struct smb_krb5_context *smb_krb5_context;
 	TALLOC_CTX *mem_ctx;
-	krb5_principal princ;
-	const char *error_string;
 	enum credentials_obtained obtained;
+	const char *principal;
 
 	mem_ctx = talloc_new(cred);
 	if (!mem_ctx) {
@@ -1080,10 +1079,9 @@ _PUBLIC_ int cli_credentials_get_server_gss_creds(struct cli_credentials *cred,
 		return ret;
 	}
 
-	ret = principal_from_credentials(mem_ctx, cred, smb_krb5_context, &princ, &obtained, &error_string);
-	if (ret) {
-		DEBUG(1,("cli_credentials_get_server_gss_creds: making krb5 principal failed (%s)\n",
-			 error_string));
+	principal = cli_credentials_get_principal_and_obtained(cred, mem_ctx, &obtained);
+	if (principal == NULL) {
+		DBG_WARNING("Failed to obtain principal\n");
 		talloc_free(mem_ctx);
 		return ret;
 	}
@@ -1105,16 +1103,80 @@ _PUBLIC_ int cli_credentials_get_server_gss_creds(struct cli_credentials *cred,
 		talloc_free(mem_ctx);
 		return ENOMEM;
 	}
+	gcc->creds = GSS_C_NO_CREDENTIAL;
 
 	if (ktc->password_based || obtained < CRED_SPECIFIED) {
-		/*
-		 * This creates a GSSAPI cred_id_t for match-by-key with only
-		 * the keytab set
-		 */
-		princ = NULL;
+		principal = NULL;
 	}
-	maj_stat = gss_krb5_import_cred(&min_stat, NULL, princ, ktc->keytab,
-					&gcc->creds);
+#ifdef HAVE_GSS_ACQUIRE_CRED_FROM
+	{
+		gss_key_value_element_desc keytab_element = {
+			.key = "keytab",
+			.value = ktc->keytab_name,
+		};
+		gss_key_value_set_desc cred_store = {
+			.elements = &keytab_element,
+			.count = 1,
+		};
+		gss_OID_set mech_set = GSS_C_NO_OID_SET;
+		gss_cred_usage_t cred_usage = GSS_C_ACCEPT;
+		gss_name_t gss_princ = GSS_C_NO_NAME;
+
+		if (principal != NULL) {
+			gss_buffer_desc name_buffer = {
+				.value = discard_const_p(char, principal),
+				.length = strlen(principal),
+			};
+
+			maj_stat = gss_import_name(&min_stat,
+						   &name_buffer,
+						   GSS_C_NT_USER_NAME,
+						   &gss_princ);
+			if (maj_stat != 0) {
+				talloc_free(mem_ctx);
+				return ENOMEM;
+			}
+		}
+
+		maj_stat = gss_acquire_cred_from(&min_stat,
+						 gss_princ,
+						 0,
+						 mech_set,
+						 cred_usage,
+						 &cred_store,
+						 &gcc->creds,
+						 NULL,
+						 NULL);
+	}
+#else
+	{
+		const char *error_string = NULL;
+		krb5_principal princ = NULL;
+
+		if (princpial != NULL) {
+			/*
+			 * This creates a GSSAPI cred_id_t for match-by-key
+			 * with only the keytab set
+			 */
+			ret = principal_from_credentials(mem_ctx,
+							 cred,
+							 smb_krb5_context,
+							 &princ,
+							 &obtained,
+							 &error_string);
+			if (ret != 0) {
+				talloc_free(mem_ctx);
+				return ENOMEM;
+			}
+		}
+
+		maj_stat = gss_krb5_import_cred(&min_stat,
+						NULL,
+						princ,
+						ktc->keytab,
+						&gcc->creds);
+	}
+#endif
 	if (maj_stat) {
 		if (min_stat) {
 			ret = min_stat;
