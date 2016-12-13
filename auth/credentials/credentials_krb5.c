@@ -591,7 +591,64 @@ _PUBLIC_ int cli_credentials_get_client_gss_creds(struct cli_credentials *cred,
 		(*error_string) = error_message(ENOMEM);
 		return ENOMEM;
 	}
+	gcc->creds = GSS_C_NO_CREDENTIAL;
 
+#if HAVE_GSS_ACQUIRE_CRED_FROM
+	{
+		gss_key_value_element_desc cred_element = {
+			.key = "ccache",
+			.value = ccache->ccache_name,
+		};
+		gss_key_value_set_desc cred_store = {
+			.elements = &cred_element,
+			.count = 1,
+		};
+		gss_OID_set mech_set = GSS_C_NO_OID_SET;
+		gss_cred_usage_t cred_usage = GSS_C_INITIATE;
+
+		maj_stat = gss_acquire_cred_from(&min_stat,
+						 GSS_C_NO_NAME,
+						 0,
+						 mech_set,
+						 cred_usage,
+						 &cred_store,
+						 &gcc->creds,
+						 NULL,
+						 NULL);
+		if ((maj_stat == GSS_S_FAILURE) &&
+		    (min_stat == (OM_uint32)KRB5_CC_END ||
+		     min_stat == (OM_uint32)KRB5_CC_NOTFOUND)) {
+			/* This CCACHE is no good.  Ensure we don't use it again */
+			cli_credentials_unconditionally_invalidate_ccache(cred);
+
+			/* Now try again to get a ccache */
+			ret = cli_credentials_get_ccache(cred,
+							 event_ctx,
+							 lp_ctx,
+							 &ccache,
+							 error_string);
+			if (ret) {
+				DBG_WARNING("Failed to re-get CCACHE for "
+					    "GSSAPI client: %s\n",
+					    error_message(ret));
+				return ret;
+			}
+
+			/* Update ccache name */
+			cred_element.value = ccache->ccache_name;
+
+			maj_stat = gss_acquire_cred_from(&min_stat,
+							 GSS_C_NO_NAME,
+							 0,
+							 mech_set,
+							 cred_usage,
+							 &cred_store,
+							 &gcc->creds,
+							 NULL,
+							 NULL);
+		}
+	}
+#else
 	maj_stat = gss_krb5_import_cred(&min_stat, ccache->ccache, NULL, NULL, 
 					&gcc->creds);
 	if ((maj_stat == GSS_S_FAILURE) && (min_stat == (OM_uint32)KRB5_CC_END || min_stat == (OM_uint32) KRB5_CC_NOTFOUND)) {
@@ -610,6 +667,7 @@ _PUBLIC_ int cli_credentials_get_client_gss_creds(struct cli_credentials *cred,
 						&gcc->creds);
 
 	}
+#endif
 
 	if (maj_stat) {
 		talloc_free(gcc);
