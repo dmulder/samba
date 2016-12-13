@@ -724,8 +724,31 @@ _PUBLIC_ int cli_credentials_get_client_gss_creds(struct cli_credentials *cred,
 		return ret;
 	}
 
+#ifdef HAVE_GSS_STORE_CRED_INTO
+	{
+		gss_key_value_element_desc element = {
+			.key = "ccache",
+			.value = ccc->ccache_name,
+		};
+		gss_key_value_set_desc store = {
+			.elements = &element,
+			.count = 1,
+		};
+
+		maj_stat = gss_store_cred_into(&min_stat,
+					       gssapi_cred,
+					       GSS_C_INITIATE,
+					       GSS_C_NULL_OID,
+					       1, /* overwrite_cred */
+					       1, /* default_cred */
+					       &store,
+					       NULL, /* elsements_stored */
+					       NULL); /* cred_usage_stored */
+	}
+#else
 	maj_stat = gss_krb5_copy_ccache(&min_stat, 
 					gssapi_cred, ccc->ccache);
+#endif
 	if (maj_stat) {
 		if (min_stat) {
 			ret = min_stat;
