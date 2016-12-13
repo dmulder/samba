@@ -87,16 +87,19 @@ if not have_gssapi:
         sys.exit(1)
 
 conf.CHECK_FUNCS_IN('''
-       gss_wrap_iov
-       gss_krb5_import_cred
-       gss_get_name_attribute
-       gss_mech_krb5
-       gss_oid_equal
-       gss_inquire_sec_context_by_oid
-       gsskrb5_extract_authz_data_from_sec_context
-       gss_krb5_export_lucid_sec_context
-       gss_import_cred gss_export_cred
-       ''', 'gssapi gssapi_krb5')
+                    gss_wrap_iov
+                    gss_krb5_import_cred
+                    gss_get_name_attribute
+                    agss_mech_krb5
+                    gss_oid_equal
+                    gss_inquire_sec_context_by_oid
+                    gsskrb5_extract_authz_data_from_sec_context
+                    gss_krb5_export_lucid_sec_context
+                    gss_import_cred
+                    gss_export_cred
+                    gss_store_cred_into
+                    ''',
+                    'gssapi gssapi_krb5')
 conf.CHECK_VARIABLE('GSS_KRB5_CRED_NO_CI_FLAGS_X', headers=possible_gssapi_headers)
 conf.CHECK_FUNCS_IN('krb5_mk_req_extended krb5_kt_compare', 'krb5')
 conf.CHECK_FUNCS('''
