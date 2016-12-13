@@ -35,6 +35,7 @@ struct cli_credentials;
 struct ccache_container {
 	struct smb_krb5_context *smb_krb5_context;
 	krb5_ccache ccache;
+	const char *ccache_name;
 };
 
 struct keytab_container {

@@ -146,6 +146,8 @@ _PUBLIC_ int cli_credentials_set_ccache(struct cli_credentials *cred,
 	krb5_error_code ret;
 	krb5_principal princ;
 	struct ccache_container *ccc;
+	char *ccache_name = NULL;
+
 	if (cred->ccache_obtained > obtained) {
 		return 0;
 	}
@@ -188,6 +190,27 @@ _PUBLIC_ int cli_credentials_set_ccache(struct cli_credentials *cred,
 			talloc_free(ccc);
 			return ret;
 		}
+	}
+
+	ret = krb5_cc_get_full_name(ccc->smb_krb5_context->krb5_context,
+				    ccc->ccache,
+				    &ccache_name);
+	if (ret != 0) {
+		(*error_string) =
+			talloc_asprintf(cred,
+					"Failed to get krb5 ccache name: %s\n",
+					smb_get_krb5_error_message(ccc->smb_krb5_context->krb5_context,
+								   ret,
+								   ccc));
+		talloc_free(ccc);
+		return ret;
+	}
+	ccc->ccache_name = talloc_strdup(ccc, ccache_name);
+	krb5_free_string(ccc->smb_krb5_context->krb5_context, ccache_name);
+	if (ccc->ccache_name == NULL) {
+		(*error_string) = error_message(ENOMEM);
+		talloc_free(ccc);
+		return ENOMEM;
 	}
 
 	talloc_set_destructor(ccc, free_dccache);
@@ -283,7 +306,6 @@ static int cli_credentials_new_ccache(struct cli_credentials *cred,
 				      struct ccache_container **_ccc,
 				      const char **error_string)
 {
-	bool must_free_cc_name = false;
 	krb5_error_code ret;
 	struct ccache_container *ccc = talloc(cred, struct ccache_container);
 	if (!ccc) {
@@ -304,44 +326,44 @@ static int cli_credentials_new_ccache(struct cli_credentials *cred,
 		return ENOMEM;
 	}
 
-	if (!ccache_name) {
-		must_free_cc_name = true;
-
+	if (ccache_name != NULL) {
+		ccc->ccache_name = talloc_strdup(ccc, ccache_name);
+	} else {
 		if (lpcfg_parm_bool(lp_ctx, NULL, "credentials", "krb5_cc_file", false)) {
-			ccache_name = talloc_asprintf(ccc, "FILE:/tmp/krb5_cc_samba_%u_%p", 
-						      (unsigned int)getpid(), ccc);
+			ccc->ccache_name =
+				talloc_asprintf(ccc,
+						"FILE:/tmp/krb5_cc_samba_%u_%p",
+						(unsigned int)getpid(),
+						ccc);
 		} else {
-			ccache_name = talloc_asprintf(ccc, "MEMORY:%p", 
-						      ccc);
-		}
-
-		if (!ccache_name) {
-			talloc_free(ccc);
-			(*error_string) = strerror(ENOMEM);
-			return ENOMEM;
+			ccc->ccache_name = talloc_asprintf(ccc,
+							   "MEMORY:%p",
+							   ccc);
 		}
 	}
+	if (ccc->ccache_name == NULL) {
+		talloc_free(ccc);
+		(*error_string) = strerror(ENOMEM);
+		return ENOMEM;
+	}
 
-	ret = krb5_cc_resolve(ccc->smb_krb5_context->krb5_context, ccache_name, 
+	ret = krb5_cc_resolve(ccc->smb_krb5_context->krb5_context,
+			      ccc->ccache_name,
 			      &ccc->ccache);
 	if (ret) {
-		(*error_string) = talloc_asprintf(cred, "failed to resolve a krb5 ccache (%s): %s\n",
-						  ccache_name,
+		(*error_string) = talloc_asprintf(cred,
+						  "failed to resolve a krb5 ccache (%s): %s\n",
+						  ccc->ccache_name,
 						  smb_get_krb5_error_message(ccc->smb_krb5_context->krb5_context,
 									     ret, ccc));
-		talloc_free(ccache_name);
 		talloc_free(ccc);
 		return ret;
 	}
 
-	if (strncasecmp(ccache_name, "MEMORY:", 7) == 0) {
+	if (strncasecmp(ccc->ccache_name, "MEMORY:", 7) == 0) {
 		talloc_set_destructor(ccc, free_mccache);
 	} else {
 		talloc_set_destructor(ccc, free_dccache);
-	}
-
-	if (must_free_cc_name) {
-		talloc_free(ccache_name);
 	}
 
 	*_ccc = ccc;
