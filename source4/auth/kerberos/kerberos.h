@@ -41,6 +41,7 @@ struct ccache_container {
 struct keytab_container {
 	struct smb_krb5_context *smb_krb5_context;
 	krb5_keytab keytab;
+	const char *keytab_name;
 	bool password_based;
 };
 
