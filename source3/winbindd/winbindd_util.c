@@ -156,7 +156,7 @@ add_trusted_domain_from_tdc(const struct winbindd_tdc_domain *tdc)
 		sid = NULL;
 	}
 
-	ignored_domains = lp_parm_string_list(-1, "winbind", "ignore domains", NULL);
+	ignored_domains = lp_winbind_ignore_domains();
 	for (dom=ignored_domains; dom && *dom; dom++) {
 		if (gen_fnmatch(*dom, domain_name) == 0) {
 			DEBUG(2,("Ignoring domain '%s'\n", domain_name));
