@@ -378,8 +378,8 @@ static NTSTATUS gensec_krb5_common_client_creds(struct gensec_security *gensec_s
 		ret = krb5_mk_req(gensec_krb5_state->smb_krb5_context->krb5_context, 
 				  &gensec_krb5_state->auth_context,
 				  gensec_krb5_state->ap_req_options,
-				  gensec_get_target_service(gensec_security),
-				  hostname,
+				  discard_const_p(char, gensec_get_target_service(gensec_security)),
+				  discard_const_p(char, hostname),
 				  in_data_p, ccache_container->ccache, 
 				  &gensec_krb5_state->enc_ticket);
 	}
@@ -578,7 +578,7 @@ static NTSTATUS gensec_krb5_update(struct gensec_security *gensec_security,
 		}
 		/* TODO: check the tok_id */
 
-		inbuf.data = unwrapped_in.data;
+		inbuf.data = (char *)unwrapped_in.data;
 		inbuf.length = unwrapped_in.length;
 		ret = krb5_rd_rep(gensec_krb5_state->smb_krb5_context->krb5_context, 
 				  gensec_krb5_state->auth_context,
@@ -647,10 +647,10 @@ static NTSTATUS gensec_krb5_update(struct gensec_security *gensec_security,
 		/* Parse the GSSAPI wrapping, if it's there... (win2k3 allows it to be omited) */
 		if (gensec_krb5_state->gssapi
 		    && gensec_gssapi_parse_krb5_wrap(out_mem_ctx, &in, &unwrapped_in, tok_id)) {
-			inbuf.data = unwrapped_in.data;
+			inbuf.data = (char *)unwrapped_in.data;
 			inbuf.length = unwrapped_in.length;
 		} else {
-			inbuf.data = in.data;
+			inbuf.data = (char *)in.data;
 			inbuf.length = in.length;
 		}
 
@@ -964,7 +964,7 @@ static NTSTATUS gensec_krb5_wrap(struct gensec_security *gensec_security,
 	krb5_error_code ret;
 	krb5_data input, output;
 	input.length = in->length;
-	input.data = in->data;
+	input.data = (char *)in->data;
 	
 	if (gensec_have_feature(gensec_security, GENSEC_FEATURE_SEAL)) {
 		ret = krb5_mk_priv(context, auth_context, &input, &output, NULL);
@@ -995,7 +995,7 @@ static NTSTATUS gensec_krb5_unwrap(struct gensec_security *gensec_security,
 	krb5_data input, output;
 	krb5_replay_data replay;
 	input.length = in->length;
-	input.data = in->data;
+	input.data = (char *)in->data;
 	
 	if (gensec_have_feature(gensec_security, GENSEC_FEATURE_SEAL)) {
 		ret = krb5_rd_priv(context, auth_context, &input, &output, &replay);

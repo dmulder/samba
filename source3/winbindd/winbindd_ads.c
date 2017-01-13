@@ -293,13 +293,11 @@ static NTSTATUS query_user_list(struct winbindd_domain *domain,
 	ADS_STRUCT *ads = NULL;
 	const char *attrs[] = { "sAMAccountType", "objectSid", NULL };
 	int count;
-	uint32_t *rids;
+	uint32_t *rids = NULL;
 	ADS_STATUS rc;
 	LDAPMessage *res = NULL;
 	LDAPMessage *msg = NULL;
 	NTSTATUS status = NT_STATUS_UNSUCCESSFUL;
-
-	*prids = NULL;
 
 	DEBUG(3,("ads: query_user_list\n"));
 
@@ -356,8 +354,9 @@ static NTSTATUS query_user_list(struct winbindd_domain *domain,
 		}
 
 		if (!ads_pull_sid(ads, msg, "objectSid", &user_sid)) {
-			DBG_INFO("No sid for %s !?\n",
-				 ads_get_dn(ads, talloc_tos(), msg));
+			char *dn = ads_get_dn(ads, talloc_tos(), msg);
+			DBG_INFO("No sid for %s !?\n", dn);
+			TALLOC_FREE(dn);
 			continue;
 		}
 
@@ -374,7 +373,9 @@ static NTSTATUS query_user_list(struct winbindd_domain *domain,
 	}
 
 	rids = talloc_realloc(mem_ctx, rids, uint32_t, count);
-	*prids = rids;
+	if (prids != NULL) {
+		*prids = rids;
+	}
 
 	status = NT_STATUS_OK;
 

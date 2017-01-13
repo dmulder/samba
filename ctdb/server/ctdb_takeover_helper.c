@@ -91,7 +91,7 @@ struct get_public_ips_state {
 	struct tevent_context *ev;
 	struct ctdb_client_context *client;
 	uint32_t *pnns;
-	int count;
+	int count, num_nodes;
 	struct ctdb_public_ip_list *ips;
 };
 
@@ -102,7 +102,7 @@ static struct tevent_req *get_public_ips_send(
 				struct tevent_context *ev,
 				struct ctdb_client_context *client,
 				uint32_t *pnns,
-				int count,
+				int count, int num_nodes,
 				bool available_only)
 {
 	struct tevent_req *req, *subreq;
@@ -116,6 +116,7 @@ static struct tevent_req *get_public_ips_send(
 
 	state->pnns = pnns;
 	state->count = count;
+	state->num_nodes = num_nodes;
 	state->ips = NULL;
 
 	ctdb_req_control_get_public_ips(&request, available_only);
@@ -164,7 +165,7 @@ static void get_public_ips_done(struct tevent_req *subreq)
 	}
 
 	state->ips = talloc_zero_array(state, struct ctdb_public_ip_list,
-				       state->count);
+				       state->num_nodes);
 	if (tevent_req_nomem(state->ips, req)) {
 		return;
 	}
@@ -294,6 +295,12 @@ static struct tevent_req *release_ip_send(TALLOC_CTX *mem_ctx,
 			}
 		}
 
+		if (substate->count == 0) {
+			/* No releases to send for this address... */
+			TALLOC_FREE(substate);
+			continue;
+		}
+
 		ip.pnn = tmp_ip->pnn;
 		ip.addr = tmp_ip->addr;
 		ctdb_req_control_release_ip(&request, &ip);
@@ -308,6 +315,12 @@ static struct tevent_req *release_ip_send(TALLOC_CTX *mem_ctx,
 		tevent_req_set_callback(subreq, release_ip_done, substate);
 
 		state->num_sent++;
+	}
+
+	/* None sent, finished... */
+	if (state->num_sent == 0) {
+		tevent_req_done(req);
+		return tevent_req_post(req, ev);
 	}
 
 	return req;
@@ -832,7 +845,7 @@ static void takeover_nodemap_done(struct tevent_req *subreq)
 
 	subreq = get_public_ips_send(state, state->ev, state->client,
 				     state->pnns_active, state->num_active,
-				     false);
+				     state->num_nodes, false);
 	if (tevent_req_nomem(subreq, req)) {
 		return;
 	}
@@ -860,7 +873,7 @@ static void takeover_known_ips_done(struct tevent_req *subreq)
 
 	subreq = get_public_ips_send(state, state->ev, state->client,
 				     state->pnns_active, state->num_active,
-				     true);
+				     state->num_nodes, true);
 	if (tevent_req_nomem(subreq, req)) {
 		return;
 	}
