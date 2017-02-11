@@ -176,13 +176,10 @@ class gp_sec_ext(gp_ext):
                     return None
 
 
-def scan_log(sysvol_path):
-    a = open(sysvol_path, "r")
+def scan_log(sysvol_tdb):
     data = {}
-    for line in a.readlines():
-        line = line.strip()
-        (guid, version) = line.split(" ")
-        data[guid] = int(version)
+    for key in sysvol_tdb.iterkeys():
+        data[key] = sysvol_tdb.get(key)
     return data
 
 
