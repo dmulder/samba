@@ -37,6 +37,7 @@ from samba.gpclass import *
 from samba.net import Net
 from samba.dcerpc import nbt
 from samba import smb
+import logging
 
 
 # Finds all GPO Files ending in inf
@@ -151,6 +152,20 @@ test_ldb = GPOService.Get_LDB()
 # Get The lp context
 lp = GPOService.Get_lp_Content()
 
+# Set up logging
+logger = logging.getLogger('samba_gpoupdate')
+logger.addHandler(logging.StreamHandler(sys.stdout))
+logger.setLevel(logging.CRITICAL)
+log_level = lp.log_level()
+if log_level == 1:
+    logger.setLevel(logging.ERROR)
+elif log_level == 2:
+    logger.setLevel(logging.WARNING)
+elif log_level == 3:
+    logger.setLevel(logging.INFO)
+elif log_level >= 4:
+    logger.setLevel(logging.DEBUG)
+
 # Get the CREDS
 creds = GPOService.Get_Creds()
 
@@ -209,7 +224,7 @@ if (GPO_Deleted):
 BackLog.transaction_start()
 for guid_eval in hierarchy_gpos:
     guid = guid_eval[0]
-    gp_extensions = [gp_sec_ext()]
+    gp_extensions = [gp_sec_ext(logger)]
     local_path = '%s/Policies' % lp.get("realm").lower() + '/' + guid + '/'
     version = int(gpo.gpo_get_sysvol_gpt_version(lp.get("path", "sysvol") + '/' + local_path)[1])
     try:
@@ -226,7 +241,12 @@ for guid_eval in hierarchy_gpos:
             # If it we have not read it before and is not empty
             # Rewrite entire logfile here
             if  (version != 0) and GPO_Changed == True:
-                change_backlog = gpo_parser(gpolist, test_ldb, conn, attr_log)
+                logger.info('GPO %s has changed' % guid)
+                try:
+                    change_backlog = gpo_parser(gpolist, test_ldb, conn, attr_log)
+                except:
+                    logger.error('Failed to parse gpo %s' % guid)
+                    continue
     BackLog.store(guid, '%i' % version)
 BackLog.transaction_commit()
 BackLog.close()
