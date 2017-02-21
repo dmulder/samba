@@ -43,22 +43,27 @@ class inf_to_ldb(object):
     parameter to Samba4. Not registry oriented whatsoever.
     '''
 
-    def __init__(self, ldb, dn, attribute, val):
+    def __init__(self, logger, ldb, dn, attribute, val):
+        self.logger = logger
         self.ldb = ldb
         self.dn = dn
         self.attribute = attribute
         self.val = val
 
     def ch_minPwdAge(self, val):
+        self.logger.info('KDC Minimum Password age was changed from %s to %s' % (self.ldb.get_minPwdAge(), val))
         self.ldb.set_minPwdAge(val)
 
     def ch_maxPwdAge(self, val):
+        self.logger.info('KDC Maximum Password age was changed from %s to %s' % (self.ldb.get_maxPwdAge(), val))
         self.ldb.set_maxPwdAge(val)
 
     def ch_minPwdLength(self, val):
+        self.logger.info('KDC Minimum Password length was changed from %s to %s' % (self.ldb.get_minPwdLength(), val))
         self.ldb.set_minPwdLength(val)
 
     def ch_pwdProperties(self, val):
+        self.logger.info('KDC Password Properties were changed from %s to %s' % (self.ldb.get_pwdProperties(), val))
         self.ldb.set_pwdProperties(val)
 
     def explicit(self):
@@ -95,6 +100,9 @@ class gp_sec_ext(gp_ext):
     '''
 
     count = 0
+
+    def __init__(self, logger):
+        self.logger = logger
 
     def __str__(self):
         return "Security GPO extension"
@@ -153,7 +161,7 @@ class gp_sec_ext(gp_ext):
                     (att, setter) = current_section.get(key)
                     value = value.encode('ascii', 'ignore')
                     ret = True
-                    setter(self.ldb, self.dn, att, value).update_samba()
+                    setter(self.logger, self.ldb, self.dn, att, value).update_samba()
         return ret
 
     def parse(self, afile, ldb, conn, attr_log):
