@@ -28,6 +28,8 @@ import samba.getopt as options
 from samba.samdb import SamDB
 from samba.netcmd import gpo as gpo_user
 import codecs
+from ConfigParser import ConfigParser
+from StringIO import StringIO
 
 class gp_ext(object):
     def list(self, rootpath):
@@ -132,7 +134,7 @@ class gp_sec_ext(gp_ext):
         inftable = self.populate_inf()
 
         try:
-            policy = conn.loadfile(path).decode('utf-16')
+            policy = conn.loadfile(path.replace('/', '\\')).decode('utf-16')
         except:
             return None
         current_section = None
@@ -145,18 +147,15 @@ class gp_sec_ext(gp_ext):
         # If at any point in time a GPO was applied,
         # then we return that boolean at the end.
 
-        for line in policy.splitlines():
-            line = line.strip()
-            if line[0] == '[':
-                section = line[1: -1]
-                current_section = inftable.get(section.encode('ascii', 'ignore'))
+        inf_conf = ConfigParser()
+        inf_conf.optionxform=str
+        inf_conf.readfp(StringIO(policy))
 
-            else:
-                # We must be in a section
-                if not current_section:
-                    continue
-                (key, value) = line.split("=")
-                key = key.strip()
+        for section in inf_conf.sections():
+            current_section = inftable.get(section)
+            if not current_section:
+                continue
+            for key, value in inf_conf.items(section):
                 if current_section.get(key):
                     (att, setter) = current_section.get(key)
                     value = value.encode('ascii', 'ignore')
