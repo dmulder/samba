@@ -31,27 +31,71 @@ import codecs
 from samba import NTSTATUSError
 from ConfigParser import ConfigParser
 from StringIO import StringIO
+from abc import ABCMeta, abstractmethod
 
 class gp_ext(object):
+    __metaclass__ = ABCMeta
+
+    @abstractmethod
     def list(self, rootpath):
-        return None
+        pass
 
+    @abstractmethod
+    def parse(self, afile, ldb, conn, attr_log, lp):
+        pass
+
+    @abstractmethod
     def __str__(self):
-        return "default_gp_ext"
+        pass
 
 
-class inf_to_ldb(object):
-    '''This class takes the .inf file parameter (essentially a GPO file mapped to a GUID),
-    hashmaps it to the Samba parameter, which then uses an ldb object to update the
-    parameter to Samba4. Not registry oriented whatsoever.
-    '''
+class inf_to():
+    __metaclass__ = ABCMeta
 
-    def __init__(self, logger, ldb, dn, attribute, val):
+    def __init__(self, logger, ldb, dn, lp, attribute, val):
         self.logger = logger
         self.ldb = ldb
         self.dn = dn
         self.attribute = attribute
         self.val = val
+        self.lp = lp
+
+    def explicit(self):
+        return self.val
+
+    def update_samba(self):
+        (upd_sam, value) = self.mapper().get(self.attribute)
+        upd_sam(value())
+
+    @abstractmethod
+    def mapper(self):
+        pass
+
+class inf_to_smbconf(inf_to):
+    def mins_to_hours(self):
+        return '%d' % (int(self.val)/60)
+
+    def days_to_hours(self):
+        return '%d' % (int(self.val)*24)
+
+    def set_krb5_conf(self, val):
+        self.lp.load(self.lp.configfile)
+        old_val = self.lp.get(self.attribute)
+        self.logger.info('%s was changed from %s to %s' % (self.attribute, old_val, val))
+        self.lp.set(self.attribute, val)
+        self.lp.dump(False, self.lp.configfile)
+
+    def mapper(self):
+        return { 'kdc:user ticket lifetime': (self.set_krb5_conf, self.explicit),
+                 'kdc:service ticket lifetime': (self.set_krb5_conf, self.mins_to_hours),
+                 'kdc:renewal lifetime': (self.set_krb5_conf, self.days_to_hours),
+               }
+
+class inf_to_ldb(inf_to):
+    '''This class takes the .inf file parameter (essentially a GPO file mapped to a GUID),
+    hashmaps it to the Samba parameter, which then uses an ldb object to update the
+    parameter to Samba4. Not registry oriented whatsoever.
+    '''
 
     def ch_minPwdAge(self, val):
         self.logger.info('KDC Minimum Password age was changed from %s to %s' % (self.ldb.get_minPwdAge(), val))
@@ -68,9 +112,6 @@ class inf_to_ldb(object):
     def ch_pwdProperties(self, val):
         self.logger.info('KDC Password Properties were changed from %s to %s' % (self.ldb.get_pwdProperties(), val))
         self.ldb.set_pwdProperties(val)
-
-    def explicit(self):
-        return self.val
 
     def nttime2unix(self):
         seconds = 60
@@ -90,10 +131,6 @@ class inf_to_ldb(object):
                  "pwdProperties" : (self.ch_pwdProperties, self.explicit),
 
                }
-
-    def update_samba(self):
-        (upd_sam, value) = self.mapper().get(self.attribute)
-        upd_sam(value())     # or val = value() then update(val)
 
 
 class gp_sec_ext(gp_ext):
@@ -127,7 +164,11 @@ class gp_sec_ext(gp_ext):
                                   "MaximumPasswordAge": ("maxPwdAge", inf_to_ldb),
                                   "MinimumPasswordLength": ("minPwdLength", inf_to_ldb),
                                   "PasswordComplexity": ("pwdProperties", inf_to_ldb),
-                                 }
+                                 },
+                "Kerberos Policy": {"MaxTicketAge": ("kdc:user ticket lifetime", inf_to_smbconf),
+                                    "MaxServiceAge": ("kdc:service ticket lifetime", inf_to_smbconf),
+                                    "MaxRenewAge": ("kdc:renewal lifetime", inf_to_smbconf),
+                                   }
                }
 
     def read_inf(self, path, conn, attr_log):
@@ -161,11 +202,12 @@ class gp_sec_ext(gp_ext):
                     (att, setter) = current_section.get(key)
                     value = value.encode('ascii', 'ignore')
                     ret = True
-                    setter(self.logger, self.ldb, self.dn, att, value).update_samba()
+                    setter(self.logger, self.ldb, self.dn, self.lp, att, value).update_samba()
         return ret
 
-    def parse(self, afile, ldb, conn, attr_log):
+    def parse(self, afile, ldb, conn, attr_log, lp):
         self.ldb = ldb
+        self.lp = lp
         self.dn = ldb.get_default_basedn()
 
         # Fixing the bug where only some Linux Boxes capitalize MACHINE
