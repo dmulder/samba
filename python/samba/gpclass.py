@@ -134,7 +134,10 @@ class gp_sec_ext(gp_ext):
         ret = False
         inftable = self.populate_inf()
 
-        policy = conn.loadfile(path.replace('/', '\\')).decode('utf-16')
+        try:
+            policy = conn.loadfile(path.replace('/', '\\')).decode('utf-16')
+        except ValueError:
+            policy = conn.loadfile(path.replace('/', '\\')) # Handle ascii files created by linux
         current_section = None
         LOG = open(attr_log, "a")
         LOG.write(str(path.split('/')[2]) + '\n')
