@@ -174,7 +174,7 @@ static void gpoupdate_task_init(struct task_server *task)
 		return;
 	}
 
-	service->sysvscan.interval = lpcfg_parm_int(task->lp_ctx, NULL, "gpoupdate", "config interval", 30);	/* in seconds */
+	service->sysvscan.interval = lpcfg_parm_int(task->lp_ctx, NULL, "gpoupdate", "config interval", 900);	/* in seconds */
 	status = gpoupdate_sysvscan_schedule(service);
 	if (!NT_STATUS_IS_OK(status)) {
 		task_server_terminate(task, talloc_asprintf(task,
