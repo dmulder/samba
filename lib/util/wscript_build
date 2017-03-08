@@ -210,3 +210,8 @@ else:
                         source='util_str_escape.c',
                         deps='talloc',
                         local_include=False)
+
+    bld.SAMBA_SUBSYSTEM('mkdir_p',
+                        source='mkdir_p.c',
+                        local_include=False)
+
