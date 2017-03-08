@@ -370,7 +370,7 @@ def build(bld):
                                           'system_common.c system_util.c') +
                                CTDB_SYSTEM_SRC,
                         includes='include',
-                        deps='replace talloc tevent tdb pcap samba-util')
+                        deps='replace talloc tevent tdb pcap samba-util mkdir_p')
 
     bld.SAMBA_SUBSYSTEM('ctdb-common',
                         source=bld.SUBDIR('common',
@@ -775,7 +775,7 @@ def build(bld):
 
     bld.SAMBA_BINARY('protocol_util_test',
                      source='tests/src/protocol_util_test.c',
-                     deps='talloc ctdb-protocol samba-util',
+                     deps='talloc ctdb-protocol samba-util mkdir_p',
                      install_path='${CTDB_TEST_LIBEXECDIR}')
 
     # Test binaries
