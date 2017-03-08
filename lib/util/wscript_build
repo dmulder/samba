@@ -204,3 +204,8 @@ else:
                         source='access.c',
                         deps='interfaces samba-util',
                         local_include=False)
+
+    bld.SAMBA_SUBSYSTEM('mkdir_p',
+                        source='mkdir_p.c',
+                        local_include=False)
+
