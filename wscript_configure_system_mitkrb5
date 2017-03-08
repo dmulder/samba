@@ -6,7 +6,7 @@ have_gssapi=False
 # Requried versions
 krb5_required_version = "1.9"
 if conf.CONFIG_SET('AD_DC_BUILD_IS_ENABLED'):
-    krb5_required_version = "1.15.1"
+    krb5_required_version = "1.15"
 
 def parse_version(v):
     return tuple(map(str, (v.split("."))))
