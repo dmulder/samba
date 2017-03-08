@@ -57,7 +57,6 @@ bool parse_ip_port(const char *addr, ctdb_sock_addr *saddr);
 
 void lockdown_memory(bool valgrinding);
 
-int mkdir_p(const char *dir, int mode);
 void mkdir_p_or_die(const char *dir, int mode);
 
 void ctdb_wait_for_process_to_exit(pid_t pid);
