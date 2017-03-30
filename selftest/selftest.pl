@@ -49,6 +49,7 @@ my @opt_exclude = ();
 my @opt_include = ();
 my $opt_testenv = 0;
 my $opt_list = 0;
+my $opt_mitkrb5 = 0;
 my $ldap = undef;
 my $opt_resetup_env = undef;
 my $opt_load_list = undef;
@@ -246,6 +247,7 @@ my $result = GetOptions (
 		'bindir=s' => \$bindir,
 		'testenv' => \$opt_testenv,
 		'list' => \$opt_list,
+		'mitkrb5' => \$opt_mitkrb5,
 		'ldap:s' => \$ldap,
 		'resetup-environment' => \$opt_resetup_env,
 		'testlist=s' => \@testlists,
@@ -318,6 +320,8 @@ my $srcdir_abs = abs_path($srcdir);
 
 die("using an empty absolute prefix isn't allowed") unless $prefix_abs ne "";
 die("using '/' as absolute prefix isn't allowed") unless $prefix_abs ne "/";
+
+$ENV{SAMBA_SELFTEST} = "1";
 
 $ENV{PREFIX} = $prefix;
 $ENV{PREFIX_ABS} = $prefix_abs;
@@ -414,6 +418,10 @@ if ($opt_use_dns_faking) {
 
 my $target;
 my $testenv_default = "none";
+
+if ($opt_mitkrb5 == 1) {
+	$ENV{MITKRB5} = $opt_mitkrb5;
+}
 
 # After this many seconds, the server will self-terminate.  All tests
 # must terminate in this time, and testenv will only stay alive this

@@ -201,6 +201,12 @@ sub mk_krb5_conf($$)
  ticket_lifetime = 24h
  forwardable = yes
  allow_weak_crypto = yes
+ # Set the grace clocskew to 1 second
+ # This is especially required by samba3.raw.session krb5
+ clockskew = 5
+ # We are running on the same machine, do not correct
+ # system clock differences
+ kdc_timesync = 0
 
 ";
 
@@ -272,6 +278,55 @@ sub mk_realms_stanza($$$$)
 
 ";
         return $realms_stanza;
+}
+
+sub mk_mitkdc_conf($$)
+{
+	# samba_kdb_dir is the path to mit_samba.so
+	my ($ctx, $samba_kdb_dir) = @_;
+
+	unless (open(KDCCONF, ">$ctx->{mitkdc_conf}")) {
+	        warn("can't open $ctx->{mitkdc_conf}$?");
+		return undef;
+	}
+
+	print KDCCONF "
+# Generated kdc.conf for $ctx->{realm}
+
+[kdcdefaults]
+	kdc_ports = 88
+	kdc_tcp_ports = 88
+
+[realms]
+	$ctx->{realm} = {
+	}
+
+	$ctx->{dnsname} = {
+	}
+
+	$ctx->{domain} = {
+	}
+
+[dbmodules]
+	db_module_dir = $samba_kdb_dir
+
+	$ctx->{realm} = {
+		db_library = samba
+	}
+
+	$ctx->{dnsname} = {
+		db_library = samba
+	}
+
+	$ctx->{domain} = {
+		db_library = samba
+	}
+
+[logging]
+	kdc = FILE:$ctx->{logdir}/mit_kdc.log
+";
+
+	close(KDCCONF);
 }
 
 sub get_interface($)
