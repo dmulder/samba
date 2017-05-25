@@ -617,7 +617,7 @@ static ADS_STATUS add_gplink_to_gpo_list(ADS_STRUCT *ads,
 		new_gpo->link = link_dn;
 		new_gpo->link_type = link_type;
 
-		DLIST_ADD(*gpo_list, new_gpo);
+		DLIST_ADD_END(*gpo_list, new_gpo);
 
 		DEBUG(10,("add_gplink_to_gplist: added GPLINK #%d %s "
 			"to GPO list\n", i, gp_link->link_names[i]));
@@ -710,7 +710,7 @@ static ADS_STATUS add_local_policy_to_gpo_list(TALLOC_CTX *mem_ctx,
 
 	gpo->link_type = link_type;
 
-	DLIST_ADD(*gpo_list, gpo);
+	DLIST_ADD_END(*gpo_list, gpo);
 
 	return ADS_ERROR_NT(NT_STATUS_OK);
 }
