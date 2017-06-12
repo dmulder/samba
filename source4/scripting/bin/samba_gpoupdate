@@ -65,13 +65,16 @@ def apply_gp(lp, creds, test_ldb, logger, backlog, gp_db, gp_extensions):
         version = int(gpo.gpo_get_sysvol_gpt_version(local_path)[1])
         if version != backlog.version(guid):
             logger.info('GPO %s has changed' % guid)
-            gp_db.set_guid(guid)
-            try:
-                for ext in gp_extensions:
-                    ext.parse(ext.list(local_path), test_ldb, conn, gp_db, lp)
-            except:
-                logger.error('Failed to parse gpo %s' % guid)
-                continue
+            gp_db.state(GPOSTATE.APPLY)
+        else:
+            gp_db.state(GPOSTATE.ENFORCE)
+        gp_db.set_guid(guid)
+        try:
+            for ext in gp_extensions:
+                ext.parse(ext.list(local_path), test_ldb, conn, gp_db, lp)
+        except:
+            logger.error('Failed to parse gpo %s' % guid)
+            continue
         backlog.store(guid, version)
     backlog.commit()
 
@@ -84,6 +87,7 @@ def unapply_log(gp_db):
             break
 
 def unapply_gp(creds, test_ldb, logger, backlog, gp_db, gp_extensions):
+    gp_db.state(GPOSTATE.UNAPPLY)
     for gpo_guid in unapply_log(gp_db):
         gp_db.set_guid(gpo_guid)
         unapply_attributes = gp_db.list(gp_extensions)
