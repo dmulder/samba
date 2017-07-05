@@ -80,15 +80,17 @@ class gp_log:
     The applylog keeps track of the order in which the GPOs were applied, so that they can be rolled
     back in reverse, returning the machine to the state prior to policy application.
     '''
-    def __init__(self, db_file, user):
+    def __init__(self, user, gpostore, db_log=None):
         ''' Initialize the gp_log
-        param db_file       - the filename where the gp_log will be stored
         param user          - the username (or machine name) that policies are being applied to
+        param gpostore      - the GPOStorage obj which references the tdb which contains gp_logs
+        param db_log        - (optional) a string to initialize the gp_log
         '''
         self._state = GPOSTATE.APPLY
-        self.db_file = db_file
-        if os.path.isfile(self.db_file):
-            self.gpdb = etree.parse(self.db_file).getroot()
+        self.gpostore = gpostore
+        self.username = user
+        if db_log:
+            self.gpdb = etree.fromstring(db_log)
         else:
             self.gpdb = etree.Element('gp')
         self.user = self.gpdb.find('user[@name="%s"]' % user)
@@ -220,32 +222,41 @@ class gp_log:
             self.user.remove(self.guid)
         if len(self.user) == 0 and self.user in self.gpdb:
             self.gpdb.remove(self.user)
-        with open(self.db_file, 'w') as db:
-            db.write(etree.tostring(self.gpdb, 'utf-8'))
+        self.gpostore.store(self.username, etree.tostring(self.gpdb, 'utf-8'))
 
-class Backlog:
-    def __init__(self, sysvol_log):
-        if os.path.isfile(sysvol_log):
-            self.backlog = tdb.open(sysvol_log)
+class GPOStorage:
+    def __init__(self, log_file):
+        if os.path.isfile(log_file):
+            self.log = tdb.open(log_file)
         else:
-            self.backlog = tdb.Tdb(sysvol_log, 0, tdb.DEFAULT, os.O_CREAT|os.O_RDWR)
-        self.backlog.transaction_start()
+            self.log = tdb.Tdb(log_file, 0, tdb.DEFAULT, os.O_CREAT|os.O_RDWR)
 
-    def version(self, guid):
+    def start(self):
+        self.log.transaction_start()
+
+    def get_int(self, key):
         try:
-            old_version = int(self.backlog.get(guid))
+            return int(self.log.get(key))
         except TypeError:
-            old_version = -1
-        return old_version
+            return None
 
-    def store(self, guid, version):
-        self.backlog.store(guid, '%i' % version)
+    def get(self, key):
+        return self.log.get(key)
+
+    def get_gplog(self, user):
+        return gp_log(user, self, self.log.get(user))
+
+    def store(self, key, val):
+        self.log.store(key, val)
+
+    def cancel(self):
+        self.log.transaction_cancel()
 
     def commit(self):
-        self.backlog.transaction_commit()
+        self.log.transaction_commit()
 
     def __del__(self):
-        self.backlog.close()
+        self.log.close()
 
 class gp_ext(object):
     __metaclass__ = ABCMeta
@@ -292,25 +303,23 @@ class inf_to():
     def __str__(self):
         pass
 
-class inf_to_smbconf(inf_to):
+class inf_to_kdc_tdb(inf_to):
     def mins_to_hours(self):
         return '%d' % (int(self.val)/60)
 
     def days_to_hours(self):
         return '%d' % (int(self.val)*24)
 
-    def set_krb5_conf(self, val):
-        self.lp.load(self.lp.configfile)
-        old_val = self.lp.get(self.attribute)
+    def set_kdc_tdb(self, val):
+        old_val = self.gp_db.gpostore.get(self.attribute)
         self.logger.info('%s was changed from %s to %s' % (self.attribute, old_val, val))
-        self.lp.set(self.attribute, val)
-        self.lp.dump(False, self.lp.configfile)
+        self.gp_db.gpostore.store(self.attribute, val)
         self.gp_db.store(str(self), self.attribute, old_val)
 
     def mapper(self):
-        return { 'kdc:user ticket lifetime': (self.set_krb5_conf, self.explicit),
-                 'kdc:service ticket lifetime': (self.set_krb5_conf, self.mins_to_hours),
-                 'kdc:renewal lifetime': (self.set_krb5_conf, self.days_to_hours),
+        return { 'kdc:user_ticket_lifetime': (self.set_kdc_tdb, self.explicit),
+                 'kdc:service_ticket_lifetime': (self.set_kdc_tdb, self.mins_to_hours),
+                 'kdc:renewal_lifetime': (self.set_kdc_tdb, self.days_to_hours),
                }
 
     def __str__(self):
@@ -398,9 +407,9 @@ class gp_sec_ext(gp_ext):
                                   "MinimumPasswordLength": ("minPwdLength", inf_to_ldb),
                                   "PasswordComplexity": ("pwdProperties", inf_to_ldb),
                                  },
-                "Kerberos Policy": {"MaxTicketAge": ("kdc:user ticket lifetime", inf_to_smbconf),
-                                    "MaxServiceAge": ("kdc:service ticket lifetime", inf_to_smbconf),
-                                    "MaxRenewAge": ("kdc:renewal lifetime", inf_to_smbconf),
+                "Kerberos Policy": {"MaxTicketAge": ("kdc:user_ticket_lifetime", inf_to_kdc_tdb),
+                                    "MaxServiceAge": ("kdc:service_ticket_lifetime", inf_to_kdc_tdb),
+                                    "MaxRenewAge": ("kdc:renewal_lifetime", inf_to_kdc_tdb),
                                    }
                }
 

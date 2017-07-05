@@ -50,7 +50,8 @@ def get_gpo_list(dc_hostname, creds, lp):
         gpos = ads.get_gpo_list(creds.get_username())
     return gpos
 
-def apply_gp(lp, creds, test_ldb, logger, backlog, gp_db, gp_extensions):
+def apply_gp(lp, creds, test_ldb, logger, store, gp_extensions):
+    gp_db = store.get_gplog(creds.get_username())
     dc_hostname = get_dc_hostname()
     try:
         conn =  smb.SMB(dc_hostname, 'sysvol', lp=lp, creds=creds)
@@ -63,20 +64,22 @@ def apply_gp(lp, creds, test_ldb, logger, backlog, gp_db, gp_extensions):
         guid = gpo_obj.name
         local_path = os.path.join(lp.get('realm').lower(), 'Policies', guid)
         version = int(gpo.gpo_get_sysvol_gpt_version(local_path)[1])
-        if version != backlog.version(guid):
+        if version != store.get_int(guid):
             logger.info('GPO %s has changed' % guid)
             gp_db.state(GPOSTATE.APPLY)
         else:
             gp_db.state(GPOSTATE.ENFORCE)
         gp_db.set_guid(guid)
+        store.start()
         try:
             for ext in gp_extensions:
                 ext.parse(ext.list(local_path), test_ldb, conn, gp_db, lp)
         except:
             logger.error('Failed to parse gpo %s' % guid)
+            store.cancel()
             continue
-        backlog.store(guid, version)
-    backlog.commit()
+        store.store(guid, '%i' % version)
+        store.commit()
 
 def unapply_log(gp_db):
     while True:
@@ -86,7 +89,8 @@ def unapply_log(gp_db):
         else:
             break
 
-def unapply_gp(creds, test_ldb, logger, backlog, gp_db, gp_extensions):
+def unapply_gp(creds, test_ldb, logger, store, gp_extensions):
+    gp_db = store.get_gplog(creds.get_username())
     gp_db.state(GPOSTATE.UNAPPLY)
     for gpo_guid in unapply_log(gp_db):
         gp_db.set_guid(gpo_guid)
@@ -138,8 +142,7 @@ if __name__ == "__main__":
         logger.setLevel(logging.DEBUG)
 
     cache_dir = lp.get('cache directory')
-    backlog = Backlog(os.path.join(cache_dir, 'sysvol_log.tdb'))
-    gp_db = gp_log(os.path.join(cache_dir, 'gp_db.xml'), creds.get_username())
+    store = GPOStorage(os.path.join(cache_dir, 'gpo.tdb'))
 
     gp_extensions = [gp_sec_ext(logger)]
 
@@ -147,7 +150,7 @@ if __name__ == "__main__":
     test_ldb = SamDB(url, session_info=session, credentials=creds, lp=lp)
 
     if not opts.unapply:
-        apply_gp(lp, creds, test_ldb, logger, backlog, gp_db, gp_extensions)
+        apply_gp(lp, creds, test_ldb, logger, store, gp_extensions)
     else:
-        unapply_gp(creds, test_ldb, logger, backlog, gp_db, gp_extensions)
+        unapply_gp(creds, test_ldb, logger, store, gp_extensions)
 
