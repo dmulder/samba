@@ -829,6 +829,8 @@ for env in ['rodc']:
 
 planpythontestsuite("rodc:local", "samba.tests.samba_tool.rodc")
 
+planpythontestsuite("ad_dc:local", "samba.tests.smb_bindings")
+
 plantestsuite("samba.blackbox.rpcclient_samlogon", "rodc:local", [os.path.join(samba3srcdir, "script/tests/test_rpcclient_samlogon.sh"),
 								  "$DC_USERNAME", "$DC_PASSWORD", "ncacn_np:$SERVER", configuration])
 
