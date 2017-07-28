@@ -126,16 +126,17 @@ static PyObject * py_smb_savefile(PyObject *self, PyObject *args)
 	struct smb_composite_savefile io;
 	const char *filename;
 	char *data;
+	int data_len;
 	NTSTATUS status;
 	struct smb_private_data *spdata;
 
-	if (!PyArg_ParseTuple(args, "ss:savefile", &filename, &data)) {
+	if (!PyArg_ParseTuple(args, "ss#:savefile", &filename, &data, &data_len)) {
 		return NULL;
 	}
 
 	io.in.fname = filename;
 	io.in.data = (unsigned char *)data;
-	io.in.size = strlen(data);
+	io.in.size = data_len;
 
 	spdata = pytalloc_get_ptr(self);
 	status = smb_composite_savefile(spdata->tree, &io);
