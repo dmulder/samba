@@ -595,6 +595,54 @@ int debuglevel_get_class(size_t idx)
 	return dbgc_config[idx].loglevel;
 }
 
+static const char *default_classname_table[] = {
+	[DBGC_ALL] =		"all",
+	[DBGC_TDB] =		"tdb",
+	[DBGC_PRINTDRIVERS] =	"printdrivers",
+	[DBGC_LANMAN] =		"lanman",
+	[DBGC_SMB] =		"smb",
+	[DBGC_RPC_PARSE] =	"rpc_parse",
+	[DBGC_RPC_SRV] =	"rpc_srv",
+	[DBGC_RPC_CLI] =	"rpc_cli",
+	[DBGC_PASSDB] =		"passdb",
+	[DBGC_SAM] =		"sam",
+	[DBGC_AUTH] =		"auth",
+	[DBGC_WINBIND] =	"winbind",
+	[DBGC_VFS] =		"vfs",
+	[DBGC_IDMAP] =		"idmap",
+	[DBGC_QUOTA] =		"quota",
+	[DBGC_ACLS] =		"acls",
+	[DBGC_LOCKING] =	"locking",
+	[DBGC_MSDFS] =		"msdfs",
+	[DBGC_DMAPI] =		"dmapi",
+	[DBGC_REGISTRY] =	"registry",
+	[DBGC_SCAVENGER] =	"scavenger",
+	[DBGC_DNS] =		"dns",
+	[DBGC_LDB] =		"ldb",
+	[DBGC_TEVENT] =		"tevent",
+	[DBGC_AUTH_AUDIT] =	"auth_audit",
+	[DBGC_AUTH_AUDIT_JSON] = "auth_json_audit",
+	[DBGC_KERBEROS] =       "kerberos",
+	[DBGC_DRS_REPL] =       "drs_repl",
+	[DBGC_SMB2] =           "smb2",
+	[DBGC_SMB2_CREDITS] =   "smb2_credits",
+	[DBGC_DSDB_AUDIT]  =	"dsdb_audit",
+	[DBGC_DSDB_AUDIT_JSON] = "dsdb_json_audit",
+	[DBGC_DSDB_PWD_AUDIT]  =	"dsdb_password_audit",
+	[DBGC_DSDB_PWD_AUDIT_JSON] = "dsdb_password_json_audit",
+	[DBGC_DSDB_TXN_AUDIT]  =	"dsdb_transaction_audit",
+	[DBGC_DSDB_TXN_AUDIT_JSON] = "dsdb_transaction_json_audit",
+	[DBGC_DSDB_GROUP_AUDIT] =	"dsdb_group_audit",
+	[DBGC_DSDB_GROUP_AUDIT_JSON] = "dsdb_group_json_audit",
+	[DBGC_DFSR] =		"dfsr",
+};
+
+/*
+ * This is to allow reading of DEBUGLEVEL_CLASS before the debug
+ * system has been initialized.
+ */
+static const int debug_class_list_initial[ARRAY_SIZE(default_classname_table)];
+
 void debuglevel_set_class(size_t idx, int level)
 {
 	dbgc_config[idx].loglevel = level;
