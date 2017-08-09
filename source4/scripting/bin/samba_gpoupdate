@@ -36,6 +36,7 @@ except:
     SamDB = None
 from samba.gpclass import *
 from samba.gp_sec_ext import gp_sec_ext
+from samba.gp_env_var_ext import gp_environment_variable_ext
 from samba.net import Net
 from samba.dcerpc import nbt
 from samba import smb
@@ -135,6 +136,8 @@ if __name__ == "__main__":
                       action='store_true')
     parser.add_option('-M', '--machine', help='Apply machine policy',
                       action='store_true', default=False)
+    parser.add_option('--sysconfdir', help='Location of sysconfdir: ex. /etc/',
+                      default='/etc/')
     parser.add_option_group(credopts)
 
     # Set the options and the arguments
@@ -173,6 +176,9 @@ if __name__ == "__main__":
         if lp.get('server role') == 'active directory domain controller':
             if gp_sec_ext.enabled():
                 gp_extensions.append(gp_sec_ext(logger))
+        if gp_environment_variable_ext.enabled():
+            gp_extensions.append(gp_environment_variable_ext(logger,
+                                                             opts.sysconfdir))
     else:
         pass # User extensions
 
