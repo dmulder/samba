@@ -37,6 +37,11 @@ struct torture_suite *gpo_apply_suite(TALLOC_CTX *ctx)
 				      torture_gpo_system_access_policies);
 	torture_suite_add_simple_test(suite, "gpo_disable_policies",
 				      torture_gpo_disable_policies);
+	torture_suite_add_simple_test(suite,
+				      "gpo_environment_variables_policies",
+				   torture_gpo_environment_variables_policies);
+	torture_suite_add_simple_test(suite, "gpo_bad_env_var",
+				      torture_gpo_bad_env_var);
 
 	suite->description = talloc_strdup(suite, "Group Policy apply tests");
 
@@ -80,6 +85,30 @@ PasswordComplexity = %d\n\
 "
 #define GPTINI "addom.samba.example.com/Policies/"\
 	       "{31B2F340-016D-11D2-945F-00C04FB984F9}/GPT.INI"
+
+#define ENVPATH "addom.samba.example.com/Policies/"\
+		"{31B2F340-016D-11D2-945F-00C04FB984F9}/MACHINE/"\
+		"Preferences/EnvironmentVariables"
+#define ENVXML "EnvironmentVariables.xml"
+#define ENVTMPL "\
+<?xml version=\"1.0\" encoding=\"utf-8\"?>\
+<EnvironmentVariables clsid=\"{BF141A63-327B-438a-B9BF-2C188F13B7AD}\">\
+<EnvironmentVariable clsid=\"{78570023-8373-4a19-BA80-2F150738EA19}\"\
+	name=\"PATH\" status=\"PATH = %s\" image=\"2\"\
+	uid=\"{B048DE7E-9B24-497C-B798-17708F7B33C5}\">\
+<Properties action=\"%s\" name=\"PATH\" value=\"%s\" user=\"0\"\
+	partial=\"%s\"/>\
+</EnvironmentVariable>\
+</EnvironmentVariables>\
+"
+#define RESENV "#\n\
+# Samba GPO Section\n\
+# These settings are applied via GPO\n\
+#\n\
+PATH=%s\n\
+#\n\
+# End Samba GPO Section\n\
+#"
 
 static void increment_gpt_ini(TALLOC_CTX *ctx, const char *gpt_file)
 {
@@ -427,6 +456,140 @@ bool torture_gpo_disable_policies(struct torture_context *tctx)
 
 	/* Re-enable the policy */
 	remove(disable_file);
+
+	talloc_free(ctx);
+	return true;
+}
+
+bool torture_gpo_environment_variables_policies(struct torture_context *tctx)
+{
+	TALLOC_CTX *ctx = talloc_new(tctx);
+	const char *env_dir = NULL, *env_xml = NULL, *smbconf = NULL;
+	const char *sysvol_path = NULL, *gpt_file = NULL;
+	char *profile = NULL;
+	const char *envcases[][4] = {
+		{ "", "D", "0" },
+		{ "/bin", "U", "0" },
+		{ "/bin", "U", "1" },
+	};
+	const char *envres[] = {
+		"",
+		"/bin",
+		"$PATH:/bin",
+		NULL,
+	};
+	char *envexpected = NULL, *envreturned = NULL;
+	size_t envlen = 0;
+	int fd, i;
+	FILE *fp = NULL;
+
+	/* Ensure the sysvol path exists */
+	sysvol_path = lpcfg_path(lpcfg_service(tctx->lp_ctx, "sysvol"),
+				 lpcfg_default_service(tctx->lp_ctx), tctx);
+	torture_assert(tctx, sysvol_path, "Failed to fetch the sysvol path");
+	env_dir = talloc_asprintf(ctx, "%s/%s", sysvol_path, ENVPATH);
+	mkdir_p(env_dir, S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
+	env_xml = talloc_asprintf(ctx, "%s/%s", env_dir, ENVXML);
+
+	smbconf = lpcfg_configfile(tctx->lp_ctx);
+	profile = talloc_strndup(ctx, smbconf, strlen(smbconf)-8);
+	profile = talloc_strdup_append(profile, "profile");
+
+	for (i = 0; i < 3; i++) {
+		if ( (fp = fopen(env_xml, "w")) ) {
+			fputs(talloc_asprintf(ctx, ENVTMPL, envcases[i][0],
+					      envcases[i][1], envcases[i][0],
+					      envcases[i][2]), fp);
+			fclose(fp);
+		}
+		gpt_file = talloc_asprintf(ctx, "%s/%s", sysvol_path, GPTINI);
+		increment_gpt_ini(ctx, gpt_file);
+
+		exec_gpo_update_command(tctx);
+
+		/* Machine env var policy */
+		envexpected = talloc_asprintf(ctx, RESENV, envres[i]);
+		fd = open(profile, O_RDONLY);
+		envlen = strlen(envexpected);
+		torture_assert(tctx, lseek(fd, -envlen,
+					   SEEK_END) != -1,
+			      "Failed to seek to start position in profile");
+		envreturned = talloc_array(ctx, char, envlen);
+		torture_assert(tctx, read(fd, envreturned, envlen) == envlen,
+				"Failed to read from profile");
+		torture_assert(tctx, strncmp(envexpected, envreturned, envlen)\
+				     == 0,
+				"Environment variable policy was not applied");
+	}
+
+	/* Unapply the settings and verify they are removed */
+	exec_gpo_unapply_command(tctx);
+
+	/* Machine env var policy */
+	fd = open(profile, O_RDONLY);
+	if (lseek(fd, -envlen, SEEK_END) != -1) {
+		if (read(fd, envreturned, envlen) == envlen) {
+			torture_assert(tctx, strncmp(envexpected, envreturned,
+						     envlen) != 0,
+			    "Environment variable policy was not unapplied");
+		}
+	}
+
+	talloc_free(ctx);
+	return true;
+}
+
+bool torture_gpo_bad_env_var(struct torture_context *tctx)
+{
+	TALLOC_CTX *ctx = talloc_new(tctx);
+	const char *env_dir = NULL, *env_xml = NULL, *smbconf = NULL;
+	const char *sysvol_path = NULL, *gpt_file = NULL;
+	char *profile = NULL;
+	const char *envcases[][4] = {
+		{ "C:\\WINDOWS\\system32", "U", "0" },
+		{ "\%USERPROFILE\%\\bin", "U", "0" },
+		{ "/foo;/bar", "U", "0" },
+	};
+	int i;
+	FILE *fp = NULL;
+	struct stat *finfo = talloc_zero(ctx, struct stat);
+
+	/* Ensure the sysvol path exists */
+	sysvol_path = lpcfg_path(lpcfg_service(tctx->lp_ctx, "sysvol"),
+				 lpcfg_default_service(tctx->lp_ctx), tctx);
+	torture_assert(tctx, sysvol_path, "Failed to fetch the sysvol path");
+	env_dir = talloc_asprintf(ctx, "%s/%s", sysvol_path, ENVPATH);
+	mkdir_p(env_dir, S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
+	env_xml = talloc_asprintf(ctx, "%s/%s", env_dir, ENVXML);
+
+	smbconf = lpcfg_configfile(tctx->lp_ctx);
+	profile = talloc_strndup(ctx, smbconf, strlen(smbconf)-8);
+	profile = talloc_strdup_append(profile, "profile");
+
+	for (i = 0; i < 3; i++) {
+		if ( (fp = fopen(env_xml, "w")) ) {
+			fputs(talloc_asprintf(ctx, ENVTMPL, envcases[i][0],
+					      envcases[i][1], envcases[i][0],
+					      envcases[i][2]), fp);
+			fclose(fp);
+		}
+		gpt_file = talloc_asprintf(ctx, "%s/%s", sysvol_path, GPTINI);
+		increment_gpt_ini(ctx, gpt_file);
+
+		exec_gpo_update_command(tctx);
+
+		/* Make sure the profile is either not there, or empty */
+		if (access(profile, F_OK) == 0) {
+			if (stat(profile, finfo) == 0) {
+				torture_assert_int_equal(tctx,
+					finfo->st_size, 0,
+					"The profile was not zero bytes");
+			}
+		}
+	}
+
+	/* Unapply the settings */
+	exec_gpo_unapply_command(tctx);
 
 	talloc_free(ctx);
 	return true;

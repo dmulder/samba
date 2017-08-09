@@ -87,4 +87,5 @@ def build(bld):
                              pattern='gp_exts/**/*.py',
                              installdir='py_gp')
 
-            bld.INSTALL_WILDCARD('${STATEDIR}', 'gp_exts/**/*.py', flat=False)
+            bld.INSTALL_WILDCARD('${STATEDIR}', 'gp_exts/**/*.py', flat=False,
+                                 python_fixup=True)
