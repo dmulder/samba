@@ -249,6 +249,9 @@ class GPOStorage:
     def store(self, key, val):
         self.log.store(key, val)
 
+    def delete(self, key):
+        self.log.delete(key)
+
     def cancel(self):
         self.log.transaction_cancel()
 
@@ -316,8 +319,12 @@ class inf_to_kdc_tdb(inf_to):
     def set_kdc_tdb(self, val):
         old_val = self.gp_db.gpostore.get(self.attribute)
         self.logger.info('%s was changed from %s to %s' % (self.attribute, old_val, val))
-        self.gp_db.gpostore.store(self.attribute, val)
-        self.gp_db.store(str(self), self.attribute, old_val)
+        if val is not None:
+            self.gp_db.gpostore.store(self.attribute, val)
+            self.gp_db.store(str(self), self.attribute, old_val)
+        else:
+            self.gp_db.gpostore.delete(self.attribute)
+            self.gp_db.delete(str(self), self.attribute)
 
     def mapper(self):
         return { 'kdc:user_ticket_lifetime': (self.set_kdc_tdb, self.explicit),
@@ -385,8 +392,12 @@ class inf_to_passwd_tdb(inf_to):
     def set_passwd_param(self, val):
         old_val = self.gp_db.gpostore.get(self.attribute)
         self.logger.info('%s was changed from %s to %s' % (self.attribute, old_val, val))
-        self.gp_db.gpostore.store(self.attribute, val)
-        self.gp_db.store(str(self), self.attribute, old_val)
+        if val is not None:
+            self.gp_db.gpostore.store(self.attribute, val)
+            self.gp_db.store(str(self), self.attribute, old_val)
+        else:
+            self.gp_db.gpostore.delete(self.attribute)
+            self.gp_db.delete(str(self), self.attribute)
 
     def mapper(self):
         return { 'MinimumPasswordAge' : (self.set_passwd_param, self.explicit),
