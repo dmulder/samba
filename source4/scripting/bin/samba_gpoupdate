@@ -144,7 +144,13 @@ if __name__ == "__main__":
     cache_dir = lp.get('cache directory')
     store = GPOStorage(os.path.join(cache_dir, 'gpo.tdb'))
 
-    gp_extensions = [gp_sec_ext(logger)]
+    gp_extensions = []
+    if lp.get('server role') == 'active directory domain controller':
+        gp_extensions.append(gp_sec_ext(logger))
+    elif creds.machine_account():
+        pass # Machine extensions
+    else:
+        pass # User extensions
 
     # Get a live instance of Samba
     test_ldb = SamDB(url, session_info=session, credentials=creds, lp=lp)

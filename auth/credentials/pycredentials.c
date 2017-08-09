@@ -517,6 +517,18 @@ static PyObject *py_creds_set_machine_account(PyObject *self, PyObject *args)
 	Py_RETURN_NONE;
 }
 
+static PyObject *py_creds_machine_account(PyObject *self, PyObject *args)
+{
+	struct cli_credentials *creds;
+
+	creds = PyCredentials_AsCliCredentials(self);
+
+	if (creds->machine_account)
+        Py_RETURN_TRUE;
+    else
+        Py_RETURN_FALSE;
+}
+
 static PyObject *PyCredentialCacheContainer_from_ccache_container(struct ccache_container *ccc)
 {
 	return pytalloc_reference(&PyCredentialCacheContainer, ccc);
@@ -753,6 +765,7 @@ static PyMethodDef py_creds_methods[] = {
 		NULL },
 	{ "guess", py_creds_guess, METH_VARARGS, NULL },
 	{ "set_machine_account", py_creds_set_machine_account, METH_VARARGS, NULL },
+	{ "machine_account", py_creds_machine_account, METH_NOARGS, NULL },
 	{ "get_named_ccache", py_creds_get_named_ccache, METH_VARARGS, NULL },
 	{ "set_gensec_features", py_creds_set_gensec_features, METH_VARARGS, NULL },
 	{ "get_gensec_features", py_creds_get_gensec_features, METH_NOARGS, NULL },
