@@ -148,7 +148,7 @@ if __name__ == "__main__":
     if lp.get('server role') == 'active directory domain controller':
         gp_extensions.append(gp_sec_ext(logger))
     elif creds.machine_account():
-        pass # Machine extensions
+        gp_extensions.append(gp_passwd_ext(logger))
     else:
         pass # User extensions
 

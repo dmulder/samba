@@ -261,6 +261,9 @@ class GPOStorage:
 class gp_ext(object):
     __metaclass__ = ABCMeta
 
+    def __init__(self, logger):
+        self.logger = logger
+
     @abstractmethod
     def list(self, rootpath):
         pass
@@ -377,41 +380,37 @@ class inf_to_ldb(inf_to):
     def __str__(self):
         return 'System Access'
 
+class inf_to_passwd_tdb(inf_to):
 
-class gp_sec_ext(gp_ext):
-    '''This class does the following two things:
-        1) Identifies the GPO if it has a certain kind of filepath,
-        2) Finally parses it.
-    '''
+    def set_passwd_param(self, val):
+        old_val = self.gp_db.gpostore.get(self.attribute)
+        self.logger.info('%s was changed from %s to %s' % (self.attribute, old_val, val))
+        self.gp_db.gpostore.store(self.attribute, val)
+        self.gp_db.store(str(self), self.attribute, old_val)
 
-    count = 0
-
-    def __init__(self, logger):
-        self.logger = logger
+    def mapper(self):
+        return { 'MinimumPasswordAge' : (self.set_passwd_param, self.explicit),
+                 'MaximumPasswordAge' : (self.set_passwd_param, self.explicit),
+                 'MinimumPasswordLength' : (self.set_passwd_param, self.explicit),
+                 'PasswordComplexity' : (self.set_passwd_param, self.explicit),
+                 'PasswordHistorySize' : (self.set_passwd_param, self.explicit),
+                 'ClearTextPassword' : (self.set_passwd_param, self.explicit),
+                 'LockoutDuration' : (self.set_passwd_param, self.explicit),
+                 'LockoutBadCount' : (self.set_passwd_param, self.explicit),
+                 'ResetLockoutCount' : (self.set_passwd_param, self.explicit)
+               }
 
     def __str__(self):
-        return "Security GPO extension"
+        return 'System Access'
 
+class gp_inf_ext(gp_ext):
+    @abstractmethod
     def list(self, rootpath):
-        return os.path.join(rootpath, "MACHINE/Microsoft/Windows NT/SecEdit/GptTmpl.inf")
+        pass
 
-    def listmachpol(self, rootpath):
-        return os.path.join(rootpath, "Machine/Registry.pol")
-
-    def listuserpol(self, rootpath):
-        return os.path.join(rootpath, "User/Registry.pol")
-
+    @abstractmethod
     def apply_map(self):
-        return {"System Access": {"MinimumPasswordAge": ("minPwdAge", inf_to_ldb),
-                                  "MaximumPasswordAge": ("maxPwdAge", inf_to_ldb),
-                                  "MinimumPasswordLength": ("minPwdLength", inf_to_ldb),
-                                  "PasswordComplexity": ("pwdProperties", inf_to_ldb),
-                                 },
-                "Kerberos Policy": {"MaxTicketAge": ("kdc:user_ticket_lifetime", inf_to_kdc_tdb),
-                                    "MaxServiceAge": ("kdc:service_ticket_lifetime", inf_to_kdc_tdb),
-                                    "MaxRenewAge": ("kdc:renewal_lifetime", inf_to_kdc_tdb),
-                                   }
-               }
+        pass
 
     def read_inf(self, path, conn):
         ret = False
@@ -467,4 +466,61 @@ class gp_sec_ext(gp_ext):
                     return self.read_inf(afile, conn)
                 except:
                     return None
+
+    @abstractmethod
+    def __str__(self):
+        pass
+
+class gp_passwd_ext(gp_inf_ext):
+
+    def __str__(self):
+        return "Security GPO extension"
+
+    def list(self, rootpath):
+        return os.path.join(rootpath, "MACHINE/Microsoft/Windows NT/SecEdit/GptTmpl.inf")
+
+    def apply_map(self):
+        return { 'System Access' : { 'MinimumPasswordAge' : ('MinimumPasswordAge', inf_to_passwd_tdb),
+                                     'MaximumPasswordAge' : ('MaximumPasswordAge', inf_to_passwd_tdb),
+                                     'MinimumPasswordLength' : ('MinimumPasswordLength', inf_to_passwd_tdb),
+                                     'PasswordComplexity' : ('PasswordComplexity', inf_to_passwd_tdb),
+                                     'PasswordHistorySize' : ('PasswordHistorySize', inf_to_passwd_tdb),
+                                     'ClearTextPassword' : ('ClearTextPassword', inf_to_passwd_tdb),
+                                     'LockoutDuration' : ('LockoutDuration', inf_to_passwd_tdb),
+                                     'LockoutBadCount' : ('LockoutBadCount', inf_to_passwd_tdb),
+                                     'ResetLockoutCount' : ('ResetLockoutCount', inf_to_passwd_tdb)
+                                   },
+               }
+
+class gp_sec_ext(gp_inf_ext):
+    '''This class does the following two things:
+        1) Identifies the GPO if it has a certain kind of filepath,
+        2) Finally parses it.
+    '''
+
+    count = 0
+
+    def __str__(self):
+        return "Security GPO extension"
+
+    def list(self, rootpath):
+        return os.path.join(rootpath, "MACHINE/Microsoft/Windows NT/SecEdit/GptTmpl.inf")
+
+    def listmachpol(self, rootpath):
+        return os.path.join(rootpath, "Machine/Registry.pol")
+
+    def listuserpol(self, rootpath):
+        return os.path.join(rootpath, "User/Registry.pol")
+
+    def apply_map(self):
+        return {"System Access": {"MinimumPasswordAge": ("minPwdAge", inf_to_ldb),
+                                  "MaximumPasswordAge": ("maxPwdAge", inf_to_ldb),
+                                  "MinimumPasswordLength": ("minPwdLength", inf_to_ldb),
+                                  "PasswordComplexity": ("pwdProperties", inf_to_ldb),
+                                 },
+                "Kerberos Policy": {"MaxTicketAge": ("kdc:user_ticket_lifetime", inf_to_kdc_tdb),
+                                    "MaxServiceAge": ("kdc:service_ticket_lifetime", inf_to_kdc_tdb),
+                                    "MaxRenewAge": ("kdc:renewal_lifetime", inf_to_kdc_tdb),
+                                   }
+               }
 
