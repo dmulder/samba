@@ -493,6 +493,7 @@ sub provision_raw_prepare($$$$$$$$$$$)
 	$ctx->{ipv4} = "127.0.0.$swiface";
 	$ctx->{ipv6} = sprintf("fd00:0000:0000:0000:0000:0000:5357:5f%02x", $swiface);
 	$ctx->{interfaces} = "$ctx->{ipv4}/8 $ctx->{ipv6}/64";
+	$ctx->{prefix_abs} = "$prefix_abs";
 
 	push(@{$ctx->{directories}}, $ctx->{privatedir});
 	push(@{$ctx->{directories}}, $ctx->{binddnsdir});
@@ -616,7 +617,8 @@ sub provision_raw_step1($$)
 	rndc command = true
 	dns update command = $ctx->{samba_dnsupdate}
 	spn update command = $ENV{SRCDIR_ABS}/source4/scripting/bin/samba_spnupdate -s $ctx->{smb_conf}
-	gpo update command = $ENV{SRCDIR_ABS}/source4/scripting/bin/samba_gpoupdate -s $ctx->{smb_conf} -H $ctx->{privatedir}/sam.ldb --machine
+	gpo update command = $ENV{SRCDIR_ABS}/source4/scripting/bin/samba_gpoupdate -s $ctx->{smb_conf} -H $ctx->{privatedir}/sam.ldb
+	template homedir = $ctx->{prefix_abs}/%D/%U
 	dreplsrv:periodic_startup_interval = 0
 	dsdb:schema update allowed = yes
 
