@@ -101,6 +101,7 @@ class gp_environment_variable_ext(gp_ext):
                    self.ldb,
                    self.gp_db,
                    self.lp,
+                   self.creds,
                    att,
                    env_var.find('Properties').attrib).update_samba()
             self.gp_db.commit()

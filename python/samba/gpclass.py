@@ -286,8 +286,9 @@ class GPOStorage:
 class gp_ext(object):
     __metaclass__ = ABCMeta
 
-    def __init__(self, logger):
+    def __init__(self, logger, creds=None):
         self.logger = logger
+        self.creds = creds
 
     @abstractmethod
     def list(self, rootpath):
@@ -313,7 +314,12 @@ class gp_ext(object):
         # Fixing the bug where only some Linux Boxes capitalize MACHINE
         try:
             blist = afile.split('/')
-            idx = afile.lower().split('/').index('machine')
+            index = None
+            if 'machine' in afile.lower():
+                index = 'machine'
+            elif 'user' in afile.lower():
+                index = 'user'
+            idx = afile.lower().split('/').index(index)
             for case in [
                             blist[idx].upper(),
                             blist[idx].capitalize(),
@@ -339,13 +345,14 @@ class gp_ext(object):
 class file_to():
     __metaclass__ = ABCMeta
 
-    def __init__(self, logger, ldb, gp_db, lp, attribute, val):
+    def __init__(self, logger, ldb, gp_db, lp, creds, attribute, val):
         self.logger = logger
         self.ldb = ldb
         self.attribute = attribute
         self.val = val
         self.lp = lp
         self.gp_db = gp_db
+        self.creds = creds
 
     def explicit(self):
         return self.val
@@ -399,7 +406,12 @@ class gp_inf_ext(gp_ext):
                     (att, setter) = current_section.get(key)
                     value = value.encode('ascii', 'ignore')
                     ret = True
-                    setter(self.logger, self.ldb, self.gp_db, self.lp, att,
+                    setter(self.logger,
+                           self.ldb,
+                           self.gp_db,
+                           self.lp,
+                           self.creds,
+                           att,
                            value).update_samba()
                     self.gp_db.commit()
         return ret

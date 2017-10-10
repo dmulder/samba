@@ -37,6 +37,7 @@ except:
 from samba.gpclass import *
 from samba.gp_sec_ext import gp_sec_ext
 from samba.gp_env_var_ext import gp_environment_variable_ext
+from samba.gp_browser_ext import gp_browser_ext
 from samba.net import Net
 from samba.dcerpc import nbt
 from samba import smb
@@ -118,7 +119,13 @@ def unapply_gp(lp, creds, test_ldb, logger, store, gp_extensions):
         gp_db.set_guid(gpo_guid)
         unapply_attributes = gp_db.list(gp_extensions)
         for attr in unapply_attributes:
-            attr_obj = attr[-1](logger, test_ldb, gp_db, lp, attr[0], attr[1])
+            attr_obj = attr[-1](logger,
+                                test_ldb,
+                                gp_db,
+                                lp,
+                                creds,
+                                attr[0],
+                                attr[1])
             attr_obj.mapper()[attr[0]][0](attr[1]) # Set the old value
             gp_db.delete(str(attr_obj), attr[0])
         gp_db.commit()
@@ -179,8 +186,9 @@ if __name__ == "__main__":
         if gp_environment_variable_ext.enabled():
             gp_extensions.append(gp_environment_variable_ext(logger,
                                                              opts.sysconfdir))
-    else:
-        pass # User extensions
+    else: # User extensions
+        if gp_browser_ext.enabled():
+            gp_extensions.append(gp_browser_ext(logger, creds))
 
     # Get a live instance of Samba
     if SamDB:
