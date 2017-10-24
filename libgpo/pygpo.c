@@ -25,6 +25,7 @@
 #include "secrets.h"
 #include "../libds/common/flags.h"
 #include "auth/credentials/pycredentials.h"
+#include "libcli/util/pyerrors.h"
 
 /* A Python C API module to use LIBGPO */
 
