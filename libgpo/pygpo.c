@@ -54,9 +54,10 @@ static PyObject* py_gpo_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 		self->gpo_ptr = PyCapsule_GetPointer(c_obj, NULL);
 		self->head = self->gpo_ptr;
 		self->frame = PyCapsule_GetPointer(talloc_obj, NULL);
-	} else
+	} else {
 		self->gpo_ptr = NULL;
 		self->frame = NULL;
+	}
 	return (PyObject*)self;
 }
 
