@@ -24,6 +24,7 @@
 #include "ads.h"
 #include "secrets.h"
 #include "../libds/common/flags.h"
+#include "librpc/rpc/pyrpc_util.h"
 #include "auth/credentials/pycredentials.h"
 #include "libcli/util/pyerrors.h"
 
