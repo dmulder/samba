@@ -210,7 +210,7 @@ static int py_ads_init(ADS *self, PyObject *args, PyObject *kwds)
 			PyErr_Format(PyExc_TypeError,
 				     "Expected samba.credentaials "
 				     "for credentials argument");
-			return NULL;
+			return -1;
 		}
 		self->cli_creds
 			= PyCredentials_AsCliCredentials(py_creds);
