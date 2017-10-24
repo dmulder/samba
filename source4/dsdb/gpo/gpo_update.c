@@ -34,8 +34,6 @@
 #include "librpc/gen_ndr/ndr_irpc.h"
 #include "libds/common/roles.h"
 
-NTSTATUS server_service_gpoupdate_init(void);
-
 struct gpoupdate_service {
 	struct auth_session_info *system_session_info;
 	struct task_server *task;
@@ -177,6 +175,8 @@ static void gpoupdate_task_init(struct task_server *task)
 		return;
 	}
 }
+
+NTSTATUS server_service_gpoupdate_init(TALLOC_CTX *ctx);
 
 /*
   register ourselves as a available server
