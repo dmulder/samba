@@ -37,36 +37,6 @@ typedef struct {
 	struct GROUP_POLICY_OBJECT *head;
 } GPO;
 
-static void py_gpo_dealloc(GPO* self)
-{
-	talloc_free(self->frame);
-	Py_TYPE(self)->tp_free((PyObject*)self);
-}
-
-static PyObject* py_gpo_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
-{
-	GPO *self;
-	PyObject *c_obj;
-	PyObject *talloc_obj;
-	static const char *kwlist[] = {"gpo_ptr", "talloc_ctx", NULL};
-	self = (GPO*)type->tp_alloc(type, 0);
-	if (PyArg_ParseTupleAndKeywords(args, kwds, "|OO", discard_const_p(char *, kwlist),
-					&c_obj, &talloc_obj)) {
-		self->gpo_ptr = PyCapsule_GetPointer(c_obj, NULL);
-		self->head = self->gpo_ptr;
-		self->frame = PyCapsule_GetPointer(talloc_obj, NULL);
-	} else {
-		self->gpo_ptr = NULL;
-		self->frame = NULL;
-	}
-	return (PyObject*)self;
-}
-
-static int py_gpo_init(GPO *self, PyObject *args, PyObject *kwds)
-{
-	return 0;
-}
-
 #define GPO_getter(ATTR) \
 static PyObject* GPO_get_##ATTR(GPO *self, void *closure) \
 { \
@@ -153,12 +123,6 @@ static PyObject* py_gpo_iter(PyObject *self)
 
 static PyTypeObject GPOType = {
 	.tp_name = "gpo.GROUP_POLICY_OBJECT",
-	.tp_basicsize = sizeof(GPO),
-	.tp_new = py_gpo_new,
-	.tp_free = PyObject_Del,
-	.tp_init = (initproc)py_gpo_init,
-	.tp_alloc = PyType_GenericAlloc,
-	.tp_dealloc = (destructor)py_gpo_dealloc,
 	.tp_doc = "GROUP_POLICY_OBJECT",
 	.tp_getset = GPO_setters,
 	.tp_methods = GPO_methods,
@@ -419,10 +383,7 @@ static PyObject *py_ads_get_gpo_list(ADS *self, PyObject *args, PyObject *kwds)
 		goto out;
 	}
 
-	t_args = PyTuple_New(2);
-	PyTuple_SetItem(t_args, 0, PyCapsule_New(gpo_list, NULL, NULL));
-	PyTuple_SetItem(t_args, 1, PyCapsule_New(gpo_ctx, NULL, NULL));
-	ret = PyObject_CallObject((PyObject *)&GPOType, t_args);
+	pytalloc_steal_ex(&GPOType, gpo_ctx, gpo_list);
 
 out:
 	talloc_free(mem_ctx);
@@ -465,10 +426,14 @@ void initgpo(void)
 	m = Py_InitModule3("gpo", py_gpo_methods, "libgpo python bindings");
 	if (m == NULL) return;
 	PyModule_AddObject(m, "version", PyString_FromString(SAMBA_VERSION_STRING));
+
 	if (PyType_Ready(&ads_ADSType) < 0)
 		return;
 	PyModule_AddObject(m, "ADS_STRUCT", (PyObject *)&ads_ADSType);
-	if (PyType_Ready(&GPOType) < 0)
+	
+	if (pytalloc_BaseObject_PyType_Ready(&GPOType) < 0)
 		return;
-	PyModule_AddObject(m, "GROUP_POLICY_OBJECT", (PyObject *)&GPOType);
+	PyModule_AddObject(m, "GROUP_POLICY_OBJECT",
+			   (PyObject *)&GPOType);
+	
 }
