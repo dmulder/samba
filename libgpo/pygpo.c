@@ -30,18 +30,14 @@
 
 /* A Python C API module to use LIBGPO */
 
-typedef struct {
-	PyObject_HEAD
-	TALLOC_CTX *frame;
-	struct GROUP_POLICY_OBJECT *gpo_ptr;
-	struct GROUP_POLICY_OBJECT *head;
-} GPO;
-
 #define GPO_getter(ATTR) \
-static PyObject* GPO_get_##ATTR(GPO *self, void *closure) \
+static PyObject* GPO_get_##ATTR(PyObject *self, void *closure) \
 { \
-	if (self->gpo_ptr->ATTR) \
-		return PyString_FromString(self->gpo_ptr->ATTR); \
+	struct GROUP_POLICY_OBJECT *gpo_ptr \
+		= pytalloc_get_type(self, struct GROUP_POLICY_OBJECT); \
+	\
+	if (gpo_ptr->ATTR) \
+		return PyString_FromString(gpo_ptr->ATTR); \
 	else \
 		return Py_None; \
 }
@@ -64,15 +60,18 @@ static PyGetSetDef GPO_setters[] = {
 	{NULL}
 };
 
-static PyObject *py_gpo_get_unix_path(GPO *self, PyObject *args, PyObject *kwds)
+static PyObject *py_gpo_get_unix_path(PyObject *self, PyObject *args,
+				      PyObject *kwds)
 {
 	NTSTATUS status;
 	const char *cache_dir = NULL;
 	PyObject *ret = Py_None;
 	char *unix_path = NULL;
 	TALLOC_CTX *frame = NULL;
-
 	static const char *kwlist[] = {"cache_dir", NULL};
+	struct GROUP_POLICY_OBJECT *gpo_ptr \
+		= pytalloc_get_type(self, struct GROUP_POLICY_OBJECT);
+	
 	if (!PyArg_ParseTupleAndKeywords(args, kwds, "|s", discard_const_p(char *, kwlist), &cache_dir)) {
 		PyErr_SetString(PyExc_SystemError, "Failed to parse arguments to gpo_get_unix_path()");
 		goto out;
@@ -88,7 +87,7 @@ static PyObject *py_gpo_get_unix_path(GPO *self, PyObject *args, PyObject *kwds)
 
 	frame = talloc_stackframe();
 
-	status = gpo_get_unix_path(self->frame, cache_dir, self->gpo_ptr, &unix_path);
+	status = gpo_get_unix_path(frame, cache_dir, gpo_ptr, &unix_path);
 
 	TALLOC_FREE(frame);
 	
@@ -108,33 +107,13 @@ static PyMethodDef GPO_methods[] = {
 	{NULL}
 };
 
-static PyTypeObject GPOType;
-static PyObject* py_gpo_iternext(GPO *self)
-{
-	if (self->gpo_ptr && self->gpo_ptr->next) {
-		self->gpo_ptr = self->gpo_ptr->next;
-		return (PyObject *)self;
-	} else {
-		self->gpo_ptr = self->head;
-		PyErr_SetNone(PyExc_StopIteration);
-		return NULL;
-	}
-}
-
-static PyObject* py_gpo_iter(PyObject *self)
-{
-	Py_INCREF(self);
-	return self;
-}
-
 static PyTypeObject GPOType = {
+	PyVarObject_HEAD_INIT(NULL, 0)
 	.tp_name = "gpo.GROUP_POLICY_OBJECT",
 	.tp_doc = "GROUP_POLICY_OBJECT",
 	.tp_getset = GPO_setters,
 	.tp_methods = GPO_methods,
-	.tp_iter = py_gpo_iter,
-	.tp_iternext = (iternextfunc)py_gpo_iternext,
-	.tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_ITER,
+	.tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,
 };
 
 typedef struct {
@@ -342,7 +321,7 @@ out:
 static PyObject *py_ads_get_gpo_list(ADS *self, PyObject *args, PyObject *kwds)
 {
 	TALLOC_CTX *frame = NULL;
-	struct GROUP_POLICY_OBJECT *gpo_list = NULL;
+	struct GROUP_POLICY_OBJECT *gpo = NULL, *gpo_list = NULL;
 	ADS_STATUS status;
 	const char *samaccountname = NULL;
 	const char *dn = NULL;
@@ -351,6 +330,8 @@ static PyObject *py_ads_get_gpo_list(ADS *self, PyObject *args, PyObject *kwds)
 	struct security_token *token = NULL;
 	PyObject *ret = Py_None;
 	TALLOC_CTX *gpo_ctx;
+	size_t list_size;
+	size_t i;
 
 	static const char *kwlist[] = {"samaccountname", NULL};
 	if (!PyArg_ParseTupleAndKeywords(args, kwds, "s", discard_const_p(char *, kwlist), &samaccountname)) {
@@ -379,7 +360,7 @@ static PyObject *py_ads_get_gpo_list(ADS *self, PyObject *args, PyObject *kwds)
 		goto out;
 	}
 
-	gpo_ctx = talloc_new(NULL);
+	gpo_ctx = talloc_new(frame);
 	status = ads_get_gpo_list(self->ads_ptr, gpo_ctx, dn, flags, token, &gpo_list);
 	if (!ADS_ERR_OK(status)) {
 		TALLOC_FREE(frame);
@@ -387,14 +368,33 @@ static PyObject *py_ads_get_gpo_list(ADS *self, PyObject *args, PyObject *kwds)
 		goto out;
 	}
 
-	pytalloc_steal_ex(&GPOType, gpo_ctx, gpo_list);
+	/* Convert the C linked list into a python list */
+	list_size = 0;
+	for (gpo = gpo_list; gpo != NULL; gpo = gpo->next) {
+		list_size++;
+	}
+
+	i = 0;
+	ret = PyList_New(list_size);
+	if (ret == NULL) {
+		TALLOC_FREE(frame);
+		goto out;
+	}
+	
+	for (gpo = gpo_list; gpo != NULL; gpo = gpo->next) {
+		PyObject *obj = pytalloc_reference_ex(&GPOType,
+						      gpo_ctx, gpo);
+		if (obj == NULL) {
+			TALLOC_FREE(frame);
+			goto out;
+		}
+			
+		PyList_SetItem(ret, i, obj);
+	}
 
 out:
+	
 	TALLOC_FREE(frame);
-	if (!ret) {
-		PyErr_Print();
-		return Py_None;
-	}
 	return ret;
 }
 
@@ -437,6 +437,8 @@ void initgpo(void)
 	
 	if (pytalloc_BaseObject_PyType_Ready(&GPOType) < 0)
 		return;
+	
+	Py_INCREF((PyObject *)(void *)&GPOType);
 	PyModule_AddObject(m, "GROUP_POLICY_OBJECT",
 			   (PyObject *)&GPOType);
 	
