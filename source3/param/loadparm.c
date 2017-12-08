@@ -923,7 +923,7 @@ static void init_globals(struct loadparm_context *lp_ctx, bool reinit_globals)
 	Globals.gpo_update_command = str_list_make_v3_const(NULL, s, NULL);
 	TALLOC_FREE(s);
 
-	Globals.apply_group_policies = false;
+	Globals.apply_group_policies = true;
 
 	s = talloc_asprintf(talloc_tos(), "%s/samba_spnupdate", get_dyn_SCRIPTSBINDIR());
 	if (s == NULL) {
