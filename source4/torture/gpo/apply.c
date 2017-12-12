@@ -40,6 +40,8 @@ struct torture_suite *gpo_apply_suite(TALLOC_CTX *ctx)
 	torture_suite_add_simple_test(suite,
 				      "gpo_environment_variables_policies",
 				   torture_gpo_environment_variables_policies);
+	torture_suite_add_simple_test(suite, "gpo_bad_env_var",
+				      torture_gpo_bad_env_var);
 
 	suite->description = talloc_strdup(suite, "Group Policy apply tests");
 
@@ -532,6 +534,62 @@ bool torture_gpo_environment_variables_policies(struct torture_context *tctx)
 			    "Environment variable policy was not unapplied");
 		}
 	}
+
+	talloc_free(ctx);
+	return true;
+}
+
+bool torture_gpo_bad_env_var(struct torture_context *tctx)
+{
+	TALLOC_CTX *ctx = talloc_new(tctx);
+	const char *env_dir = NULL, *env_xml = NULL, *smbconf = NULL;
+	const char *sysvol_path = NULL, *gpt_file = NULL;
+	char *profile = NULL;
+	const char *envcases[][4] = {
+		{ "C:\\WINDOWS\\system32", "U", "0" },
+		{ "\%USERPROFILE\%\\bin", "U", "0" },
+		{ "/foo;/bar", "U", "0" },
+	};
+	int i;
+	FILE *fp = NULL;
+	struct stat *finfo = talloc_zero(ctx, struct stat);
+
+	/* Ensure the sysvol path exists */
+	sysvol_path = lpcfg_path(lpcfg_service(tctx->lp_ctx, "sysvol"),
+				 lpcfg_default_service(tctx->lp_ctx), tctx);
+	torture_assert(tctx, sysvol_path, "Failed to fetch the sysvol path");
+	env_dir = talloc_asprintf(ctx, "%s/%s", sysvol_path, ENVPATH);
+	mkdir_p(env_dir, S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
+	env_xml = talloc_asprintf(ctx, "%s/%s", env_dir, ENVXML);
+
+	smbconf = lpcfg_configfile(tctx->lp_ctx);
+	profile = talloc_strndup(ctx, smbconf, strlen(smbconf)-8);
+	profile = talloc_strdup_append(profile, "profile");
+
+	for (i = 0; i < 3; i++) {
+		if ( (fp = fopen(env_xml, "w")) ) {
+			fputs(talloc_asprintf(ctx, ENVTMPL, envcases[i][0],
+					      envcases[i][1], envcases[i][0],
+					      envcases[i][2]), fp);
+			fclose(fp);
+		}
+		gpt_file = talloc_asprintf(ctx, "%s/%s", sysvol_path, GPTINI);
+		increment_gpt_ini(ctx, gpt_file);
+
+		exec_gpo_update_command(tctx);
+
+		/* Make sure the profile is either not there, or empty */
+		if (access(profile, F_OK) == 0) {
+			if (stat(profile, finfo) == 0) {
+				torture_assert_int_equal(tctx,
+					finfo->st_size, 0,
+					"The profile was not zero bytes");
+			}
+		}
+	}
+
+	/* Unapply the settings */
+	exec_gpo_unapply_command(tctx);
 
 	talloc_free(ctx);
 	return true;

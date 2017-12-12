@@ -15,6 +15,19 @@ class xml_to_env(file_to):
         global sysconfdir
         if type(val) is not dict:
             val = { 'value': val, 'action': 'U' }
+
+        # MS PATH variable is seperated by ';', which if placed in a posix
+        # PATH causes everything after the ';' to be executed, which is not
+        # what we intend. So, ignore PATH variables that contain ';'. Also
+        # ensure the first character in the PATH is something valid (rather
+        # than C:\ or something).
+        if val['value'] and self.attribute == 'PATH' and \
+           (';' in val['value'] or \
+           val['value'][0] not in ['/', '$', '~', '.']):
+            self.logger.info('Ignored PATH variable assignment due to it\'s' +\
+                ' similarity to a Windows PATH: %s' % val['value'])
+            return
+
         profile = ini_file_append(os.path.join(sysconfdir, 'profile'))
 
         old_val = profile[self.attribute]
