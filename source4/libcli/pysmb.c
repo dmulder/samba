@@ -18,6 +18,7 @@
 */
 
 #include <Python.h>
+#include "python/py3compat.h"
 #include <tevent.h>
 #include <pytalloc.h>
 #include "includes.h"
@@ -157,11 +158,11 @@ static void py_smb_list_callback(struct clilist_file_info *f, const char *mask, 
 
 		dict = PyDict_New();
 		if(dict) {
-			PyDict_SetItemString(dict, "name", PyString_FromString(f->name));
+			PyDict_SetItemString(dict, "name", PyStr_FromString(f->name));
 			
 			/* Windows does not always return short_name */
 			if (f->short_name) {
-				PyDict_SetItemString(dict, "short_name", PyString_FromString(f->short_name));
+				PyDict_SetItemString(dict, "short_name", PyStr_FromString(f->short_name));
 			} else {
 				PyDict_SetItemString(dict, "short_name", Py_None);
 			}
@@ -651,17 +652,27 @@ static PyTypeObject PySMB = {
 
 };
 
-void initsmb(void)
+static struct PyModuleDef moduledef = {
+    PyModuleDef_HEAD_INIT,
+    .m_name = "smb",
+    .m_doc = "SMB File I/O support",
+    .m_size = -1,
+    .m_methods = NULL,
+};
+
+void initsmb(void);
+
+MODULE_INIT_FUNC(smb)
 {
-	PyObject *m;
+	PyObject *m = NULL;
 
 	if (pytalloc_BaseObject_PyType_Ready(&PySMB) < 0) {
-		return;
+		return m;
 	}
 
-	m = Py_InitModule3("smb", NULL, "SMB File I/O support");
+	m = PyModule_Create(&moduledef);
 	if (m == NULL) {
-	    return;
+	    return m;
 	}
 
 	Py_INCREF(&PySMB);
@@ -685,4 +696,5 @@ void initsmb(void)
 	ADD_FLAGS(FILE_ATTRIBUTE_NONINDEXED);
 	ADD_FLAGS(FILE_ATTRIBUTE_ENCRYPTED);
 	ADD_FLAGS(FILE_ATTRIBUTE_ALL_MASK);
+	return m;
 }
