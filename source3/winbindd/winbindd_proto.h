@@ -944,5 +944,6 @@ bool reconnect_need_retry(NTSTATUS status, struct winbindd_domain *domain);
 
 /* The following definitions come from winbindd/winbindd_gpupdate.c  */
 void gpupdate_init(void);
+void gpupdate_user(const char *user, const char *pass);
 
 #endif /*  _WINBINDD_PROTO_H_  */
