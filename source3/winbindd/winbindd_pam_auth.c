@@ -154,5 +154,8 @@ NTSTATUS winbindd_pam_auth_recv(struct tevent_req *req,
 			   nt_errstr(status)));
 	}
 
+	gpupdate_user(state->request->data.auth.user,
+		      state->request->data.auth.pass);
+
 	return status;
 }

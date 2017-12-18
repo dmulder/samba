@@ -114,3 +114,38 @@ void gpupdate_init(void)
 	}
 }
 
+void gpupdate_user(const char *user, const char *pass)
+{
+	TALLOC_CTX * ctx = talloc_new(NULL);
+	struct tevent_context *ev = tevent_context_init(ctx);
+	struct tevent_req *req = NULL;
+	struct loadparm_context *lp_ctx =
+		loadparm_init_s3(ctx, loadparm_s3_helpers());
+	const char *const *gpupdate_cmd =
+		lpcfg_gpo_update_command(lp_ctx);
+	const char *smbconf = lp_default_path();
+
+	/*
+	 * Check if gpupdate is enabled for winbind, if not
+	 * return without executing gpupdate.
+	 */
+	if (!lpcfg_apply_group_policies(lp_ctx)) {
+		talloc_free(ctx);
+		return;
+	}
+
+	req = samba_runcmd_send(ctx, ev, timeval_zero(), 2, 0,
+				gpupdate_cmd,
+				"-s",
+				smbconf,
+				talloc_asprintf(ctx, "--username=%s", user),
+				talloc_asprintf(ctx, "--password=%s", pass),
+				NULL);
+	if (req == NULL) {
+		DEBUG(0, ("Failed to execute the gpupdate command\n"));
+		talloc_free(ctx);
+		return;
+	}
+
+	talloc_free(ctx);
+}
