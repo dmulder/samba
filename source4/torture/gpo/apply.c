@@ -28,6 +28,7 @@
 #include "torture/gpo/proto.h"
 #include <unistd.h>
 #include <fcntl.h>
+#include <pwd.h>
 
 struct torture_suite *gpo_apply_suite(TALLOC_CTX *ctx)
 {
@@ -42,6 +43,8 @@ struct torture_suite *gpo_apply_suite(TALLOC_CTX *ctx)
 				   torture_gpo_environment_variables_policies);
 	torture_suite_add_simple_test(suite, "gpo_bad_env_var",
 				      torture_gpo_bad_env_var);
+	torture_suite_add_simple_test(suite, "torture_gpo_user_proxy_policy",
+				      torture_gpo_user_proxy_policy);
 
 	suite->description = talloc_strdup(suite, "Group Policy apply tests");
 
@@ -135,28 +138,11 @@ static void increment_gpt_ini(TALLOC_CTX *ctx, const char *gpt_file)
 	}
 }
 
-static bool exec_gpo_update_command(struct torture_context *tctx)
-{
-	int ret = 0;
-	const char **gpo_update_cmd;
-
-	/* Get the gpo update command */
-	gpo_update_cmd = lpcfg_gpo_update_command(tctx->lp_ctx);
-	torture_assert(tctx, gpo_update_cmd && gpo_update_cmd[0],
-		       "Failed to fetch the gpo update command");
-
-	/* Run the gpo update command */
-	ret = exec_wait(discard_const_p(char *, gpo_update_cmd));
-	torture_assert(tctx, ret == 0,
-		       "Failed to execute the gpo update command");
-
-	return true;
-}
-
-static bool exec_gpo_unapply_command(struct torture_context *tctx)
+static bool exec_gpo_update_command(struct torture_context *tctx, bool machine,
+				    const char *user, const char *pass)
 {
 	TALLOC_CTX *ctx = talloc_new(tctx);
-	char **gpo_unapply_cmd;
+	char **gpo_cmd;
 	const char **gpo_update_cmd;
 	int gpo_update_len = 0;
 	const char **itr;
@@ -170,14 +156,66 @@ static bool exec_gpo_unapply_command(struct torture_context *tctx)
 	for (itr = gpo_update_cmd; *itr != NULL; itr++) {
 		gpo_update_len++;
 	}
-	gpo_unapply_cmd = talloc_array(ctx, char*, gpo_update_len+2);
+	gpo_cmd = talloc_array(ctx, char*, gpo_update_len+3);
 	for (i = 0; i < gpo_update_len; i++) {
-		gpo_unapply_cmd[i] = talloc_strdup(gpo_unapply_cmd,
-						   gpo_update_cmd[i]);
+		gpo_cmd[i] = talloc_strdup(gpo_cmd,
+					   gpo_update_cmd[i]);
 	}
-	gpo_unapply_cmd[i] = talloc_asprintf(gpo_unapply_cmd, "--unapply");
-	gpo_unapply_cmd[i+1] = NULL;
-	ret = exec_wait(gpo_unapply_cmd);
+	if (machine) {
+		gpo_cmd[i] = talloc_asprintf(gpo_cmd, "--machine");
+		gpo_cmd[i+1] = NULL;
+	} else {
+		gpo_cmd[i] = talloc_asprintf(gpo_cmd, "--username=%s", user);
+		gpo_cmd[i+1] = talloc_asprintf(gpo_cmd,
+					       "--password=%s", pass);
+		gpo_cmd[i+2] = NULL;
+	}
+
+	/* Run the gpo update command */
+	ret = exec_wait(gpo_cmd);
+	torture_assert(tctx, ret == 0,
+		       "Failed to execute the gpo update command");
+
+	talloc_free(ctx);
+	return true;
+}
+
+static bool exec_gpo_unapply_command(struct torture_context *tctx,
+				     bool machine,
+				     const char *user, const char *pass)
+{
+	TALLOC_CTX *ctx = talloc_new(tctx);
+	char **gpo_cmd;
+	const char **gpo_update_cmd;
+	int gpo_update_len = 0;
+	const char **itr;
+	int ret = 0, i;
+
+	/* Get the gpo update command */
+	gpo_update_cmd = lpcfg_gpo_update_command(tctx->lp_ctx);
+	torture_assert(tctx, gpo_update_cmd && gpo_update_cmd[0],
+		       "Failed to fetch the gpo update command");
+
+	for (itr = gpo_update_cmd; *itr != NULL; itr++) {
+		gpo_update_len++;
+	}
+	gpo_cmd = talloc_array(ctx, char*, gpo_update_len+4);
+	for (i = 0; i < gpo_update_len; i++) {
+		gpo_cmd[i] = talloc_strdup(gpo_cmd, gpo_update_cmd[i]);
+	}
+	if (machine) {
+		gpo_cmd[i] = talloc_asprintf(gpo_cmd, "--machine");
+		gpo_cmd[i+1] = talloc_asprintf(gpo_cmd, "--unapply");
+		gpo_cmd[i+2] = NULL;
+	} else {
+		gpo_cmd[i] = talloc_asprintf(gpo_cmd, "--unapply");
+		gpo_cmd[i+1] = talloc_asprintf(gpo_cmd,
+					       "--username=%s", user);
+		gpo_cmd[i+2] = talloc_asprintf(gpo_cmd,
+					       "--password=%s", pass);
+		gpo_cmd[i+3] = NULL;
+	}
+	ret = exec_wait(gpo_cmd);
 	torture_assert(tctx, ret == 0,
 		       "Failed to execute the gpo unapply command");
 
@@ -240,7 +278,7 @@ bool torture_gpo_system_access_policies(struct torture_context *tctx)
 		gpt_file = talloc_asprintf(ctx, "%s/%s", sysvol_path, GPTINI);
 		increment_gpt_ini(ctx, gpt_file);
 
-		exec_gpo_update_command(tctx);
+		exec_gpo_update_command(tctx, true, NULL, NULL);
 
 		ret = ldb_search(samdb, ctx, &result,
 				 ldb_get_default_basedn(samdb),
@@ -282,7 +320,7 @@ bool torture_gpo_system_access_policies(struct torture_context *tctx)
 	}
 
 	/* Unapply the settings and verify they are removed */
-	exec_gpo_unapply_command(tctx);
+	exec_gpo_unapply_command(tctx, true, NULL, NULL);
 
 	ret = ldb_search(samdb, ctx, &result, ldb_get_default_basedn(samdb),
 			 LDB_SCOPE_BASE, attrs, NULL);
@@ -392,7 +430,7 @@ bool torture_gpo_disable_policies(struct torture_context *tctx)
 		gpt_file = talloc_asprintf(ctx, "%s/%s", sysvol_path, GPTINI);
 		increment_gpt_ini(ctx, gpt_file);
 
-		exec_gpo_update_command(tctx);
+		exec_gpo_update_command(tctx, true, NULL, NULL);
 
 		ret = ldb_search(samdb, ctx, &result,
 				 ldb_get_default_basedn(samdb),
@@ -452,7 +490,7 @@ bool torture_gpo_disable_policies(struct torture_context *tctx)
 	}
 
 	/* Unapply the settings and verify they are removed */
-	exec_gpo_unapply_command(tctx);
+	exec_gpo_unapply_command(tctx, true, NULL, NULL);
 
 	/* Re-enable the policy */
 	remove(disable_file);
@@ -505,7 +543,7 @@ bool torture_gpo_environment_variables_policies(struct torture_context *tctx)
 		gpt_file = talloc_asprintf(ctx, "%s/%s", sysvol_path, GPTINI);
 		increment_gpt_ini(ctx, gpt_file);
 
-		exec_gpo_update_command(tctx);
+		exec_gpo_update_command(tctx, true, NULL, NULL);
 
 		/* Machine env var policy */
 		envexpected = talloc_asprintf(ctx, RESENV, envres[i]);
@@ -523,7 +561,7 @@ bool torture_gpo_environment_variables_policies(struct torture_context *tctx)
 	}
 
 	/* Unapply the settings and verify they are removed */
-	exec_gpo_unapply_command(tctx);
+	exec_gpo_unapply_command(tctx, true, NULL, NULL);
 
 	/* Machine env var policy */
 	fd = open(profile, O_RDONLY);
@@ -576,7 +614,7 @@ bool torture_gpo_bad_env_var(struct torture_context *tctx)
 		gpt_file = talloc_asprintf(ctx, "%s/%s", sysvol_path, GPTINI);
 		increment_gpt_ini(ctx, gpt_file);
 
-		exec_gpo_update_command(tctx);
+		exec_gpo_update_command(tctx, true, NULL, NULL);
 
 		/* Make sure the profile is either not there, or empty */
 		if (access(profile, F_OK) == 0) {
@@ -589,7 +627,175 @@ bool torture_gpo_bad_env_var(struct torture_context *tctx)
 	}
 
 	/* Unapply the settings */
-	exec_gpo_unapply_command(tctx);
+	exec_gpo_unapply_command(tctx, true, NULL, NULL);
+
+	talloc_free(ctx);
+	return true;
+}
+
+#define PROXYPATH "addom.samba.example.com/Policies/"\
+		  "{31B2F340-016D-11D2-945F-00C04FB984F9}/USER/"\
+		  "MICROSOFT/IEAK"
+#define PROXYFILE "install.ins"
+
+#define PROXYTMPL "[Proxy]\n\
+Proxy_Enable=%s\n\
+HTTP_Proxy_Server=%s\n\
+Use_Same_Proxy=%s\n\
+%s\
+"
+#define PROXYTMPLEXT "\
+FTP_Proxy_Server=%s\n\
+Secure_Proxy_Server=%s\n\
+"
+#define TESTUSER "alice"
+#define TESTPASS "Secret007"
+
+bool torture_gpo_user_proxy_policy(struct torture_context *tctx)
+{
+	TALLOC_CTX *ctx = talloc_new(tctx);
+	int ret, i;
+	const char *sysvol_path = NULL, *proxy_dir = NULL;
+	const char *proxy_file = NULL, *gpt_file = NULL;
+	FILE *fp = NULL;
+	const char *use_same[] = {
+		"proxy2.example.com:8080",
+		"proxy3.example.com:8080"
+	};
+	const char *proxycases[][4] = {
+		{ "1", "proxy.example.com:8080", "1", "" },
+		{ "1", "proxy.example.com:8080", "0",
+		  talloc_asprintf(ctx, PROXYTMPLEXT,
+				  use_same[0],
+				  use_same[1]) },
+		{ "1", "proxy.example.com:8080", "1",
+		  talloc_asprintf(ctx, PROXYTMPLEXT,
+				  use_same[0],
+				  use_same[1]) },
+		{ "0", "proxy.example.com:8080", "0",
+		  talloc_asprintf(ctx, PROXYTMPLEXT,
+				  use_same[0],
+				  use_same[1]) },
+		{ "0", "proxy.example.com:8080", "1", "" },
+	};
+	char *profile = NULL;
+	struct stat *finfo = talloc_zero(ctx, struct stat);
+	struct passwd *pwd = NULL;
+	char *profile_data = NULL;
+
+	/* Ensure the sysvol path exists */
+	sysvol_path = lpcfg_path(lpcfg_service(tctx->lp_ctx, "sysvol"),
+				 lpcfg_default_service(tctx->lp_ctx), tctx);
+	torture_assert(tctx, sysvol_path, "Failed to fetch the sysvol path");
+	proxy_dir = talloc_asprintf(ctx, "%s/%s", sysvol_path, PROXYPATH);
+	mkdir_p(proxy_dir, S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
+	proxy_file = talloc_asprintf(ctx, "%s/%s", proxy_dir, PROXYFILE);
+
+	pwd = getpwnam(TESTUSER);
+	mkdir_p(pwd->pw_dir, S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
+	profile = talloc_asprintf(ctx, "%s/.profile", pwd->pw_dir);
+
+	for (i = 0; i < sizeof(proxycases)/sizeof(proxycases[0]); i++) {
+		if ( (fp = fopen(proxy_file, "w")) ) {
+			fputs(talloc_asprintf(ctx, PROXYTMPL,
+					      proxycases[i][0],
+					      proxycases[i][1],
+					      proxycases[i][2],
+					      proxycases[i][3]), fp);
+			fclose(fp);
+		}
+		gpt_file = talloc_asprintf(ctx, "%s/%s", sysvol_path, GPTINI);
+		increment_gpt_ini(ctx, gpt_file);
+
+		exec_gpo_update_command(tctx, false, TESTUSER, TESTPASS);
+
+		/* test that things are applied here */
+		torture_assert(tctx, access(profile, F_OK) == 0,
+			       "The profile does not exist");
+		torture_assert(tctx, stat(profile, finfo) == 0,
+			       "Failed to stat the profile");
+		profile_data = talloc_zero_size(ctx, finfo->st_size);
+		fp = fopen(profile, "rb");
+		fread(profile_data, 1, finfo->st_size, fp);
+
+		if (atoi(proxycases[i][0]) == 1) {
+			torture_assert(tctx, strstr(profile_data,
+				       talloc_asprintf(ctx, "http_proxy=%s",
+						       proxycases[i][1]))
+				       != NULL,
+				       "Failed to find http_proxy in profile");
+			if (atoi(proxycases[i][2]) == 0) {
+				torture_assert(tctx, strstr(profile_data,
+					talloc_asprintf(ctx, "ftp_proxy=%s",
+							use_same[0]))
+					!= NULL,
+					"Failed to find ftp_proxy in profile");
+				torture_assert(tctx, strstr(profile_data,
+					talloc_asprintf(ctx, "https_proxy=%s",
+							use_same[1]))
+					!= NULL,
+				"Failed to find https_proxy in profile");
+			} else {
+				torture_assert(tctx, strstr(profile_data,
+					talloc_asprintf(ctx, "ftp_proxy=%s",
+							use_same[0]))
+					== NULL,
+					"ftp_proxy should NOT have been set");
+				torture_assert(tctx, strstr(profile_data,
+					talloc_asprintf(ctx, "https_proxy=%s",
+							use_same[1]))
+					== NULL,
+				"https_proxy should NOT have been set");
+			}
+		} else {
+			torture_assert(tctx, strstr(profile_data,
+				       talloc_asprintf(ctx, "http_proxy=%s",
+						       proxycases[i][1]))
+				       == NULL,
+				       "http_proxy should NOT have been set");
+			torture_assert(tctx, strstr(profile_data,
+				       talloc_asprintf(ctx, "ftp_proxy=%s",
+						       use_same[0]))
+				       == NULL,
+				       "ftp_proxy should NOT have been set");
+			torture_assert(tctx, strstr(profile_data,
+				       talloc_asprintf(ctx, "https_proxy=%s",
+						       use_same[1]))
+				       == NULL,
+				       "https_proxy should NOT have been set");
+		}
+	}
+
+	exec_gpo_unapply_command(tctx, false, TESTUSER, TESTPASS);
+
+	/* Make sure the profile is either not there, or empty */
+	if (access(profile, F_OK) == 0) {
+		if (stat(profile, finfo) == 0) {
+			if (finfo->st_size != 0) {
+				torture_assert(tctx, strstr(profile_data,
+					talloc_asprintf(ctx, "http_proxy=%s",
+							proxycases[i][1]))
+					== NULL,
+					"http_proxy should NOT have been set");
+				torture_assert(tctx, strstr(profile_data,
+					talloc_asprintf(ctx, "ftp_proxy=%s",
+							use_same[0]))
+					== NULL,
+					"ftp_proxy should NOT have been set");
+				torture_assert(tctx, strstr(profile_data,
+					talloc_asprintf(ctx, "https_proxy=%s",
+							use_same[1]))
+					== NULL,
+				"https_proxy should NOT have been set");
+				torture_assert(tctx, strstr(profile_data,
+					       "use_same_proxy=") == NULL,
+				"use_same_proxy should NOT have been set");
+				torture_assert(tctx, strstr(profile_data,
+					       "proxy_enable=") == NULL,
+				"proxy_enable should NOT have been set");
+			}
+		}
+	}
 
 	talloc_free(ctx);
 	return true;
