@@ -35,6 +35,7 @@ try:
 except:
     SamDB = None
 from samba.gpclass import *
+from samba.gp_sec_ext import gp_sec_ext
 from samba.net import Net
 from samba.dcerpc import nbt
 from samba import smb
@@ -170,7 +171,8 @@ if __name__ == "__main__":
     gp_extensions = []
     if opts.machine:
         if lp.get('server role') == 'active directory domain controller':
-            gp_extensions.append(gp_sec_ext(logger))
+            if gp_sec_ext.enabled():
+                gp_extensions.append(gp_sec_ext(logger))
     else:
         pass # User extensions
 
