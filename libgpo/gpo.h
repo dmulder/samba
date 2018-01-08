@@ -109,7 +109,7 @@ struct GP_EXT {
 };
 
 #define GPO_CACHE_DIR "gpo_cache"
-#define GPT_INI "GPT.INI"
+#define GPT_INI "gpt.ini"
 #define GPO_REFRESH_INTERVAL 60*90
 
 #define GPO_REG_STATE_MACHINE "State\\Machine"
