@@ -2743,6 +2743,33 @@ int ads_count_replies(ADS_STRUCT *ads, void *res)
 }
 
 /**
+ * pull a single uint64_t from a ADS result
+ * @param ads connection to ads server
+ * @param msg Results of search
+ * @param field Attribute to retrieve
+ * @param v Pointer to int to store result
+ * @return boolean inidicating success
+*/
+bool ads_pull_uint64(ADS_STRUCT *ads, LDAPMessage *msg, const char *field,
+		     uint64_t *v)
+{
+	char **values = NULL;
+
+	values = ldap_get_values(ads->ldap.ld, msg, field);
+	if (values == NULL) {
+		return False;
+	}
+	if (values[0] == NULL) {
+		ldap_value_free(values);
+		return False;
+	}
+
+	*v = strtoull(values[0], NULL, 10);
+	ldap_value_free(values);
+	return True;
+}
+
+/**
  * pull a single objectGUID from an ADS result
  * @param ads connection to ADS server
  * @param msg results of search

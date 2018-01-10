@@ -347,6 +347,7 @@ struct WINBINDD_CCACHE_ENTRY {
 	time_t renew_until;
 	time_t refresh_time;
 	struct tevent_timer *event;
+	NTTIME last_password_change;
 };
 
 #include "winbindd/winbindd_proto.h"

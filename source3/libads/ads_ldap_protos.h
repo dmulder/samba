@@ -52,6 +52,8 @@ char **ads_pull_strings_range(ADS_STRUCT *ads,
 			      bool *more_strings);
 bool ads_pull_uint32(ADS_STRUCT *ads, LDAPMessage *msg, const char *field,
 		     uint32_t *v);
+bool ads_pull_uint64(ADS_STRUCT *ads, LDAPMessage *msg, const char *field,
+		     uint64_t *v);
 bool ads_pull_guid(ADS_STRUCT *ads, LDAPMessage *msg, struct GUID *guid);
 bool ads_pull_sid(ADS_STRUCT *ads, LDAPMessage *msg, const char *field,
 		  struct dom_sid *sid);

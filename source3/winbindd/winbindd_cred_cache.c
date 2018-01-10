@@ -26,6 +26,7 @@
 #include "../libcli/auth/libcli_auth.h"
 #include "smb_krb5.h"
 #include "libads/kerberos_proto.h"
+#include "winbindd_ads.h"
 
 #undef DBGC_CLASS
 #define DBGC_CLASS DBGC_WINBIND
@@ -100,6 +101,53 @@ void ccache_remove_all_after_fork(void)
 	return;
 }
 
+static uint64_t fetch_last_password_change(struct WINBINDD_CCACHE_ENTRY *entry)
+{
+	TALLOC_CTX *ctx = talloc_new(entry);
+	ADS_STATUS status;
+	ADS_STRUCT *ads = NULL;
+	LDAPMessage *res = NULL;
+	char *ldap_exp;
+	uint64_t ret = 0;
+	const char *attr_list[] = {
+		"pwdLastSet",
+		NULL
+	};
+
+	ldap_exp = talloc_asprintf(ctx, "(userPrincipalName=%s)",
+				   entry->principal_name);
+	if (ldap_exp == NULL) {
+		goto fail;
+	}
+
+	status = ads_idmap_cached_connection(&ads, entry->realm);
+	if (!ADS_ERR_OK(status)) {
+		DBG_DEBUG("Failed to fetch ads cached connection\n");
+		goto fail;
+	}
+
+	status = ads_do_search_all(ads, ads->config.bind_path,
+				   LDAP_SCOPE_SUBTREE, ldap_exp,
+				   attr_list, &res);
+	if (ADS_ERR_OK(status)) {
+		bool ok;
+		int count = ads_count_replies(ads, res);
+		if (count != 1) {
+			DBG_DEBUG("Number of fetched responses for search with"
+				  " filter \"%s\" was %d\n", ldap_exp, count);
+			goto fail;
+		}
+		ok = ads_pull_uint64(ads, res, "pwdLastSet", &ret);
+		if (!ok) {
+			goto fail;
+		}
+	}
+
+fail:
+	TALLOC_FREE(ctx);
+	return ret;
+}
+
 /****************************************************************
  Do the work of refreshing the ticket.
 ****************************************************************/
@@ -133,20 +181,36 @@ static void krb5_ticket_refresh_handler(struct tevent_context *event_ctx,
 	if (entry->renew_until < time(NULL)) {
 rekinit:
 		if (cred_ptr && cred_ptr->pass) {
+			uint64_t last_pwd_chg;
 
-			set_effective_uid(entry->uid);
+			/* Using cached passwords to kinit can lockout a user
+			 * account if their password has changed. Check the
+			 * user pwdLastSet attribute and ignore the kinit if it
+			 * has changed.
+			 */
+			last_pwd_chg = fetch_last_password_change(entry);
+			if (last_pwd_chg <= entry->last_password_change) {
+				set_effective_uid(entry->uid);
 
-			ret = kerberos_kinit_password_ext(entry->principal_name,
-							  cred_ptr->pass,
-							  0, /* hm, can we do time correction here ? */
-							  &entry->refresh_time,
-							  &entry->renew_until,
-							  entry->ccname,
-							  False, /* no PAC required anymore */
-							  True,
-							  WINBINDD_PAM_AUTH_KRB5_RENEW_TIME,
-							  NULL);
-			gain_root_privilege();
+				ret = kerberos_kinit_password_ext(
+					entry->principal_name,
+					cred_ptr->pass,
+					0, /* can we do time correction here? */
+					&entry->refresh_time,
+					&entry->renew_until,
+					entry->ccname,
+					False, /* no PAC required anymore */
+					True,
+					WINBINDD_PAM_AUTH_KRB5_RENEW_TIME,
+					NULL);
+
+				gain_root_privilege();
+			} else {
+				ret = KRB5KDC_ERR_PREAUTH_FAILED;
+				DBG_NOTICE("Skipping re-kinit for %s"
+					   " due to cached invalid password\n",
+					   entry->principal_name);
+			}
 
 			if (ret) {
 				DEBUG(3,("krb5_ticket_refresh_handler: "
@@ -308,6 +372,7 @@ static void krb5_ticket_gain_handler(struct tevent_context *event_ctx,
 	struct timeval t;
 	struct WINBINDD_MEMORY_CREDS *cred_ptr = entry->cred_ptr;
 	struct winbindd_domain *domain = NULL;
+	uint64_t last_pwd_chg;
 #endif
 
 	DBG_DEBUG("event called for: %s, %s\n",
@@ -331,9 +396,15 @@ static void krb5_ticket_gain_handler(struct tevent_context *event_ctx,
 		goto retry_later;
 	}
 
-	set_effective_uid(entry->uid);
+	/* Using cached passwords to kinit can lockout a user account if their
+	 * password has changed. Check the user pwdLastSet attribute and ignore
+	 * the kinit if it has changed.
+	 */
+	last_pwd_chg = fetch_last_password_change(entry);
+	if (last_pwd_chg <= entry->last_password_change) {
+		set_effective_uid(entry->uid);
 
-	ret = kerberos_kinit_password_ext(entry->principal_name,
+		ret = kerberos_kinit_password_ext(entry->principal_name,
 					  cred_ptr->pass,
 					  0, /* hm, can we do time correction here ? */
 					  &entry->refresh_time,
@@ -343,7 +414,14 @@ static void krb5_ticket_gain_handler(struct tevent_context *event_ctx,
 					  True,
 					  WINBINDD_PAM_AUTH_KRB5_RENEW_TIME,
 					  NULL);
-	gain_root_privilege();
+
+		gain_root_privilege();
+	} else {
+		ret = KRB5KDC_ERR_PREAUTH_FAILED;
+		DBG_NOTICE("Skipping kinit for %s"
+			   " due to cached invalid password\n",
+			   entry->principal_name);
+	}
 
 	if (ret) {
 		DEBUG(3,("krb5_ticket_gain_handler: "
@@ -494,7 +572,8 @@ NTSTATUS add_ccache_to_list(const char *princ_name,
 			    time_t create_time,
 			    time_t ticket_end,
 			    time_t renew_until,
-			    bool postponed_request)
+			    bool postponed_request,
+			    NTTIME last_password_change)
 {
 	struct WINBINDD_CCACHE_ENTRY *entry = NULL;
 	struct timeval t;
@@ -625,6 +704,7 @@ NTSTATUS add_ccache_to_list(const char *princ_name,
 	entry->renew_until = renew_until;
 	entry->uid = uid;
 	entry->ref_count = 1;
+	entry->last_password_change = last_password_change;
 
 	if (!lp_winbind_refresh_tickets() || renew_until <= 0) {
 		goto add_entry;
