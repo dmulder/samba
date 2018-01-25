@@ -25,6 +25,7 @@ from StringIO import StringIO
 from abc import ABCMeta, abstractmethod
 import xml.etree.ElementTree as etree
 import re
+from ldb import SCOPE_BASE
 
 try:
     from enum import Enum
@@ -307,6 +308,15 @@ class gp_ext(object):
         return not os.path.exists(cls.disabled_file())
 
     def parse(self, afile, ldb, conn, gp_db, lp):
+        if is_dn(afile):
+            self.parse_ldap(afile, ldb, conn, gp_db, lp)
+        else:
+            self.parse_file(afile, ldb, conn, gp_db, lp)
+
+    def parse_ldap(self, dn, ldb, conn, gp_db, lp):
+        return ldb.search(dn, SCOPE_BASE, self.expression, [])
+
+    def parse_file(self, afile, ldb, conn, gp_db, lp):
         self.ldb = ldb
         self.gp_db = gp_db
         self.lp = lp
@@ -419,4 +429,13 @@ class gp_inf_ext(gp_ext):
     @abstractmethod
     def __str__(self):
         pass
+
+def rootpath_to_dn(rootpath):
+    return ','.join(['DC=%s' % p for p in rootpath.split('/')[0].split('.')])
+
+def is_dn(path):
+    parts = path.split(',')
+    if len(parts) > 1 and parts[-1].upper().startswith('DC='):
+        return True
+    return False
 
