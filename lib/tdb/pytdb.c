@@ -59,9 +59,15 @@ static void PyErr_SetTDBError(TDB_CONTEXT *tdb)
 
 static TDB_DATA PyBytes_AsTDB_DATA(PyObject *data)
 {
+	PyObject *rdata = data;
 	TDB_DATA ret;
-	ret.dptr = (unsigned char *)PyBytes_AsString(data);
-	ret.dsize = PyBytes_Size(data);
+#if PY_MAJOR_VERSION >= 3
+	if (PyUnicode_Check(data)) {
+		rdata = PyUnicode_AsEncodedString(data, "UTF-8", "strict");
+	}
+#endif
+	ret.dptr = (unsigned char *)PyBytes_AsString(rdata);
+	ret.dsize = PyBytes_Size(rdata);
 	return ret;
 }
 
