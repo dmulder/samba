@@ -121,6 +121,7 @@ def configure(conf):
             raise Utils.WafError('--disable-python requires --without-ad-dc')
 
     conf.SAMBA_CHECK_PYTHON(mandatory=True, version=(2, 6, 0))
+    conf.load('compiler_c python gnu_dirs')
     conf.SAMBA_CHECK_PYTHON_HEADERS(mandatory=(not conf.env.disable_python))
 
     if sys.platform == 'darwin' and not conf.env['HAVE_ENVIRON_DECL']:

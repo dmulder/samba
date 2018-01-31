@@ -1,0 +1,4 @@
+[submodule "waf"]
+	path = third_party/waf
+	url = https://github.com/waf-project/waf.git
+	branch = waf-1.9
