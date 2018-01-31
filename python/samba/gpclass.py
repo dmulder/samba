@@ -20,8 +20,14 @@ import os
 import tdb
 sys.path.insert(0, "bin/python")
 from samba import NTSTATUSError
-from ConfigParser import ConfigParser
-from StringIO import StringIO
+try:
+    from ConfigParser import ConfigParser
+except ImportError:
+    from configparser import ConfigParser
+try:
+    from StringIO import StringIO
+except ImportError:
+    from io import StringIO
 from abc import ABCMeta, abstractmethod
 import xml.etree.ElementTree as etree
 import re
