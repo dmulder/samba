@@ -131,9 +131,6 @@ def configure(conf):
     if sys.platform == 'darwin':
         conf.ADD_LDFLAGS('-framework CoreFoundation')
 
-    if int(conf.env['PYTHON_VERSION'][0]) >= 3:
-        raise Utils.WafError('Python version 3.x is not supported by Samba yet')
-
     conf.RECURSE('dynconfig')
 
     if conf.CHECK_FOR_THIRD_PARTY():

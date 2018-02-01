@@ -1,5 +1,6 @@
 # functions to support bundled libraries
 
+import waflib.extras.compat15
 import sys
 import Build, Options, Logs
 from Configure import conf
@@ -207,7 +208,7 @@ def CHECK_BUNDLED_SYSTEM(conf, libname, minversion='0.0.0',
 
     # try pkgconfig first
     if (conf.CHECK_CFG(package=pkg,
-                      args='"%s" --cflags --libs' % (version_checks),
+                      args=[version_checks, '--cflags', '--libs'],
                       msg=msg, uselib_store=uselib_store) and
         check_functions_headers_code()):
         if set_target:

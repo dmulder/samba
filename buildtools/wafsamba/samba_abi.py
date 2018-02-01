@@ -1,5 +1,6 @@
 # functions for handling ABI checking of libraries
 
+import waflib.extras.compat15
 import Options, Utils, os, Logs, samba_utils, sys, Task, fnmatch, re, Build
 from TaskGen import feature, before, after
 
@@ -10,7 +11,7 @@ abi_type_maps = {
     'struct __va_list_tag *' : 'va_list'
     }
 
-version_key = lambda x: map(int, x.split("."))
+version_key = lambda x: list(map(int, x.split(".")))
 
 def normalise_signature(sig):
     '''normalise a signature from gdb'''
@@ -76,7 +77,7 @@ def abi_check_task(self):
     '''check if the ABI has changed'''
     abi_gen = self.ABI_GEN
 
-    libpath = self.inputs[0].abspath(self.env)
+    libpath = self.inputs[0].abspath()
     libname = os.path.basename(libpath)
 
     sigs = Utils.cmd_output([abi_gen, libpath])
@@ -184,8 +185,8 @@ def abi_write_vscript(f, libname, current_version, versions, symmap, abi_match):
         f.write("}%s;\n\n" % last_key)
         last_key = " %s" % symver
     f.write("%s {\n" % current_version)
-    local_abi = filter(lambda x: x[0] == '!', abi_match)
-    global_abi = filter(lambda x: x[0] != '!', abi_match)
+    local_abi = [x for x in abi_match if x[0] == '!']
+    global_abi = [x for x in abi_match if x[0] != '!']
     f.write("\tglobal:\n")
     if len(global_abi) > 0:
         for x in global_abi:
@@ -203,13 +204,12 @@ def abi_write_vscript(f, libname, current_version, versions, symmap, abi_match):
 
 def abi_build_vscript(task):
     '''generate a vscript file for our public libraries'''
-
-    tgt = task.outputs[0].bldpath(task.env)
+    tgt = task.outputs[0].abspath()
 
     symmap = {}
     versions = []
     for f in task.inputs:
-        fname = f.abspath(task.env)
+        fname = f.abspath()
         basename = os.path.basename(fname)
         version = basename[len(task.env.LIBNAME)+1:-len(".sigs")]
         versions.append(version)

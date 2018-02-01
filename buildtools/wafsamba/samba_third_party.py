@@ -1,5 +1,6 @@
 # functions to support third party libraries
 
+import waflib.extras.compat15
 import os
 import Utils, Build
 from Configure import conf

@@ -1,6 +1,7 @@
 # a waf tool to add autoconf-like macros to the configure section
 # and for SAMBA_ macros for building libraries, binaries etc
 
+import waflib.extras.compat15
 import Options, Build, os
 from samba_utils import os_path_relpath, TO_LIST, samba_add_onoff_option
 from samba_autoconf import library_flags

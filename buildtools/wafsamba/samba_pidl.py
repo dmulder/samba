@@ -1,5 +1,6 @@
 # waf build tool for building IDL files with pidl
 
+import waflib.extras.compat15
 import os
 import Build
 from TaskGen import feature, before
@@ -76,7 +77,19 @@ def SAMBA_PIDL(bld, pname, source,
         else:
             cc = 'CC="%s"' % bld.CONFIG_GET("CC")
 
-    t = bld(rule='cd .. && %s %s ${PERL} "${PIDL}" --quiet ${OPTIONS} --outputdir ${OUTPUTDIR} -- "${SRC[0].abspath(env)}"' % (cpp, cc),
+    # XXX horrible hack
+    # pidl tool builds the headers with include dirs pointing somewhere
+    # related to `outputdir`. we need to copy the results to bin/ SOMEHOW
+    # because if we *generate* them there, the include paths inside will be messed up.
+    # And if we *don't* put them to bin/, waf will complain because we declared outputs
+    # and then seemingly didn't generate them, because it's impossible to tell waf
+    # that outputs go somewhere else ... OR IS IT.
+    # (we *could* get `-I.` to compiler opts, but of course in a different place
+    # wafsamba is CHECKING whether the headers exist, so that probably won't fly)
+    # What we would need to do is copy the results over. But we don't know what are the
+    # results. Maybe simply copy everything and don't care? Yeah, that's probably
+    # the way to go.
+    t = bld(rule='cd .. && %s %s ${PERL} "${PIDL}" --quiet ${OPTIONS} --outputdir ${OUTPUTDIR} -- "${SRC[0].abspath()}" && mkdir -p bin/${TGTDIR} && cp -r ${OUTPUTDIR}/* bin/${TGTDIR}' % (cpp, cc),
             ext_out    = '.c',
             before     = 'cc',
             update_outputs = True,
@@ -85,13 +98,19 @@ def SAMBA_PIDL(bld, pname, source,
             target     = out_files,
             name       = name,
             samba_type = 'PIDL')
+    t.out_dir = "."
 
     # prime the list of nodes we are dependent on with the cached pidl sources
     t.allnodes = pidl_src_nodes
 
     t.env.PIDL = os.path.join(bld.srcnode.abspath(), 'pidl/pidl')
     t.env.OPTIONS = TO_LIST(options)
-    t.env.OUTPUTDIR = bld.bldnode.name + '/' + bld.path.find_dir(output_dir).bldpath(t.env)
+    relpath = bld.path.find_dir(output_dir).bldpath()
+    t.env.OUTPUTDIR = bld.bldnode.name + '/' + relpath
+    tgtdir = relpath
+    if tgtdir.startswith('../'):
+        tgtdir = tgtdir[3:]
+    t.env.TGTDIR = tgtdir
 
     if generate_tables and table_header_idx is not None:
         pidl_headers = LOCAL_CACHE(bld, 'PIDL_HEADERS')

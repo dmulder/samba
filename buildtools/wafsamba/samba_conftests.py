@@ -1,6 +1,7 @@
 # a set of config tests that use the samba_autoconf functions
 # to test for commonly needed configuration options
 
+import waflib.extras.compat15
 import os, shutil, re
 import Build, Configure, Utils, Options, Logs
 from Configure import conf
@@ -16,59 +17,6 @@ def add_option(self, *k, **kw):
     opt.match = match
     return opt
 Options.Handler.add_option = add_option
-
-@conf
-def check(self, *k, **kw):
-    '''Override the waf defaults to inject --with-directory options'''
-
-    if not 'env' in kw:
-        kw['env'] = self.env.copy()
-
-    # match the configuration test with specific options, for example:
-    # --with-libiconv -> Options.options.iconv_open -> "Checking for library iconv"
-    additional_dirs = []
-    if 'msg' in kw:
-        msg = kw['msg']
-        for x in Options.Handler.parser.parser.option_list:
-             if getattr(x, 'match', None) and msg in x.match:
-                 d = getattr(Options.options, x.dest, '')
-                 if d:
-                     additional_dirs.append(d)
-
-    # we add the additional dirs twice: once for the test data, and again if the compilation test suceeds below
-    def add_options_dir(dirs, env):
-        for x in dirs:
-             if not x in env.CPPPATH:
-                 env.CPPPATH = [os.path.join(x, 'include')] + env.CPPPATH
-             if not x in env.LIBPATH:
-                 env.LIBPATH = [os.path.join(x, 'lib')] + env.LIBPATH
-
-    add_options_dir(additional_dirs, kw['env'])
-
-    self.validate_c(kw)
-    self.check_message_1(kw['msg'])
-    ret = None
-    try:
-        ret = self.run_c_code(*k, **kw)
-    except Configure.ConfigurationError, e:
-        self.check_message_2(kw['errmsg'], 'YELLOW')
-        if 'mandatory' in kw and kw['mandatory']:
-            if Logs.verbose > 1:
-                raise
-            else:
-                self.fatal('the configuration failed (see %r)' % self.log.name)
-    else:
-        kw['success'] = ret
-        self.check_message_2(self.ret_msg(kw['okmsg'], kw))
-
-        # success! keep the CPPPATH/LIBPATH
-        add_options_dir(additional_dirs, self.env)
-
-    self.post_check(*k, **kw)
-    if not kw.get('execute', False):
-        return ret == 0
-    return ret
-
 
 @conf
 def CHECK_ICONV(conf, define='HAVE_NATIVE_ICONV'):
@@ -201,6 +149,9 @@ int foo(int v) {
 @conf
 def CHECK_NEED_LC(conf, msg):
     '''check if we need -lc'''
+    # We don't.
+    return False
+    # see also CHECK_LIBRARY_SUPPORT for thoughts on how to do this properly.
 
     dir = find_config_dir(conf)
 
@@ -220,8 +171,8 @@ def CHECK_NEED_LC(conf, msg):
     bld = Build.BuildContext()
     bld.log = conf.log
     bld.all_envs.update(conf.all_envs)
-    bld.all_envs['default'] = env
-    bld.lst_variants = bld.all_envs.keys()
+    bld.all_envs[''] = env
+    bld.lst_variants = list(bld.all_envs.keys())
     bld.load_dirs(dir, bdir)
 
     bld.rescan(bld.srcnode)
@@ -266,6 +217,14 @@ int foo(int v) {
 @conf
 def CHECK_LIBRARY_SUPPORT(conf, rpath=False, version_script=False, msg=None):
     '''see if the platform supports building libraries'''
+    # This is complicated because waf 1.5 apparently didn't support creating build contexts
+    # as part of config runs. Waf 1.6 and up does that and this feature could most likely
+    # be rewritten with that in mind; see "feature `test_exec`" and docs for
+    # `waflib.Tools.c_config.check(build_fun=x)`
+
+    # For us, we know our compiler support both rpath and version scripts.
+    # So let's simplify.
+    return True
 
     if msg is None:
         if rpath:
@@ -291,13 +250,14 @@ def CHECK_LIBRARY_SUPPORT(conf, rpath=False, version_script=False, msg=None):
                  'int main(void) {return !(lib_func() == 42);}\n')
 
     bld = Build.BuildContext()
-    bld.log = conf.log
+    bld.init_dirs()
+    #bld.log = conf.log
     bld.all_envs.update(conf.all_envs)
-    bld.all_envs['default'] = env
-    bld.lst_variants = bld.all_envs.keys()
-    bld.load_dirs(dir, bdir)
+    bld.all_envs[''] = env
+    bld.lst_variants = list(bld.all_envs.keys())
+    #bld.load_dirs(dir, bdir)
 
-    bld.rescan(bld.srcnode)
+    #bld.rescan(bld.srcnode)
 
     ldflags = []
     if version_script:
@@ -322,7 +282,7 @@ def CHECK_LIBRARY_SUPPORT(conf, rpath=False, version_script=False, msg=None):
     try:
         bld.compile()
     except:
-        conf.check_message(msg, '', False)
+        conf.msg("Checking for " + msg, result=False)
         return False
 
     # path for execution
@@ -416,7 +376,7 @@ def CHECK_COMMAND(conf, cmd, msg=None, define=None, on_target=True, boolean=Fals
     if on_target:
         cmd.extend(conf.SAMBA_CROSS_ARGS(msg=msg))
     try:
-        ret = Utils.cmd_output(cmd)
+        ret = Utils.cmd_output(cmd).decode('utf-8')
     except:
         conf.COMPOUND_END(False)
         return False
@@ -481,18 +441,18 @@ def CHECK_XSLTPROC_MANPAGES(conf):
 
 
     if not conf.CONFIG_SET('XSLTPROC'):
-        conf.find_program('xsltproc', var='XSLTPROC')
+        conf.find_program('xsltproc', var='XSLTPROC', mandatory=False)
     if not conf.CONFIG_SET('XSLTPROC'):
         return False
 
     s='http://docbook.sourceforge.net/release/xsl/current/manpages/docbook.xsl'
-    conf.CHECK_COMMAND('%s --nonet %s 2> /dev/null' % (conf.env.XSLTPROC, s),
+    conf.CHECK_COMMAND('%s --nonet %s 2> /dev/null' % (conf.env.XSLTPROC[0], s),
                              msg='Checking for stylesheet %s' % s,
                              define='XSLTPROC_MANPAGES', on_target=False,
                              boolean=True)
     if not conf.CONFIG_SET('XSLTPROC_MANPAGES'):
-        print "A local copy of the docbook.xsl wasn't found on your system" \
-              " consider installing package like docbook-xsl"
+        print("A local copy of the docbook.xsl wasn't found on your system" \
+              " consider installing package like docbook-xsl")
 
 #
 # Determine the standard libpath for the used compiler,
@@ -506,7 +466,7 @@ def CHECK_STANDARD_LIBPATH(conf):
     # at least gcc and clang support this:
     try:
         cmd = conf.env.CC + ['-print-search-dirs']
-        out = Utils.cmd_output(cmd).split('\n')
+        out = Utils.cmd_output(cmd).decode('utf-8').split('\n')
     except ValueError:
         # option not supported by compiler - use a standard list of directories
         dirlist = [ '/usr/lib', '/usr/lib64' ]

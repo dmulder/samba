@@ -1,6 +1,7 @@
 # a waf tool to add autoconf-like macros to the configure section
 # and for SAMBA_ macros for building libraries, binaries etc
 
+import waflib.extras.compat15
 import os, sys, re, fnmatch, shlex
 from optparse import SUPPRESS_HELP
 import Build, Options, Utils, Task, Logs, Configure
@@ -216,7 +217,7 @@ def ENFORCE_GROUP_ORDERING(bld):
     '''enforce group ordering for the project. This
        makes the group ordering apply only when you specify
        a target with --target'''
-    if Options.options.compile_targets:
+    if getattr(Options.options, 'compile_targets', None):
         @feature('*')
         @before('exec_rule', 'apply_core', 'collect')
         def force_previous_groups(self):
@@ -243,7 +244,7 @@ def ENFORCE_GROUP_ORDERING(bld):
             if stop is None:
                 return
 
-            for i in xrange(len(bld.task_manager.groups)):
+            for i in range(len(bld.task_manager.groups)):
                 g = bld.task_manager.groups[i]
                 bld.task_manager.current_group = i
                 if id(g) == stop:
@@ -354,7 +355,7 @@ def RUN_PYTHON_TESTS(testfiles, pythonpath=None, extra_env=None):
     if pythonpath is None:
         pythonpath = os.path.join(Utils.g_module.blddir, 'python')
     result = 0
-    for interp in env.python_interpreters:
+    for interp in env.python_interpreters[0]:
         for testfile in testfiles:
             cmd = "PYTHONPATH=%s %s %s" % (pythonpath, interp, testfile)
             if extra_env:
@@ -368,52 +369,13 @@ def RUN_PYTHON_TESTS(testfiles, pythonpath=None, extra_env=None):
     return result
 
 
-# make sure we have md5. some systems don't have it
-try:
-    from hashlib import md5
-    # Even if hashlib.md5 exists, it may be unusable.
-    # Try to use MD5 function. In FIPS mode this will cause an exception
-    # and we'll get to the replacement code
-    foo = md5('abcd')
-except:
-    try:
-        import md5
-        # repeat the same check here, mere success of import is not enough.
-        # Try to use MD5 function. In FIPS mode this will cause an exception
-        foo = md5.md5('abcd')
-    except:
-        import Constants
-        Constants.SIG_NIL = hash('abcd')
-        class replace_md5(object):
-            def __init__(self):
-                self.val = None
-            def update(self, val):
-                self.val = hash((self.val, val))
-            def digest(self):
-                return str(self.val)
-            def hexdigest(self):
-                return self.digest().encode('hex')
-        def replace_h_file(filename):
-            f = open(filename, 'rb')
-            m = replace_md5()
-            while (filename):
-                filename = f.read(100000)
-                m.update(filename)
-            f.close()
-            return m.digest()
-        Utils.md5 = replace_md5
-        Task.md5 = replace_md5
-        Utils.h_file = replace_h_file
-
-
 def LOAD_ENVIRONMENT():
     '''load the configuration environment, allowing access to env vars
        from new commands'''
-    import Environment
-    env = Environment.Environment()
+    from waflib.ConfigSet import ConfigSet
+    env = ConfigSet()
     try:
-        env.load('.lock-wscript')
-        env.load(env.blddir + '/c4che/default.cache.py')
+        env.load('bin/c4che/_cache.py')
     except:
         pass
     return env
@@ -446,14 +408,12 @@ def RECURSE(ctx, directory):
         return
     visited_dirs.add(key)
     relpath = os_path_relpath(abspath, ctx.curdir)
-    if ctxclass == 'Handler':
+    if ctxclass in ('Handler', 'OptionsContext'):
         return ctx.sub_options(relpath)
     if ctxclass == 'ConfigurationContext':
         return ctx.sub_config(relpath)
-    if ctxclass == 'BuildContext':
+    else:
         return ctx.add_subdirs(relpath)
-    Logs.error('Unknown RECURSE context class', ctxclass)
-    raise
 Options.Handler.RECURSE = RECURSE
 Build.BuildContext.RECURSE = RECURSE
 
@@ -561,7 +521,7 @@ def map_shlib_extension(ctx, name, python=False):
     if python:
         return ctx.env.pyext_PATTERN % root1
     else:
-        (root2, ext2) = os.path.splitext(ctx.env.shlib_PATTERN)
+        (root2, ext2) = os.path.splitext(ctx.env.cshlib_PATTERN)
     return root1+ext2
 Build.BuildContext.map_shlib_extension = map_shlib_extension
 
@@ -583,7 +543,7 @@ def make_libname(ctx, name, nolibprefix=False, version=None, python=False):
     if python:
         libname = apply_pattern(name, ctx.env.pyext_PATTERN)
     else:
-        libname = apply_pattern(name, ctx.env.shlib_PATTERN)
+        libname = apply_pattern(name, ctx.env.cshlib_PATTERN)
     if nolibprefix and libname[0:3] == 'lib':
         libname = libname[3:]
     if version:
@@ -631,12 +591,13 @@ def PROCESS_SEPARATE_RULE(self, rule):
     file_path = os.path.join(self.curdir, WSCRIPT_FILE+'_'+stage+'_'+rule)
     txt = load_file(file_path)
     if txt:
-        dc = {'ctx': self}
+        dc = {'ctx': self, 'conf': self, 'bld': self}
+        node = self.root.find_node(file_path)
         if getattr(self.__class__, 'pre_recurse', None):
-            dc = self.pre_recurse(txt, file_path, self.curdir)
+            self.pre_recurse(node)
         exec(compile(txt, file_path, 'exec'), dc)
         if getattr(self.__class__, 'post_recurse', None):
-            dc = self.post_recurse(txt, file_path, self.curdir)
+            self.post_recurse(node)
 
 Build.BuildContext.PROCESS_SEPARATE_RULE = PROCESS_SEPARATE_RULE
 ConfigurationContext.PROCESS_SEPARATE_RULE = PROCESS_SEPARATE_RULE

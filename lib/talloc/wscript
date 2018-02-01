@@ -72,7 +72,7 @@ def configure(conf):
     if not conf.env.standalone_talloc:
         if conf.CHECK_BUNDLED_SYSTEM_PKG('talloc', minversion=VERSION,
                                      implied_deps='replace'):
-            conf.define('USING_SYSTEM_TALLOC', 1)
+            conf.DEFINE('USING_SYSTEM_TALLOC', 1)
 
         using_system_pytalloc_util = True
         if not conf.CHECK_BUNDLED_SYSTEM_PKG('pytalloc-util', minversion=VERSION,
@@ -88,7 +88,7 @@ def configure(conf):
                 using_system_pytalloc_util = False
 
         if using_system_pytalloc_util:
-            conf.define('USING_SYSTEM_PYTALLOC_UTIL', 1)
+            conf.DEFINE('USING_SYSTEM_PYTALLOC_UTIL', 1)
 
 
 def build(bld):

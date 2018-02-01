@@ -15,7 +15,7 @@ def configure(conf):
     conf.SET_TARGET_TYPE('gpgme', 'EMPTY')
 
     if Options.options.with_gpgme != False:
-        conf.find_program('gpgme-config', var='GPGME_CONFIG')
+        conf.find_program('gpgme-config', var='GPGME_CONFIG', mandatory=False)
 
         if conf.env.GPGME_CONFIG:
             conf.CHECK_CFG(path=conf.env.GPGME_CONFIG, args="--cflags --libs",

@@ -1,14 +1,14 @@
 # a waf tool to add autoconf-like macros to the configure section
 # and for SAMBA_ macros for building libraries, binaries etc
 
-import Build, os, sys, Options, Task, Utils, cc, TaskGen, fnmatch, re, shutil, Logs, Constants
+import waflib.extras.compat15
+import Build, os, sys, Options, Task, Utils, TaskGen, fnmatch, re, shutil, Logs, Constants
 from Configure import conf
 from Logs import debug
 from samba_utils import SUBST_VARS_RECURSIVE
 TaskGen.task_gen.apply_verif = Utils.nada
 
 # bring in the other samba modules
-from samba_optimisation import *
 from samba_utils import *
 from samba_version import *
 from samba_autoconf import *
@@ -25,10 +25,6 @@ import samba_install
 import samba_conftests
 import samba_abi
 import samba_headers
-import tru64cc
-import irixcc
-import hpuxcc
-import generic_cc
 import samba_dist
 import samba_wildcard
 import stale_files
@@ -235,6 +231,8 @@ def SAMBA_LIBRARY(bld, libname, source,
     if bundled_name is not None:
         pass
     elif target_type == 'PYTHON' or realname or not private_library:
+        if bundled_name and bundled_name.endswith('.so'):
+            bundled_name = bundled_name[:-3]
         if keep_underscore:
             bundled_name = libname
         else:
@@ -280,7 +278,7 @@ def SAMBA_LIBRARY(bld, libname, source,
             vscript = "%s.vscript" % libname
             bld.ABI_VSCRIPT(version_libname, abi_directory, version, vscript,
                             abi_match)
-            fullname = apply_pattern(bundled_name, bld.env.shlib_PATTERN)
+            fullname = apply_pattern(bundled_name, bld.env.cshlib_PATTERN)
             fullpath = bld.path.find_or_declare(fullname)
             vscriptpath = bld.path.find_or_declare(vscript)
             if not fullpath:
@@ -290,9 +288,9 @@ def SAMBA_LIBRARY(bld, libname, source,
             bld.add_manual_dependency(fullpath, vscriptpath)
             if bld.is_install:
                 # also make the .inst file depend on the vscript
-                instname = apply_pattern(bundled_name + '.inst', bld.env.shlib_PATTERN)
+                instname = apply_pattern(bundled_name + '.inst', bld.env.cshlib_PATTERN)
                 bld.add_manual_dependency(bld.path.find_or_declare(instname), bld.path.find_or_declare(vscript))
-            vscript = os.path.join(bld.path.abspath(bld.env), vscript)
+            vscript = vscriptpath
 
     bld.SET_BUILD_GROUP(group)
     t = bld(
@@ -375,7 +373,7 @@ def SAMBA_BINARY(bld, binname, source,
     if not SET_TARGET_TYPE(bld, binname, 'BINARY'):
         return
 
-    features = 'c cprogram symlink_bin install_bin'
+    features = 'c cprogram install_bin'
     if pyembed:
         features += ' pyembed'
 
@@ -667,7 +665,7 @@ def SAMBA_GENERATOR(bld, name, rule, source='', target='',
         target=target,
         shell=isinstance(rule, str),
         update_outputs=True,
-        before='cc',
+        before='c',
         ext_out='.c',
         samba_type='GENERATOR',
         dep_vars = dep_vars,
@@ -749,7 +747,7 @@ def SAMBA_SCRIPT(bld, name, pattern, installdir, installname=None):
         if installname is not None:
             iname = installname
         target = os.path.join(installdir, iname)
-        tgtdir = os.path.dirname(os.path.join(bld.srcnode.abspath(bld.env), '..', target))
+        tgtdir = os.path.dirname(os.path.join(bld.srcnode.abspath(), '..', target))
         mkdir_p(tgtdir)
         link_src = os.path.normpath(os.path.join(bld.curdir, s))
         link_dst = os.path.join(tgtdir, os.path.basename(iname))
@@ -777,8 +775,8 @@ sys.path.insert(1, "%s")""" % (task.env["PYTHONARCHDIR"], task.env["PYTHONDIR"])
     else:
         replacement_shebang = "#!/usr/bin/env %s\n" % task.env["PYTHON"]
 
-    installed_location=task.outputs[0].bldpath(task.env)
-    source_file = open(task.inputs[0].srcpath(task.env))
+    installed_location=task.outputs[0].abspath()
+    source_file = open(task.inputs[0].srcpath())
     installed_file = open(installed_location, 'w')
     lineno = 0
     for line in source_file:
@@ -791,7 +789,7 @@ sys.path.insert(1, "%s")""" % (task.env["PYTHONARCHDIR"], task.env["PYTHONDIR"])
         installed_file.write(newline)
         lineno = lineno + 1
     installed_file.close()
-    os.chmod(installed_location, 0755)
+    os.chmod(installed_location, 0o755)
     return 0
 
 def copy_and_fix_perl_path(task):
@@ -806,8 +804,8 @@ def copy_and_fix_perl_path(task):
     else:
         replacement_shebang = "#!/usr/bin/env %s\n" % task.env["PERL"]
 
-    installed_location=task.outputs[0].bldpath(task.env)
-    source_file = open(task.inputs[0].srcpath(task.env))
+    installed_location=task.outputs[0].abspath()
+    source_file = open(task.inputs[0].srcpath())
     installed_file = open(installed_location, 'w')
     lineno = 0
     for line in source_file:
@@ -819,7 +817,7 @@ def copy_and_fix_perl_path(task):
         installed_file.write(newline)
         lineno = lineno + 1
     installed_file.close()
-    os.chmod(installed_location, 0755)
+    os.chmod(installed_location, 0o755)
     return 0
 
 
@@ -928,7 +926,7 @@ def SAMBAMANPAGES(bld, manpages, extra_source=None):
                             dep_vars=['SAMBA_MAN_XSL', 'SAMBA_EXPAND_XSL', 'SAMBA_CATALOG'],
                             rule='''XML_CATALOG_FILES="${SAMBA_CATALOGS}"
                                     export XML_CATALOG_FILES
-                                    ${XSLTPROC} --xinclude --stringparam noreference 0 -o ${TGT}.xml --nonet ${SAMBA_EXPAND_XSL} ${SRC[0].abspath(env)}
+                                    ${XSLTPROC} --xinclude --stringparam noreference 0 -o ${TGT}.xml --nonet ${SAMBA_EXPAND_XSL} ${SRC[0].abspath()}
                                     ${XSLTPROC} --nonet -o ${TGT} ${SAMBA_MAN_XSL} ${TGT}.xml'''
                             )
         bld.INSTALL_FILES('${MANDIR}/man%s' % m[-1], m, flat=True)
@@ -949,7 +947,6 @@ def link_display(self):
         return Task.Task.old_display(self)
     fname = self.outputs[0].bldpath(self.env)
     return progress_display(self, 'Linking', fname)
-Task.TaskBase.classes['cc_link'].display = link_display
 
 def samba_display(self):
     if Options.options.progress_bar != 0:
@@ -983,8 +980,6 @@ def samba_display(self):
         return progress_display(self, ext_map[ext], fname)
     return Task.Task.old_display(self)
 
-Task.TaskBase.classes['Task'].old_display = Task.TaskBase.classes['Task'].display
-Task.TaskBase.classes['Task'].display = samba_display
 
 
 @after('apply_link')

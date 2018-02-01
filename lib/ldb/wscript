@@ -41,12 +41,12 @@ def configure(conf):
         if not conf.CHECK_POPT():
             raise Utils.WafError('popt development packages have not been found.\nIf third_party is installed, check that it is in the proper place.')
         else:
-            conf.define('USING_SYSTEM_POPT', 1)
+            conf.DEFINE('USING_SYSTEM_POPT', 1)
 
         if not conf.CHECK_CMOCKA():
             raise Utils.WafError('cmocka development package have not been found.\nIf third_party is installed, check that it is in the proper place.')
         else:
-            conf.define('USING_SYSTEM_CMOCKA', 1)
+            conf.DEFINE('USING_SYSTEM_CMOCKA', 1)
 
     conf.RECURSE('lib/replace')
     conf.find_program('python', var='PYTHON')
@@ -66,7 +66,7 @@ def configure(conf):
             if conf.CHECK_BUNDLED_SYSTEM_PKG('ldb', minversion=VERSION,
                                          onlyif='talloc tdb tevent',
                                          implied_deps='replace talloc tdb tevent'):
-                conf.define('USING_SYSTEM_LDB', 1)
+                conf.DEFINE('USING_SYSTEM_LDB', 1)
         else:
             using_system_pyldb_util = True
             if not conf.CHECK_BUNDLED_SYSTEM_PKG('pyldb-util', minversion=VERSION,
@@ -84,12 +84,12 @@ def configure(conf):
                     using_system_pyldb_util = False
 
             if using_system_pyldb_util:
-                conf.define('USING_SYSTEM_PYLDB_UTIL', 1)
+                conf.DEFINE('USING_SYSTEM_PYLDB_UTIL', 1)
 
             if conf.CHECK_BUNDLED_SYSTEM_PKG('ldb', minversion=VERSION,
                                          onlyif='talloc tdb tevent pyldb-util',
                                          implied_deps='replace talloc tdb tevent'):
-                conf.define('USING_SYSTEM_LDB', 1)
+                conf.DEFINE('USING_SYSTEM_LDB', 1)
 
     if conf.CONFIG_SET('USING_SYSTEM_LDB'):
         v = VERSION.split('.')

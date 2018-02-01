@@ -1,5 +1,6 @@
 # handle substitution of variables in pc files
 
+import waflib.extras.compat15
 import os, re, sys
 import Build, Logs
 from samba_utils import SUBST_VARS_RECURSIVE, TO_LIST

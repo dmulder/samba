@@ -14,6 +14,7 @@ nodes/tasks, in which case the method will have to be modified
 to exclude some folders for example.
 """
 
+import waflib.extras.compat15
 import Logs, Build, os, samba_utils, Options, Utils
 from Runner import Parallel
 
@@ -28,7 +29,7 @@ def replace_refill_task_list(self):
         # we only need to check for stale files if the build rules changed
         return iit
 
-    if Options.options.compile_targets:
+    if hasattr(Options.options, 'compile_targets'):
         # not safe when --target is used
         return iit
 
@@ -38,7 +39,7 @@ def replace_refill_task_list(self):
     self.cleanup_done = True
 
     def group_name(g):
-        tm = self.bld.task_manager
+        tm = self.bld
         return [x for x in tm.groups_names if id(tm.groups_names[x]) == id(g)][0]
 
     bin_base = bld.bldnode.abspath()
@@ -50,10 +51,8 @@ def replace_refill_task_list(self):
 
     # obtain the expected list of files
     expected = []
-    for i in range(len(bld.task_manager.groups)):
-        g = bld.task_manager.groups[i]
-        tasks = g.tasks_gen
-        for x in tasks:
+    for group in bld.groups:
+        for x in group:
             try:
                 if getattr(x, 'target'):
                     tlist = samba_utils.TO_LIST(getattr(x, 'target'))
@@ -68,7 +67,7 @@ def replace_refill_task_list(self):
                                 expected.append(objpath)
                     for t in tlist:
                         if ttype in ['LIBRARY','MODULE']:
-                            t = samba_utils.apply_pattern(t, bld.env.shlib_PATTERN)
+                            t = samba_utils.apply_pattern(t, bld.env.cshlib_PATTERN)
                         if ttype == 'PYTHON':
                             t = samba_utils.apply_pattern(t, bld.env.pyext_PATTERN)
                         p = os.path.join(x.path.abspath(bld.env), t)

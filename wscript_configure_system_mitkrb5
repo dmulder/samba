@@ -22,7 +22,7 @@ def krb5_define_syslib(conf, lib, deps):
     conf.env[found] = True
 
 Logs.info("Looking for kerberos features")
-conf.find_program('krb5-config.heimdal', var='HEIMDAL_KRB5_CONFIG')
+conf.find_program('krb5-config.heimdal', var='HEIMDAL_KRB5_CONFIG', mandatory=False)
 
 if isinstance(Options.options.with_system_mitkrb5, list):
     path_krb5_config = [x+'/bin' for x in Options.options.with_system_mitkrb5]
@@ -31,19 +31,20 @@ else:
 
 conf.find_program('krb5-config', path_list=path_krb5_config, var='KRB5_CONFIG')
 if conf.env.KRB5_CONFIG:
-    conf.CHECK_CFG(path=conf.env.KRB5_CONFIG, args="--cflags --libs",
+    krb5_config = conf.env.KRB5_CONFIG[0]
+    conf.CHECK_CFG(path=krb5_config, args="--cflags --libs",
                package="", uselib_store="KRB5")
     krb5_define_syslib(conf, "krb5", conf.env['LIB_KRB5'])
 
-    conf.CHECK_CFG(path=conf.env.KRB5_CONFIG, args="--cflags --libs",
+    conf.CHECK_CFG(path=krb5_config, args="--cflags --libs",
                    package="kadm-server", uselib_store="KADM-SERVER")
     conf.CHECK_FUNCS_IN('kadm5_init', 'kadm5srv_mit')
 
-    conf.CHECK_CFG(path=conf.env.KRB5_CONFIG, args="--cflags --libs",
+    conf.CHECK_CFG(path=krb5_config, args="--cflags --libs",
                    package="kdb", uselib_store="KDB5")
     krb5_define_syslib(conf, "kdb5", conf.env['LIB_KDB5'])
 
-    conf.CHECK_CFG(path=conf.env.KRB5_CONFIG, args="--cflags --libs",
+    conf.CHECK_CFG(path=krb5_config, args="--cflags --libs",
                package="gssapi", uselib_store="GSSAPI")
     krb5_define_syslib(conf, "gssapi", conf.env['LIB_GSSAPI'])
     if 'k5crypto' in conf.env['LIB_GSSAPI']:
@@ -53,12 +54,12 @@ if conf.env.KRB5_CONFIG:
     if 'gssapi_krb5' in conf.env['LIB_GSSAPI']:
         krb5_define_syslib(conf, "gssapi_krb5", conf.env['LIB_GSSAPI'])
 
-    vendor = conf.cmd_and_log("%(path)s --vendor" % dict(path=conf.env.KRB5_CONFIG), dict())
+    vendor = conf.cmd_and_log("%(path)s --vendor" % dict(path=krb5_config))
     conf.env.KRB5_VENDOR = vendor.strip().lower()
     if conf.env.KRB5_VENDOR != 'heimdal':
-        conf.define('USING_SYSTEM_KRB5', 1)
+        conf.DEFINE('USING_SYSTEM_KRB5', 1)
         del conf.env.HEIMDAL_KRB5_CONFIG
-        krb5_conf_version = conf.cmd_and_log("%(path)s --version" % dict(path=conf.env.KRB5_CONFIG), dict()).strip()
+        krb5_conf_version = conf.cmd_and_log("%(path)s --version" % dict(path=krb5_config)).strip()
 
         krb5_version = krb5_conf_version.split()[-1]
 
@@ -94,7 +95,7 @@ if conf.CHECK_FUNCS_IN('gss_display_status', 'gssapi gssapi_krb5'):
     have_gssapi=True
 
 if not have_gssapi:
-    if conf.env.KRB5_CONFIG and conf.env.KRB5_CONFIG != 'heimdal':
+    if conf.env.KRB5_CONFIG and conf.env.KRB5_CONFIG[0] != 'heimdal':
         Logs.error("ERROR: WAF build with MIT Krb5 requires working GSSAPI implementation")
         sys.exit(1)
 
@@ -309,4 +310,4 @@ if conf.CONFIG_SET('AD_DC_BUILD_IS_ENABLED'):
         conf.DEFINE('MIT_KDC_PATH', '"' + Options.options.with_system_mitkdc + '"')
     else:
         conf.find_program('krb5kdc', path_list=kdc_path_list, var='MIT_KDC_BINARY', mandatory=True)
-        conf.DEFINE('MIT_KDC_PATH', '"' + conf.env.MIT_KDC_BINARY + '"')
+        conf.DEFINE('MIT_KDC_PATH', '"' + conf.env.MIT_KDC_BINARY[0] + '"')

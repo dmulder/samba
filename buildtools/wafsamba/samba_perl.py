@@ -1,3 +1,4 @@
+import waflib.extras.compat15
 import Utils
 from Configure import conf
 
@@ -15,7 +16,7 @@ def SAMBA_CHECK_PERL(conf, mandatory=True, version=(5,0,0)):
     conf.check_perl_version(version)
 
     def read_perl_config_var(cmd):
-        return Utils.to_list(Utils.cmd_output([conf.env.PERL, '-MConfig', '-e', cmd]))
+        return Utils.to_list(Utils.cmd_output([conf.env.PERL[0], '-MConfig', '-e', cmd]).decode('utf-8'))
 
     def check_perl_config_var(var):
         conf.start_msg("Checking for perl $Config{%s}:" % var)
