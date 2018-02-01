@@ -27,7 +27,6 @@ def SAMBA_CHECK_PYTHON(conf, mandatory=True, version=(2,4,2)):
             Logs.warn('extra-python needs to be Python 3.3 or later')
             raise
         interpreters.append(conf.env['PYTHON'])
-        conf.setenv('default')
 
     conf.find_program('python3', var='PYTHON', mandatory=mandatory)
     conf.check_tool('python')
@@ -57,7 +56,6 @@ def SAMBA_CHECK_PYTHON_HEADERS(conf, mandatory=True):
         if conf.env['EXTRA_PYTHON']:
             conf.setenv('extrapython')
             _check_python_headers(conf, mandatory=True)
-            conf.setenv('default')
 
         _check_python_headers(conf, mandatory)
         conf.env["python_headers_checked"] = "yes"
