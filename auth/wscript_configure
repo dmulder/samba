@@ -3,5 +3,5 @@
 conf.SET_TARGET_TYPE('jansson', 'EMPTY')
 
 if conf.CHECK_CFG(package='jansson', args='--cflags --libs',
-		  msg='Checking for jansson'):
+		  msg='Checking for jansson', mandatory=False):
     conf.CHECK_FUNCS_IN('json_object', 'jansson')

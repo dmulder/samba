@@ -1,5 +1,6 @@
 # handle substitution of variables in .in files
 
+import waflib.extras.compat15
 import re, os
 import Build, sys, Logs
 from samba_utils import SUBST_VARS_RECURSIVE

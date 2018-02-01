@@ -190,7 +190,7 @@ def check_system_heimdal_lib(name, functions='', headers='', onlyif=None):
     if not conf.CHECK_BUNDLED_SYSTEM(name, checkfunctions=functions, headers=headers,
                                      onlyif=onlyif):
         return False
-    conf.define('USING_SYSTEM_%s' % name.upper(), 1)
+    conf.DEFINE('USING_SYSTEM_%s' % name.upper(), 1)
     return True
 
 def check_system_heimdal_binary(name):
@@ -198,7 +198,7 @@ def check_system_heimdal_binary(name):
         return False
     if not conf.find_program(name, var=name.upper()):
         return False
-    conf.define('USING_SYSTEM_%s' % name.upper(), 1)
+    conf.DEFINE('USING_SYSTEM_%s' % name.upper(), 1)
     return True
 
 check_system_heimdal_lib("com_err", "com_right_r com_err", "com_err.h")
@@ -250,7 +250,7 @@ finally:
 
 # With the proper checks in place we should be able to build against the system libtommath.
 #if conf.CHECK_BUNDLED_SYSTEM('tommath', checkfunctions='mp_init', headers='tommath.h'):
-#    conf.define('USING_SYSTEM_TOMMATH', 1)
+#    conf.DEFINE('USING_SYSTEM_TOMMATH', 1)
 
 check_system_heimdal_binary("compile_et")
 check_system_heimdal_binary("asn1_compile")

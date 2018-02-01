@@ -20,7 +20,7 @@ def check_system_perl_module(conf, module, version=None):
     if not conf.check_perl_module(module_check):
         return False
 
-    conf.define('USING_SYSTEM_%s' % bundle_name.upper(), 1)
+    conf.DEFINE('USING_SYSTEM_%s' % bundle_name.upper(), 1)
 
     return True
 
@@ -38,8 +38,8 @@ def configure(conf):
         conf.DEFINE('HAVE_PERL_MAKEMAKER', 1)
 
     # yapp is used for building the parser
-    conf.find_program('yapp', var='YAPP')
-    conf.find_program('pod2man', var='POD2MAN')
+    conf.find_program('yapp', var='YAPP', mandatory=False)
+    conf.find_program('pod2man', var='POD2MAN', mandatory=False)
 
 def build(bld):
     bld.INSTALL_FILES('${BINDIR}', 'pidl', chmod=MODE_755, perl_fixup=True)
@@ -58,7 +58,7 @@ def build(bld):
         'lib/Parse/Pidl/Wireshark/NDR.pm': 'man3/Parse::Pidl::Wireshark::NDR.${PERLMAN3EXT}'
     }
 
-    for k, v in pidl_manpages.iteritems():
+    for k, v in pidl_manpages.items():
         pidl_manpages[k] = bld.EXPAND_VARIABLES(v)
 
     # use perl to build the manpages
@@ -66,7 +66,7 @@ def build(bld):
 
     bld.SET_BUILD_GROUP('final')
     if 'POD2MAN' in bld.env and bld.env['POD2MAN'] != '':
-        for src, manpage in pidl_manpages.iteritems():
+        for src, manpage in pidl_manpages.items():
             bld(rule='${POD2MAN} -c "Samba Documentation" ${SRC} ${TGT}',
                 shell=True,
                 source=src,

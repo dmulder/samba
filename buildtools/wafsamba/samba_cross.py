@@ -1,5 +1,6 @@
 # functions for handling cross-compilation
 
+import waflib.extras.compat15
 import os, sys, re, shlex
 import Utils, Logs, Options
 from Configure import conf

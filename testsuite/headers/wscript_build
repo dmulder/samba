@@ -3,7 +3,7 @@ from samba_utils import os_path_relpath
 
 def build_test_headers(task):
     '''symlink a header in the build tree'''
-    tgt = task.outputs[0].bldpath(task.env)
+    tgt = task.outputs[0].abspath()
     f = open(tgt, mode='w')
     f.write('/* generated header test */\n')
     hlist = task.env.public_headers_list[:]
@@ -16,7 +16,7 @@ def build_test_headers(task):
 relpath1 = os_path_relpath(bld.srcnode.abspath(), bld.curdir)
 public_headers = []
 for h in bld.env.public_headers_list:
-    public_headers.append(os.path.join(relpath1, bld.env.build_public_headers, h))
+    public_headers.append(os.path.join(relpath1, 'bin', bld.env.build_public_headers, h))
 
 bld.SAMBA_GENERATOR('test_headers.h',
                     group='main',

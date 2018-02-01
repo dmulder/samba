@@ -1,5 +1,6 @@
 # specialist handling of header files for Samba
 
+import waflib.extras.compat15
 import os, re, sys, fnmatch
 import Build, Logs, Utils
 from samba_utils import TO_LIST, os_path_relpath
@@ -36,8 +37,8 @@ def find_suggested_header(hpath):
 
 def create_public_header(task):
     '''create a public header from a private one, output within the build tree'''
-    src = task.inputs[0].abspath(task.env)
-    tgt = task.outputs[0].bldpath(task.env)
+    src = task.inputs[0].abspath()
+    tgt = task.outputs[0].abspath()
 
     if os.path.exists(tgt):
         os.unlink(tgt)
@@ -151,8 +152,6 @@ def PUBLIC_HEADERS(bld, public_headers, header_path=None, public_headers_install
         relpath1 = os_path_relpath(bld.srcnode.abspath(), bld.curdir)
         relpath2 = os_path_relpath(bld.curdir, bld.srcnode.abspath())
         targetdir = os.path.normpath(os.path.join(relpath1, bld.env.build_public_headers, inst_path))
-        if not os.path.exists(os.path.join(bld.curdir, targetdir)):
-            raise Utils.WafError("missing source directory %s for public header %s" % (targetdir, inst_name))
         target = os.path.join(targetdir, inst_name)
 
         # the source path of the header, relative to the top of the source tree

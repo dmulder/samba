@@ -1,5 +1,6 @@
 # waf build tool for building automatic prototypes from C source
 
+import waflib.extras.compat15
 import os
 import Build
 from samba_utils import SET_TARGET_TYPE, os_path_relpath

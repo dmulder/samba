@@ -1,5 +1,6 @@
 # Samba automatic dependency handling and project rules
 
+import waflib.extras.compat15
 import os, sys, re, time
 
 import Build, Environment, Options, Logs, Utils
@@ -169,7 +170,7 @@ def build_includes(self):
                 inc_abs.append(npath)
                 inc_set.add(npath)
 
-    mypath = self.path.abspath(bld.env)
+    mypath = self.path.abspath()
     for inc in inc_abs:
         relpath = os_path_relpath(inc, mypath)
         includes.append(relpath)
@@ -268,7 +269,7 @@ def check_duplicate_sources(bld, tgt_list):
 
     for t in tgt_list:
         source_list = TO_LIST(getattr(t, 'source', ''))
-        tpath = os.path.normpath(os_path_relpath(t.path.abspath(bld.env), t.env.BUILD_DIRECTORY + '/default'))
+        tpath = os.path.normpath(os_path_relpath(t.path.abspath(), t.env.BUILD_DIRECTORY + '/default'))
         obj_sources = set()
         for s in source_list:
             p = os.path.normpath(os.path.join(tpath, s))
@@ -296,7 +297,7 @@ def check_duplicate_sources(bld, tgt_list):
 
     for s in subsystems:
         if len(subsystems[s]) > 1 and Options.options.SHOW_DUPLICATES:
-            Logs.warn("WARNING: source %s is in more than one target: %s" % (s, subsystems[s].keys()))
+            Logs.warn("WARNING: source %s is in more than one target: %s" % (s, list(subsystems[s].keys())))
         for tname in subsystems[s]:
             if len(subsystems[s][tname]) > 1:
                 raise Utils.WafError("ERROR: source %s is in more than one subsystem of target '%s': %s" % (s, tname, subsystems[s][tname]))
@@ -311,17 +312,16 @@ def check_group_ordering(bld, tgt_list):
     '''
 
     def group_name(g):
-        tm = bld.task_manager
-        return [x for x in tm.groups_names if id(tm.groups_names[x]) == id(g)][0]
+        return [x for x in bld.group_names if id(bld.group_names[x]) == id(g)][0]
 
-    for g in bld.task_manager.groups:
+    for g in bld.groups:
         gname = group_name(g)
-        for t in g.tasks_gen:
+        for t in g:
             t.samba_group = gname
 
     grp_map = {}
     idx = 0
-    for g in bld.task_manager.groups:
+    for g in bld.groups:
         name = group_name(g)
         grp_map[name] = idx
         idx += 1
@@ -369,7 +369,7 @@ def add_samba_attributes(bld, tgt_list):
         else:
             t.sname = t.target
         t.samba_type = targets[t.sname]
-        t.samba_abspath = t.path.abspath(bld.env)
+        t.samba_abspath = t.path.abspath()
         t.samba_deps_extended = t.samba_deps[:]
         t.samba_includes_extended = TO_LIST(t.samba_includes)[:]
         t.ccflags = getattr(t, 'samba_cflags', '')
@@ -1007,18 +1007,18 @@ def save_samba_deps(bld, tgt_list):
         if tdeps != {}:
             denv.outenv[t.sname] = tdeps
 
-    depsfile = os.path.join(bld.bdir, "sambadeps")
-    denv.store_fast(depsfile)
+    depsfile = os.path.join(bld.out_dir, "sambadeps")
+    denv.store(depsfile)
 
 
 
 def load_samba_deps(bld, tgt_list):
     '''load a previous set of build dependencies if possible'''
-    depsfile = os.path.join(bld.bdir, "sambadeps")
+    depsfile = os.path.join(bld.out_dir, "sambadeps")
     denv = Environment.Environment()
     try:
         debug('deps: checking saved dependencies')
-        denv.load_fast(depsfile)
+        denv.load(depsfile)
         if (denv.version != savedeps_version or
             denv.savedeps_inputs != savedeps_inputs or
             denv.savedeps_outputs != savedeps_outputs):

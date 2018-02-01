@@ -1,3 +1,4 @@
+import waflib.extras.compat15
 import os
 import Utils
 import samba_utils
@@ -95,7 +96,7 @@ also accepted as dictionary entries here
         self.VENDOR_SUFFIX=None
         self.VENDOR_PATCH=None
 
-        for a, b in version_dict.iteritems():
+        for a, b in version_dict.items():
             if a.startswith("SAMBA_VERSION_"):
                 setattr(self, a[14:], b)
             else:
@@ -198,7 +199,7 @@ also accepted as dictionary entries here
         for name in sorted(self.vcs_fields.keys()):
             string+="#define SAMBA_VERSION_%s " % name
             value = self.vcs_fields[name]
-            if isinstance(value, basestring):
+            if isinstance(value, str):
                 string += "\"%s\"" % value
             elif type(value) is int:
                 string += "%d" % value

@@ -3,6 +3,7 @@
 # with all the configure options that affect rpath and shared
 # library use
 
+import waflib.extras.compat15
 import os
 import Utils
 from TaskGen import feature, before, after
@@ -45,7 +46,7 @@ def install_binary(self):
 
     # tell waf to install the right binary
     bld.install_as(os.path.join(install_path, orig_target),
-                   os.path.join(self.path.abspath(bld.env), self.target),
+                   self.target,
                    chmod=MODE_755)
 
 
@@ -60,10 +61,10 @@ def install_library(self):
 
     bld = self.bld
 
-    default_env = bld.all_envs['default']
+    default_env = bld.all_envs['']
     try:
         if self.env['IS_EXTRA_PYTHON']:
-            bld.all_envs['default'] = bld.all_envs['extrapython']
+            bld.all_envs[''] = bld.all_envs['extrapython']
 
         install_ldflags = install_rpath(self)
         build_ldflags   = build_rpath(bld)
@@ -143,7 +144,7 @@ def install_library(self):
 
         # tell waf to install the library
         bld.install_as(os.path.join(install_path, install_name),
-                       os.path.join(self.path.abspath(bld.env), inst_name),
+                       inst_name,
                        chmod=MODE_755)
         if install_link and install_link != install_name:
             # and the symlink if needed
@@ -151,7 +152,7 @@ def install_library(self):
         if dev_link:
             bld.symlink_as(os.path.join(install_path, dev_link), os.path.basename(install_name))
     finally:
-        bld.all_envs['default'] = default_env
+        bld.all_envs[''] = default_env
 
 
 @feature('cshlib')
@@ -187,8 +188,8 @@ def symlink_lib(self):
     if self.target.endswith('.inst'):
         return
 
-    blddir = os.path.dirname(self.bld.srcnode.abspath(self.bld.env))
-    libpath = self.link_task.outputs[0].abspath(self.env)
+    blddir = os.path.dirname(self.bld.srcnode.abspath())
+    libpath = self.link_task.outputs[0].abspath()
 
     # calculat the link target and put it in the environment
     soext=""
@@ -228,7 +229,7 @@ def symlink_bin(self):
 
     if not self.link_task.outputs or not self.link_task.outputs[0]:
         raise Utils.WafError('no outputs found for %s in symlink_bin' % self.name)
-    binpath = self.link_task.outputs[0].abspath(self.env)
+    binpath = self.link_task.outputs[0].abspath()
     bldpath = os.path.join(self.bld.env.BUILD_DIRECTORY, self.link_task.outputs[0].name)
 
     if os.path.lexists(bldpath):

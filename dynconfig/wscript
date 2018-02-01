@@ -42,7 +42,7 @@ class SambaIndentedHelpFormatter (optparse.IndentedHelpFormatter):
         result.append(opts)
         if option.help:
             help_text = self.expand_default(option)
-            if string.find(help_text, '\n') == -1:
+            if help_text.find('\n') == -1:
                 help_lines = textwrap.wrap(help_text, self.help_width)
             else:
                 help_lines = help_text.splitlines()
@@ -282,7 +282,7 @@ def set_options(opt):
     opt_group.add_option('--enable-fhs', help=fhs_help,
                    action="store_true", dest='ENABLE_FHS', default=False)
 
-    for varname in dynconfig.keys():
+    for varname in list(dynconfig.keys()):
         if 'OPTION' not in dynconfig[varname]:
             continue
         opt = dynconfig[varname]['OPTION']
@@ -310,7 +310,7 @@ def configure(conf):
     explicit_set ={}
 
     dyn_vars = {}
-    for varname in dynconfig.keys():
+    for varname in dynconfig:
         dyn_vars[varname] = dynconfig[varname][flavor]
         if 'OVERWRITE' in dynconfig[varname] and dynconfig[varname]['OVERWRITE']:
             # we may overwrite this option
@@ -318,7 +318,7 @@ def configure(conf):
         conf.ASSERT(varname not in conf.env, "Variable %s already defined" % varname)
 
     # the explicit block
-    for varname in dynconfig.keys():
+    for varname in dynconfig:
         if 'OPTION' not in dynconfig[varname]:
             continue
         value = getattr(Options.options, varname, None)
@@ -330,7 +330,7 @@ def configure(conf):
         explicit_set[varname] = value
 
     # defaults stage 1 after the explicit block
-    for varname in dynconfig.keys():
+    for varname in dynconfig:
         if 'DELAY' in dynconfig[varname] and dynconfig[varname]['DELAY']:
             # this option referrs to other options,
             # so it needs to wait for stage 2.
@@ -342,7 +342,7 @@ def configure(conf):
             conf.env[varname] = value
 
     # defaults stage 2 after the explicit block
-    for varname in dynconfig.keys():
+    for varname in dynconfig:
         if 'DELAY' not in dynconfig[varname] or not dynconfig[varname]['DELAY']:
             # this option was already handled in stage 1.
             continue
@@ -353,7 +353,7 @@ def configure(conf):
             conf.env[varname] = value
 
     # display the expanded pathes for the user
-    for varname in dynconfig.keys():
+    for varname in dynconfig:
         value = conf.env[varname]
         conf.start_msg("Dynconfig[%s]: " % (varname))
         conf.end_msg("'%s'" % (value), 'GREEN')
@@ -373,7 +373,7 @@ def get_override(bld):
 def dynconfig_cflags(bld, list=None):
     '''work out the extra CFLAGS for dynconfig.c'''
     cflags = []
-    for varname in dynconfig.keys():
+    for varname in dynconfig:
         if list and not varname in list:
             continue
         value = bld.env[varname]
@@ -388,7 +388,7 @@ Build.BuildContext.dynconfig_cflags = dynconfig_cflags
 def dynconfig_varnames(bld, list=None):
     '''work out the dynconfig variables'''
     varnames = []
-    for varname in dynconfig.keys():
+    for varname in dynconfig:
         if list and not varname in list:
             continue
         varnames.append(varname)
@@ -398,7 +398,7 @@ Build.BuildContext.dynconfig_varnames = dynconfig_varnames
 def pathconfig_entities(bld, list=None):
     '''work out the extra entities for the docs'''
     entities = []
-    for varname in dynconfig.keys():
+    for varname in dynconfig:
         if list and not varname in list:
             continue
         value = bld.env[varname]

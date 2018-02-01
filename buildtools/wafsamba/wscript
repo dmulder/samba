@@ -17,7 +17,7 @@ if '--enable-auto-reconfigure' in sys.argv:
     Configure.autoconfig = True
 
 def set_options(opt):
-    opt.tool_options('compiler_cc')
+    opt.tool_options('compiler_c')
 
     opt.tool_options('gnu_dirs')
 
@@ -226,41 +226,12 @@ def configure(conf):
 
     conf.CHECK_CC_ENV()
 
-    conf.check_tool('compiler_cc')
+    conf.check_tool('compiler_c')
 
     conf.CHECK_STANDARD_LIBPATH()
 
     # we need git for 'waf dist'
-    conf.find_program('git', var='GIT')
-
-    # older gcc versions (< 4.4) does not work with gccdeps, so we have to see if the .d file is generated
-    if Options.options.enable_gccdeps:
-        # stale file removal - the configuration may pick up the old .pyc file
-        p = os.path.join(conf.srcdir, 'buildtools/wafsamba/gccdeps.pyc')
-        if os.path.exists(p):
-            os.remove(p)
-
-        from TaskGen import feature, after
-        @feature('testd')
-        @after('apply_core')
-        def check_d(self):
-            tsk = self.compiled_tasks[0]
-            tsk.outputs.append(tsk.outputs[0].change_ext('.d'))
-
-        import Task
-        cc = Task.TaskBase.classes['cc']
-        oldmeth = cc.run
-
-        cc.run = Task.compile_fun_noshell('cc', '${CC} ${CCFLAGS} ${CPPFLAGS} ${_CCINCFLAGS} ${_CCDEFFLAGS} ${CC_SRC_F}${SRC} ${CC_TGT_F}${TGT[0].abspath(env)}')[0]
-        try:
-            try:
-                conf.check(features='c testd', fragment='int main() {return 0;}\n', ccflags=['-MD'], mandatory=True, msg='Check for -MD')
-            except:
-                pass
-            else:
-                conf.check_tool('gccdeps', tooldir=conf.srcdir + "/buildtools/wafsamba")
-        finally:
-            cc.run = oldmeth
+    conf.find_program('git', var='GIT', mandatory=False)
 
     # make the install paths available in environment
     conf.env.LIBDIR = Options.options.LIBDIR or '${PREFIX}/lib'
@@ -507,7 +478,7 @@ struct foo bar = { .y = 'X', .x = 1 };
         conf.DEFINE('TIME_WITH_SYS_TIME', 1)
 
     # cope with different extensions for libraries
-    (root, ext) = os.path.splitext(conf.env.shlib_PATTERN)
+    (root, ext) = os.path.splitext(conf.env.cshlib_PATTERN)
     if ext[0] == '.':
         conf.define('SHLIBEXT', ext[1:], quote=True)
     else:
@@ -571,7 +542,7 @@ struct foo bar = { .y = 'X', .x = 1 };
     # Extra sanity check.
     if conf.CONFIG_SET("HAVE_BIG_ENDIAN") == conf.CONFIG_SET("HAVE_LITTLE_ENDIAN"):
         Logs.error("Failed endian determination.  The PDP-11 is back?")
-	sys.exit(1)
+        sys.exit(1)
     else:
         if conf.CONFIG_SET("HAVE_BIG_ENDIAN"):
             conf.DEFINE('WORDS_BIGENDIAN', 1)

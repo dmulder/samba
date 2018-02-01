@@ -3,6 +3,7 @@
 srcdir=".."
 
 import sys, os
+from waflib.extras import compat15
 from optparse import SUPPRESS_HELP
 sys.path.insert(0, srcdir+"/buildtools/wafsamba")
 sys.path.insert(0, "source3")
@@ -10,7 +11,7 @@ import wafsamba, Options, Logs, Utils, Scripting
 import build.charset
 import samba_utils, samba_version
 import samba3
-import bison, flex
+from waflib.Tools import bison, flex
 
 default_prefix = Options.default_prefix = '/usr/local/samba'
 
@@ -1563,7 +1564,7 @@ main() {
 
     if Options.options.with_glusterfs:
         conf.CHECK_CFG(package='glusterfs-api', args='"glusterfs-api >= 4" --cflags --libs',
-                       msg='Checking for glusterfs-api >= 4', uselib_store="GFAPI")
+                       msg='Checking for glusterfs-api >= 4', uselib_store="GFAPI", mandatory=False)
         conf.CHECK_HEADERS('glusterfs/api/glfs.h', lib='gfapi')
         conf.CHECK_LIB('gfapi', shlib=True)
 

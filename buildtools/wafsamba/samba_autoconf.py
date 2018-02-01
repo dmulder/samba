@@ -1,7 +1,9 @@
 # a waf tool to add autoconf-like macros to the configure section
 
-import os, sys
+import waflib.extras.compat15
+import os, sys, shlex
 import Build, Options, preproc, Logs
+from waflib import Errors
 from Configure import conf
 from TaskGen import feature
 from samba_utils import TO_LIST, GET_TARGET_TYPE, SET_TARGET_TYPE, unique_list, mkdir_p
@@ -17,6 +19,7 @@ missing_headers = set()
 def DEFINE(conf, d, v, add_to_cflags=False, quote=False):
     '''define a config option'''
     conf.define(d, v, quote=quote)
+    conf.env[d]=v
     if add_to_cflags:
         conf.env.append_value('CCDEFINES', d + '=' + str(v))
 
@@ -434,10 +437,6 @@ def CHECK_CODE(conf, code, define,
                      quote=quote,
                      exec_args=exec_args,
                      define_ret=define_ret)
-    if not ret and CONFIG_SET(conf, define):
-        # sometimes conf.check() returns false, but it
-        # sets the define. Maybe a waf bug?
-        ret = True
     if ret:
         if not define_ret:
             conf.DEFINE(define, 1)
@@ -478,11 +477,14 @@ def CHECK_CFLAGS(conf, cflags, fragment='int main(void) { return 0; }\n'):
     check_cflags = TO_LIST(cflags)
     if 'WERROR_CFLAGS' in conf.env:
         check_cflags.extend(conf.env['WERROR_CFLAGS'])
-    return conf.check(fragment=fragment,
-                      execute=0,
-                      type='nolink',
-                      ccflags=check_cflags,
-                      msg="Checking compiler accepts %s" % cflags)
+    try:
+        return conf.check(fragment=fragment,
+                          execute=0,
+                          type='nolink',
+                          ccflags=cflags,
+                          msg="Checking compiler accepts %s" % cflags)
+    except Errors.ConfigurationError:
+        return False
 
 @conf
 def CHECK_LDFLAGS(conf, ldflags):
@@ -514,6 +516,8 @@ def CONFIG_SET(conf, option):
     if v == []:
         return False
     if v == ():
+        return False
+    if v is 0:
         return False
     return True
 
@@ -760,9 +764,9 @@ int main(void) {
         conf.env['EXTRA_LDFLAGS'].extend(conf.env['ADDITIONAL_LDFLAGS'])
 
     if path is None:
-        conf.write_config_header('config.h', top=True)
+        conf.write_config_header('config.h', top=True, remove=False)
     else:
-        conf.write_config_header(path)
+        conf.write_config_header(path, remove=False)
     conf.SAMBA_CROSS_CHECK_COMPLETE()
 
 
@@ -887,4 +891,6 @@ def SAMBA_CHECK_UNDEFINED_SYMBOL_FLAGS(conf):
 
 @conf
 def CHECK_CFG(self, *k, **kw):
+    if 'args' in kw and isinstance(kw['args'], str):
+        kw['args'] = shlex.split(kw['args'])
     return self.check_cfg(*k, **kw)

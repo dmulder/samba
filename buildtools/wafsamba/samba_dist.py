@@ -1,6 +1,7 @@
 # customised version of 'waf dist' for Samba tools
 # uses git ls-files to get file lists
 
+import waflib.extras.compat15
 import os, sys, tarfile
 import Utils, Scripting, Logs, Options
 from Configure import conf
@@ -167,7 +168,7 @@ def dist(appname='', version=''):
         absdir = os.path.join(srcdir, dir)
         try:
             files = vcs_dir_contents(absdir)
-        except Exception, e:
+        except Exception as e:
             Logs.error('unable to get contents of %s: %s' % (absdir, e))
             sys.exit(1)
         add_files_to_tarball(tar, srcdir, dir, dist_base, destdir, blacklist, files)

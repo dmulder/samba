@@ -1,6 +1,7 @@
 # a waf tool to extract symbols from object files or libraries
 # using nm, producing a set of exposed defined/undefined symbols
 
+import waflib.extras.compat15
 import os, re, subprocess
 import Utils, Build, Options, Logs
 from Logs import debug

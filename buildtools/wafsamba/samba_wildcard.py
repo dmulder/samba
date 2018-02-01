@@ -1,5 +1,6 @@
 # based on playground/evil in the waf svn tree
 
+import waflib.extras.compat15
 import os, datetime, fnmatch
 import Scripting, Utils, Options, Logs, Environment
 from Constants import SRCDIR, BLDDIR

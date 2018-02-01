@@ -6,6 +6,7 @@
 
 # overall this makes some build tasks quite a bit faster
 
+import waflib.extras.compat15
 import os
 import Build, Utils, Node
 from TaskGen import feature, after, before
@@ -94,35 +95,15 @@ import Node, Environment
 
 def vari(self):
     return "default"
-Environment.Environment.variant = vari
 
 def variant(self, env):
     if not env: return 0
     elif self.id & 3 == Node.FILE: return 0
     else: return "default"
-Node.Node.variant = variant
 
 
 import TaskGen, Task
 
-def create_task(self, name, src=None, tgt=None):
-    task = Task.TaskBase.classes[name](self.env, generator=self)
-    if src:
-        task.set_inputs(src)
-    if tgt:
-        task.set_outputs(tgt)
-    return task
-TaskGen.task_gen.create_task = create_task
-
-def hash_constraints(self):
-    a = self.attr
-    sum = hash((str(a('before', '')),
-            str(a('after', '')),
-            str(a('ext_in', '')),
-            str(a('ext_out', '')),
-            self.__class__.maxjobs))
-    return sum
-Task.TaskBase.hash_constraints = hash_constraints
 
 def hash_env_vars(self, env, vars_lst):
     idx = str(id(env)) + str(vars_lst)
@@ -136,7 +117,6 @@ def hash_env_vars(self, env, vars_lst):
 
     ret = self.cache_sig_vars[idx] = m.digest()
     return ret
-Build.BuildContext.hash_env_vars = hash_env_vars
 
 
 def store_fast(self, filename):
@@ -146,7 +126,6 @@ def store_fast(self, filename):
         Build.cPickle.dump(data, file, -1)
     finally:
         file.close()
-Environment.Environment.store_fast = store_fast
 
 def load_fast(self, filename):
     file = open(filename, 'rb')
@@ -155,7 +134,6 @@ def load_fast(self, filename):
     finally:
         file.close()
     self.table.update(data)
-Environment.Environment.load_fast = load_fast
 
 def is_this_a_static_lib(self, name):
     try:
@@ -167,7 +145,6 @@ def is_this_a_static_lib(self, name):
     except KeyError:
         ret = cache[name] = 'cstaticlib' in self.bld.get_tgen_by_name(name).features
         return ret
-TaskGen.task_gen.is_this_a_static_lib = is_this_a_static_lib
 
 def shared_ancestors(self):
     try:
@@ -185,10 +162,9 @@ def shared_ancestors(self):
                 ret = [x for x in lst if not self.is_this_a_static_lib(x)]
         cache[id(self)] = ret
         return ret
-TaskGen.task_gen.shared_ancestors = shared_ancestors
 
-@feature('c', 'cc', 'cxx')
-@after('apply_link', 'init_cc', 'init_cxx', 'apply_core')
+#@feature('c', 'cc', 'cxx')
+#@after('apply_link', 'init_cc', 'init_cxx', 'apply_core')
 def apply_lib_vars(self):
     """after apply_link because of 'link_task'
     after default_cc because of the attribute 'uselib'"""

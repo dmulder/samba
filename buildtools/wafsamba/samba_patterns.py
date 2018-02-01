@@ -1,11 +1,12 @@
 # a waf tool to add extension based build patterns for Samba
 
+import waflib.extras.compat15
 import Build
 from wafsamba import samba_version_file
 
 def write_version_header(task):
     '''print version.h contents'''
-    src = task.inputs[0].srcpath(task.env)
+    src = task.inputs[0].srcpath()
 
     version = samba_version_file(src, task.env.srcdir, env=task.env, is_install=task.generator.bld.is_install)
     string = str(version)
@@ -171,7 +172,7 @@ def write_build_options(task):
         else:
             keys_misc.append(key)
 
-    tgt = task.outputs[0].bldpath(task.env)
+    tgt = task.outputs[0].abspath()
     f = open(tgt, 'w')
     write_build_options_header(f)
     write_build_options_section(f, keys_header_sys, "System Headers")
