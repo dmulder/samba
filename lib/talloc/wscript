@@ -6,8 +6,8 @@ VERSION = '2.1.11'
 
 blddir = 'bin'
 
-import Logs
-import os, sys
+import os
+import sys
 
 # find the buildtools directory
 srcdir = '.'
@@ -15,16 +15,16 @@ while not os.path.exists(srcdir+'/buildtools') and len(srcdir.split('/')) < 5:
     srcdir = srcdir + '/..'
 sys.path.insert(0, srcdir + '/buildtools/wafsamba')
 
-import sys
 sys.path.insert(0, srcdir+"/buildtools/wafsamba")
-import wafsamba, samba_dist, Options
+import wafsamba, samba_dist
+from waflib import Logs, Options
 
 # setup what directories to put in a tarball
 samba_dist.DIST_DIRS("""lib/talloc:. lib/replace:lib/replace
 buildtools:buildtools third_party/waf:third_party/waf""")
 
 
-def set_options(opt):
+def options(opt):
     opt.BUILTIN_DEFAULT('replace')
     opt.PRIVATE_EXTENSION_DEFAULT('talloc', noextension='talloc')
     opt.RECURSE('lib/replace')
