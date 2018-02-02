@@ -1,5 +1,6 @@
 # waf build tool for building IDL files with pidl
 
+import waflib.extras.compat15
 import os
 from waflib import Build, Logs, Utils, Configure, Errors
 from waflib.Configure import conf
@@ -167,6 +168,7 @@ def SAMBA_PYTHON(bld, name,
                       cflags_end=cflags_end,
                       local_include=local_include,
                       vars=vars,
+                      bundled_name=realname,
                       realname=realname,
                       link_name=link_name,
                       pyext=True,
@@ -180,10 +182,11 @@ Build.BuildContext.SAMBA_PYTHON = SAMBA_PYTHON
 
 
 def pyembed_libname(bld, name, extrapython=False):
-    if bld.env['PYTHON_SO_ABI_FLAG']:
-        return name + bld.env['PYTHON_SO_ABI_FLAG']
-    else:
-        return name
+    # Not sure what this was used for originally, but right now
+    # it's being used to royally mess up dependency name matching.
+    # (my suspicion is that nobody ever expected that Python2,
+    # and thus the unmangled name, would be missing).
+    return name
 
 Build.BuildContext.pyembed_libname = pyembed_libname
 
@@ -201,10 +204,10 @@ def gen_python_environments(bld, extra_env_vars=()):
     if bld.env['EXTRA_PYTHON']:
         copied = ('GLOBAL_DEPENDENCIES', 'TARGET_TYPE') + tuple(extra_env_vars)
         for name in copied:
-            bld.all_envs['extrapython'][name] = bld.all_envs['default'][name]
+            bld.all_envs['extrapython'][name] = bld.all_envs[''][name]
         default_env = bld.all_envs['default']
-        bld.all_envs['default'] = bld.all_envs['extrapython']
+        bld.all_envs[''] = bld.all_envs['extrapython']
         yield
-        bld.all_envs['default'] = default_env
+        bld.all_envs[''] = default_env
 
 Build.BuildContext.gen_python_environments = gen_python_environments
