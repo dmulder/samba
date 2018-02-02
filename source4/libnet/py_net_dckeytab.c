@@ -22,6 +22,7 @@
 
 #include <Python.h>
 #include "includes.h"
+#include "python/py3compat.h"
 #include "py_net.h"
 #include "libnet_export_keytab.h"
 
@@ -74,20 +75,29 @@ static PyMethodDef export_keytab_method_table[] = {
  * the global module table even if we don't really need that record. Thus, we initialize
  * dckeytab module but never use it.
  * */
-void initdckeytab(void)
+void initdckeytab(void);
+static struct PyModuleDef moduledef = {
+    PyModuleDef_HEAD_INIT,
+    .m_name = "dckeytab",
+    .m_doc = "dckeytab",
+    .m_size = -1,
+    .m_methods = NULL
+};
+
+MODULE_INIT_FUNC(dckeytab)
 {
-	PyObject *m;
+	PyObject *m = NULL;
 	PyObject *Net;
 	PyObject *descr;
 	int ret;
 
-	m = Py_InitModule3("dckeytab", NULL, NULL);
+	m = PyModule_Create(&moduledef);
 	if (m == NULL)
-		return;
+		return m;
 
 	m = PyImport_ImportModule("samba.net");
         if (m == NULL)
-		return;
+		return m;
 
 	Net = (PyObject *)PyObject_GetAttrString(m, "Net");
 	if (Net == NULL)
