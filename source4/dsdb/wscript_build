@@ -61,12 +61,12 @@ bld.SAMBA_MODULE('service_dns_update',
 	internal_module=False,
 	enabled=bld.AD_DC_BUILD_IS_ENABLED()
 	)
-
-bld.SAMBA_PYTHON('python_dsdb',
-	source='pydsdb.c',
-	# the dependency on dcerpc here is because gensec
-	# depends on dcerpc but the waf circular dependency finder
-	# removes it so we end up with unresolved symbols.
-	deps='samdb pyldb-util dcerpc com_err pyrpc_util pyparam_util dsdb_garbage_collect_tombstones',
-	realname='samba/dsdb.so'
-	)
+for env in bld.gen_python_environments():
+	bld.SAMBA_PYTHON('python_dsdb',
+		source='pydsdb.c',
+		# the dependency on dcerpc here is because gensec
+		# depends on dcerpc but the waf circular dependency finder
+		# removes it so we end up with unresolved symbols.
+		deps='samdb pyldb-util dcerpc com_err pyrpc_util pyparam_util dsdb_garbage_collect_tombstones',
+		realname='samba/dsdb.so'
+		)
