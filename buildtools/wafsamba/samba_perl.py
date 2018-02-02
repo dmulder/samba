@@ -48,9 +48,9 @@ def SAMBA_CHECK_PERL(conf, mandatory=True, version=(5,0,0)):
     conf.end_msg("'%s'" % (perl_lib_install_dir), 'GREEN')
     conf.env.PERL_LIB_INSTALL_DIR = perl_lib_install_dir
 
-    perl_inc = read_perl_config_var('print "@INC"')
+    perl_inc = read_perl_config_var('print "@INC"').decode('utf-8')
     if '.' in perl_inc:
-        perl_inc.remove('.')
+        perl_inc = perl_inc.replace('.', '')
     conf.start_msg("PERL_INC: ")
     conf.end_msg("%s" % (perl_inc), 'GREEN')
     conf.env.PERL_INC = perl_inc

@@ -724,6 +724,8 @@ class Task(evil):
 					except AttributeError:
 						if hasattr(v, '__call__'):
 							v = v() # dependency is a function, call it
+					if isinstance(v, str):
+						v = v.encode('utf-8')
 					upd(v)
 
 	def sig_vars(self):

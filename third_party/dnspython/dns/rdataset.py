@@ -16,7 +16,10 @@
 """DNS rdatasets (an rdataset is a set of rdatas of a given type and class)"""
 
 import random
-import StringIO
+try:
+    import StringIO
+except ImportError:
+    from io import StringIO
 import struct
 
 import dns.exception

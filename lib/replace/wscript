@@ -716,7 +716,7 @@ def build(bld):
 
     REPLACE_HOSTCC_SOURCE = ''
 
-    for filename, functions in REPLACEMENT_FUNCTIONS.iteritems():
+    for filename, functions in REPLACEMENT_FUNCTIONS.items():
         for function in functions:
             if not bld.CONFIG_SET('HAVE_%s' % function.upper()):
                 REPLACE_HOSTCC_SOURCE += ' %s' % filename

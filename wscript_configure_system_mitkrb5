@@ -24,8 +24,8 @@ def krb5_define_syslib(conf, lib, deps):
 Logs.info("Looking for kerberos features")
 conf.find_program('krb5-config.heimdal', var='HEIMDAL_KRB5_CONFIG')
 
-if isinstance(Options.options.with_system_mitkrb5, list):
-    path_krb5_config = [x+'/bin' for x in Options.options.with_system_mitkrb5]
+if isinstance(options.with_system_mitkrb5, list):
+    path_krb5_config = [x+'/bin' for x in options.with_system_mitkrb5]
 else:
     path_krb5_config = None
 
@@ -305,8 +305,8 @@ if conf.CONFIG_SET('AD_DC_BUILD_IS_ENABLED'):
 
     kdc_path_list = [ '/usr/sbin', '/usr/lib/mit/sbin']
 
-    if getattr(Options.options, 'with_system_mitkdc', None):
-        conf.DEFINE('MIT_KDC_PATH', '"' + Options.options.with_system_mitkdc + '"')
+    if getattr(options, 'with_system_mitkdc', None):
+        conf.DEFINE('MIT_KDC_PATH', '"' + options.with_system_mitkdc + '"')
     else:
         conf.find_program('krb5kdc', path_list=kdc_path_list, var='MIT_KDC_BINARY', mandatory=True)
         conf.DEFINE('MIT_KDC_PATH', '"' + " ".join(conf.env.MIT_KDC_BINARY) + '"')

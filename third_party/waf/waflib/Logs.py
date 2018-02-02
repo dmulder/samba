@@ -288,6 +288,8 @@ def info(*k, **kw):
 	"""
 	Wraps logging.info
 	"""
+	if not log:
+		init_log()
 	log.info(*k, **kw)
 
 def init_log():

@@ -133,7 +133,7 @@ def test(dir):
 def find_lib():
 	path = '../../third_party/waf'
 	paths = [path, path+'/waflib']
- 	return [os.path.abspath(os.path.join(os.path.dirname(__file__), x)) for x in paths]
+	return [os.path.abspath(os.path.join(os.path.dirname(__file__), x)) for x in paths]
 
 wafdir = find_lib()
 for p in wafdir:

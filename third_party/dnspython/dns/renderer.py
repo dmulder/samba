@@ -15,7 +15,10 @@
 
 """Help for building DNS wire format messages"""
 
-import cStringIO
+try:
+    import cStringIO
+except ImportError:
+    from io import BytesIO as cStringIO
 import struct
 import random
 import time
@@ -218,7 +221,7 @@ class Renderer(object):
         """
 
         # make sure the EDNS version in ednsflags agrees with edns
-        ednsflags &= 0xFF00FFFFL
+        ednsflags &= 0xFF00FFFF
         ednsflags |= (edns << 16)
         self._set_section(ADDITIONAL)
         before = self.output.tell()

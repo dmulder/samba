@@ -795,7 +795,7 @@ sys.path.insert(1, "%s")""" % (task.env["PYTHONARCHDIR"], task.env["PYTHONDIR"])
         installed_file.write(newline)
         lineno = lineno + 1
     installed_file.close()
-    os.chmod(installed_location, 0755)
+    os.chmod(installed_location, 0o755)
     return 0
 
 def copy_and_fix_perl_path(task):
@@ -823,7 +823,7 @@ def copy_and_fix_perl_path(task):
         installed_file.write(newline)
         lineno = lineno + 1
     installed_file.close()
-    os.chmod(installed_location, 0755)
+    os.chmod(installed_location, 0o755)
     return 0
 
 
@@ -904,7 +904,7 @@ def INSTALL_DIR(bld, path, chmod=0o755, env=None):
             try:
                 os.makedirs(destpath)
                 os.chmod(destpath, chmod)
-            except OSError, e:
+            except OSError as e:
                 if not os.path.isdir(destpath):
                     raise Errors.WafError("Cannot create the folder '%s' (error: %s)" % (path, e))
 Build.BuildContext.INSTALL_DIR = INSTALL_DIR

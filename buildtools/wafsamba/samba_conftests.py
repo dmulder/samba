@@ -51,7 +51,7 @@ def check(self, *k, **kw):
     ret = None
     try:
         ret = self.run_c_code(*k, **kw)
-    except Configure.ConfigurationError, e:
+    except Configure.ConfigurationError as e:
         self.end_msg(kw['errmsg'], 'YELLOW')
         if 'mandatory' in kw and kw['mandatory']:
             if Logs.verbose > 1:
@@ -493,8 +493,8 @@ def CHECK_XSLTPROC_MANPAGES(conf):
                              define='XSLTPROC_MANPAGES', on_target=False,
                              boolean=True)
     if not conf.CONFIG_SET('XSLTPROC_MANPAGES'):
-        print "A local copy of the docbook.xsl wasn't found on your system" \
-              " consider installing package like docbook-xsl"
+        print("A local copy of the docbook.xsl wasn't found on your system" \
+              " consider installing package like docbook-xsl")
 
 #
 # Determine the standard libpath for the used compiler,
@@ -507,8 +507,8 @@ def CHECK_XSLTPROC_MANPAGES(conf):
 def CHECK_STANDARD_LIBPATH(conf):
     # at least gcc and clang support this:
     try:
-        cmd = conf.env.CC + ['-print-search-dirs']
-        out = Utils.cmd_output(cmd).split('\n')
+        cmd = conf.env.CC + [b'-print-search-dirs']
+        out = Utils.cmd_output(cmd).decode('utf-8').split('\n')
     except ValueError:
         # option not supported by compiler - use a standard list of directories
         dirlist = [ '/usr/lib', '/usr/lib64' ]
