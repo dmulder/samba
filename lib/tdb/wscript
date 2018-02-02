@@ -13,7 +13,8 @@ while not os.path.exists(srcdir+'/buildtools') and len(srcdir.split('/')) < 5:
     srcdir = srcdir + '/..'
 sys.path.insert(0, srcdir + '/buildtools/wafsamba')
 
-import wafsamba, samba_dist, Options, Logs
+import wafsamba, samba_dist
+from waflib import Options, Logs
 
 samba_dist.DIST_DIRS('lib/tdb:. lib/replace:lib/replace buildtools:buildtools third_party/waf:third_party/waf')
 
@@ -54,7 +55,7 @@ tdb1_unit_tests = [
     'run-mutex1',
 ]
 
-def set_options(opt):
+def options(opt):
     opt.BUILTIN_DEFAULT('replace')
     opt.PRIVATE_EXTENSION_DEFAULT('tdb', noextension='tdb')
     opt.RECURSE('lib/replace')
