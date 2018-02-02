@@ -21,6 +21,7 @@
 
 #include <Python.h>
 #include "includes.h"
+#include "python/py3compat.h"
 #include <pyldb.h>
 #include <pytalloc.h>
 #include "dns_server/dnsserver_common.h"
@@ -335,12 +336,18 @@ static PyMethodDef py_dsdb_dns_methods[] = {
 
 void initdsdb_dns(void);
 
-void initdsdb_dns(void)
-{
-	PyObject *m;
+static struct PyModuleDef moduledef = {
+    PyModuleDef_HEAD_INIT,
+    .m_name = "dsdb_dns",
+    .m_doc = "Python bindings for the DNS objects in the directory service databases.",
+    .m_size = -1,
+    .m_methods = py_dsdb_dns_methods,
+};
 
-	m = Py_InitModule3("dsdb_dns", py_dsdb_dns_methods,
-			   "Python bindings for the DNS objects in the directory service databases.");
-	if (m == NULL)
-		return;
+MODULE_INIT_FUNC(dsdb_dns)
+{
+	PyObject *m = NULL;
+
+	m = PyModule_Create(&moduledef);
+	return m;
 }

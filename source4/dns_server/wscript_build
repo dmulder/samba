@@ -66,7 +66,8 @@ bld.SAMBA_LIBRARY('dlz_bind9_for_torture',
                   enabled=bld.AD_DC_BUILD_IS_ENABLED())
 
 
-bld.SAMBA_PYTHON('python_dsdb_dns',
-	         source='pydns.c',
-	         deps='samdb pyldb-util pyrpc_util dnsserver_common pytalloc-util',
-	         realname='samba/dsdb_dns.so')
+for env in bld.gen_python_environments():
+	bld.SAMBA_PYTHON('python_dsdb_dns',
+		         source='pydns.c',
+		         deps='samdb pyldb-util pyrpc_util dnsserver_common pytalloc-util',
+		         realname='samba/dsdb_dns.so')
