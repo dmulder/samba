@@ -5,7 +5,8 @@ VERSION = '1.2.1'
 
 blddir = 'bin'
 
-import Logs, sys, os
+import sys
+import os
 
 # find the buildtools directory
 srcdir = '.'
@@ -14,11 +15,11 @@ while not os.path.exists(srcdir+'/buildtools') and len(srcdir.split('/')) < 5:
 sys.path.insert(0, srcdir + '/buildtools/wafsamba')
 
 import wafsamba, samba_dist
-import Options, Utils
+from waflib import Options, Utils, Logs
 
 samba_dist.DIST_DIRS('lib/replace buildtools:buildtools third_party/waf:third_party/waf')
 
-def set_options(opt):
+def options(opt):
     opt.BUILTIN_DEFAULT('NONE')
     opt.PRIVATE_EXTENSION_DEFAULT('')
     opt.RECURSE('buildtools/wafsamba')
