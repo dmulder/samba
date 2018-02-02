@@ -6,7 +6,8 @@ import sys, os
 from optparse import SUPPRESS_HELP
 sys.path.insert(0, srcdir+"/buildtools/wafsamba")
 sys.path.insert(0, "source3")
-import wafsamba, Options, Logs, Utils, Scripting
+from waflib import Options, Logs, Utils, Scripting
+import wafsamba
 import build.charset
 import samba_utils, samba_version
 import samba3
@@ -14,7 +15,7 @@ import bison, flex
 
 default_prefix = Options.default_prefix = '/usr/local/samba'
 
-def set_options(opt):
+def options(opt):
 
     opt.add_option('--with-static-modules',
                    help=("Comma-separated list of names of modules to statically link in. "+
