@@ -2,9 +2,9 @@
 # based on suncc.py from waf
 
 import os, optparse, sys
-import Utils, Options, Configure
+from waflib import Utils, Options, Configure
 import ccroot, ar
-from Configure import conftest
+from waflib.Configure import conftest
 import gcc
 
 
@@ -38,7 +38,7 @@ def gcc_modifier_hpux(conf):
 
 gcc.gcc_modifier_hpux = gcc_modifier_hpux
 
-from TaskGen import feature, after
+from waflib.TaskGen import feature, after
 @feature('cprogram', 'cshlib')
 @after('apply_link', 'apply_lib_vars', 'apply_obj_vars')
 def hpux_addfullpath(self):

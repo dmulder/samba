@@ -3,9 +3,9 @@
 # based on suncc.py from waf
 
 import os, optparse
-import Utils, Options, Configure
-import ccroot, ar
-from Configure import conftest
+from waflib import Utils, Options, Configure
+from waflib.Tools import ccroot, ar
+from waflib.Configure import conftest
 
 from compiler_cc import c_compiler
 
