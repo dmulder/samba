@@ -22,6 +22,7 @@
 
 #include <Python.h>
 #include "includes.h"
+#include "python/py3compat.h"
 #include "web_server/web_server.h"
 #include "../lib/util/dlinklist.h"
 #include "lib/tls/tls.h"
@@ -73,19 +74,19 @@ static PyObject *start_response(PyObject *self, PyObject *args, PyObject *kwargs
 
 		py_name = PyTuple_GetItem(item, 0);
 
-		if (!PyString_Check(py_name)) {
+		if (!PyStr_Check(py_name)) {
 			PyErr_SetString(PyExc_TypeError, "header name should be string");
 			return NULL;
 		}
 
 		py_value = PyTuple_GetItem(item, 1);
-		if (!PyString_Check(py_value)) {
+		if (!PyStr_Check(py_value)) {
 			PyErr_SetString(PyExc_TypeError, "header value should be string");
 			return NULL;
 		}
 
-		hdr->name = talloc_strdup(hdr, PyString_AsString(py_name));
-		hdr->value = talloc_strdup(hdr, PyString_AsString(py_value));
+		hdr->name = talloc_strdup(hdr, PyStr_AsString(py_name));
+		hdr->value = talloc_strdup(hdr, PyStr_AsString(py_value));
 		DLIST_ADD(headers, hdr);
 	}
 
@@ -142,7 +143,7 @@ static PyObject *py_error_writelines(PyObject *self, PyObject *args, PyObject *k
 	}
 
 	while ((item = PyIter_Next(seq))) {
-		char *str = PyString_AsString(item);
+		char *str = PyStr_AsString(item);
 
 		DEBUG(0, ("%s", str));
 	}
@@ -187,7 +188,7 @@ static PyObject *py_input_read(PyObject *_self, PyObject *args, PyObject *kwargs
 	else
 		size = MIN(size, self->web->input.partial.length-self->offset);
 
-	ret = PyString_FromStringAndSize((char *)self->web->input.partial.data+self->offset, size);
+	ret = PyStr_FromStringAndSize((char *)self->web->input.partial.data+self->offset, size);
 	self->offset += size;
 
 	return ret;
@@ -323,7 +324,7 @@ static PyObject *create_environ(bool tls, int content_length, struct http_header
 	PyDict_SetItemString(env, "wsgi.multithread", Py_False);
 	PyDict_SetItemString(env, "wsgi.multiprocess", Py_False);
 	PyDict_SetItemString(env, "wsgi.run_once", Py_False);
-	py_val = PyString_FromString("HTTP/1.0");
+	py_val = PyStr_FromString("HTTP/1.0");
 	if (py_val == NULL) goto error;
 	PyDict_SetItemString(env, "SERVER_PROTOCOL", py_val);
 	Py_DECREF(py_val);
@@ -333,39 +334,39 @@ static PyObject *create_environ(bool tls, int content_length, struct http_header
 		PyDict_SetItemString(env, "CONTENT_LENGTH", py_val);
 		Py_DECREF(py_val);
 	}
-	py_val = PyString_FromString(request_method);
+	py_val = PyStr_FromString(request_method);
 	if (py_val == NULL) goto error;
 	PyDict_SetItemString(env, "REQUEST_METHOD", py_val);
 	Py_DECREF(py_val);
 
 	/* There is always a single wsgi app to which all requests are redirected,
 	 * so SCRIPT_NAME will be / */
-	py_val = PyString_FromString("/");
+	py_val = PyStr_FromString("/");
 	if (py_val == NULL) goto error;
 	PyDict_SetItemString(env, "SCRIPT_NAME", py_val);
 	Py_DECREF(py_val);
 	questionmark = strchr(request_string, '?');
 	if (questionmark == NULL) {
-		py_val = PyString_FromString(request_string);
+		py_val = PyStr_FromString(request_string);
 		if (py_val == NULL) goto error;
 		PyDict_SetItemString(env, "PATH_INFO", py_val);
 		Py_DECREF(py_val);
 	} else {
-		py_val = PyString_FromString(questionmark+1);
+		py_val = PyStr_FromString(questionmark+1);
 		if (py_val == NULL) goto error;
 		PyDict_SetItemString(env, "QUERY_STRING", py_val);
 		Py_DECREF(py_val);
-		py_val = PyString_FromStringAndSize(request_string, questionmark-request_string);
+		py_val = PyStr_FromStringAndSize(request_string, questionmark-request_string);
 		if (py_val == NULL) goto error;
 		PyDict_SetItemString(env, "PATH_INFO", py_val);
 		Py_DECREF(py_val);
 	}
 
-	py_val = PyString_FromString(servername);
+	py_val = PyStr_FromString(servername);
 	if (py_val == NULL) goto error;
 	PyDict_SetItemString(env, "SERVER_NAME", py_val);
 	Py_DECREF(py_val);
-	py_val = PyString_FromFormat("%d", serverport);
+	py_val = PyStr_FromFormat("%d", serverport);
 	if (py_val == NULL) goto error;
 	PyDict_SetItemString(env, "SERVER_PORT", py_val);
 	Py_DECREF(py_val);
@@ -373,7 +374,7 @@ static PyObject *create_environ(bool tls, int content_length, struct http_header
 	for (hdr = headers; hdr; hdr = hdr->next) {
 		char *name;
 		if (!strcasecmp(hdr->name, "Content-Type")) {
-			py_val = PyString_FromString(hdr->value);
+			py_val = PyStr_FromString(hdr->value);
 			PyDict_SetItemString(env, "CONTENT_TYPE", py_val);
 			Py_DECREF(py_val);
 		} else {
@@ -381,7 +382,7 @@ static PyObject *create_environ(bool tls, int content_length, struct http_header
 				PyErr_NoMemory();
 				goto error;
 			}
-			py_val = PyString_FromString(hdr->value);
+			py_val = PyStr_FromString(hdr->value);
 			PyDict_SetItemString(env, name, py_val);
 			Py_DECREF(py_val);
 			free(name);
@@ -389,9 +390,9 @@ static PyObject *create_environ(bool tls, int content_length, struct http_header
 	}
 
 	if (tls) {
-		py_scheme = PyString_FromString("https");
+		py_scheme = PyStr_FromString("https");
 	} else {
-		py_scheme = PyString_FromString("http");
+		py_scheme = PyStr_FromString("http");
 	}
 	if (py_scheme == NULL) goto error;
 	PyDict_SetItemString(env, "wsgi.url_scheme", py_scheme);
@@ -487,7 +488,7 @@ static void wsgi_process_http_input(struct web_server_data *wdata,
 	/* Now, iter over all the data returned */
 
 	while ((item = PyIter_Next(iter))) {
-		websrv_output(web, PyString_AsString(item), PyString_Size(item));
+		websrv_output(web, PyStr_AsString(item), PyBytes_Size(item));
 		Py_DECREF(item);
 	}
 
