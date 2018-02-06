@@ -23,85 +23,87 @@
 
 import sys, os.path, io, string
 from gen_error_common import parseErrorDescriptions, ErrorDef
+from io import open
+from builtins import str
 
 def generateHeaderFile(out_file, errors):
-    out_file.write("/*\n")
-    out_file.write(" * Descriptions for errors generated from\n")
-    out_file.write(" * [MS-ERREF] http://msdn.microsoft.com/en-us/library/cc704588.aspx\n")
-    out_file.write(" */\n\n")
-    out_file.write("#ifndef _NTSTATUS_GEN_H\n")
-    out_file.write("#define _NTSTATUS_GEN_H\n")
+    out_file.write(u"/*\n")
+    out_file.write(u" * Descriptions for errors generated from\n")
+    out_file.write(u" * [MS-ERREF] http://msdn.microsoft.com/en-us/library/cc704588.aspx\n")
+    out_file.write(u" */\n\n")
+    out_file.write(u"#ifndef _NTSTATUS_GEN_H\n")
+    out_file.write(u"#define _NTSTATUS_GEN_H\n")
     for err in errors:
-        line = "#define %s NT_STATUS(%#x)\n" % (err.err_define, err.err_code)
+        line = u"#define %s NT_STATUS(%#x)\n" % (str(err.err_define), err.err_code)
         out_file.write(line)
-    out_file.write("\n#endif /* _NTSTATUS_GEN_H */\n")
+    out_file.write(u"\n#endif /* _NTSTATUS_GEN_H */\n")
 
 def generateSourceFile(out_file, errors):
-    out_file.write("/*\n")
-    out_file.write(" * Names for errors generated from\n")
-    out_file.write(" * [MS-ERREF] http://msdn.microsoft.com/en-us/library/cc704588.aspx\n")
-    out_file.write(" */\n")
+    out_file.write(u"/*\n")
+    out_file.write(u" * Names for errors generated from\n")
+    out_file.write(u" * [MS-ERREF] http://msdn.microsoft.com/en-us/library/cc704588.aspx\n")
+    out_file.write(u" */\n")
 
-    out_file.write("static const nt_err_code_struct nt_errs[] = \n")
-    out_file.write("{\n")
+    out_file.write(u"static const nt_err_code_struct nt_errs[] = \n")
+    out_file.write(u"{\n")
     for err in errors:
-        out_file.write("\t{ \"%s\", %s },\n" % (err.err_define, err.err_define))
-    out_file.write("{ 0, NT_STATUS(0) }\n")
-    out_file.write("};\n")
+        out_file.write(u"\t{ \"%s\", %s },\n" % (str(err.err_define), str(err.err_define)))
+    out_file.write(u"{ 0, NT_STATUS(0) }\n")
+    out_file.write(u"};\n")
 
-    out_file.write("\n/*\n")
-    out_file.write(" * Descriptions for errors generated from\n")
-    out_file.write(" * [MS-ERREF] http://msdn.microsoft.com/en-us/library/cc704588.aspx\n")
-    out_file.write(" */\n")
+    out_file.write(u"\n/*\n")
+    out_file.write(u" * Descriptions for errors generated from\n")
+    out_file.write(u" * [MS-ERREF] http://msdn.microsoft.com/en-us/library/cc704588.aspx\n")
+    out_file.write(u" */\n")
 
-    out_file.write("static const nt_err_code_struct nt_err_desc[] = \n")
-    out_file.write("{\n")
+    out_file.write(u"static const nt_err_code_struct nt_err_desc[] = \n")
+    out_file.write(u"{\n")
     for err in errors:
         # Account for the possibility that some errors may not have descriptions
         if err.err_string == "":
             continue
-        out_file.write("\t{ N_(\"%s\"), %s },\n"%(err.err_string, err.err_define))
-    out_file.write("{ 0, NT_STATUS(0) }\n")
-    out_file.write("};")
+        out_file.write(u"\t{ N_(\"%s\"), %s },\n"%(str(err.err_string), str(err.err_define)))
+    out_file.write(u"{ 0, NT_STATUS(0) }\n")
+    out_file.write(u"};")
 
 def generatePythonFile(out_file, errors):
-    out_file.write("/*\n")
-    out_file.write(" * New descriptions for existing errors generated from\n")
-    out_file.write(" * [MS-ERREF] http://msdn.microsoft.com/en-us/library/cc704588.aspx\n")
-    out_file.write(" */\n")
-    out_file.write("#include <Python.h>\n")
-    out_file.write("#include \"python/py3compat.h\"\n")
-    out_file.write("#include \"includes.h\"\n\n")
-    out_file.write("static inline PyObject *ndr_PyLong_FromUnsignedLongLong(unsigned long long v)\n");
-    out_file.write("{\n");
-    out_file.write("\tif (v > LONG_MAX) {\n");
-    out_file.write("\t\treturn PyLong_FromUnsignedLongLong(v);\n");
-    out_file.write("\t} else {\n");
-    out_file.write("\t\treturn PyInt_FromLong(v);\n");
-    out_file.write("\t}\n");
-    out_file.write("}\n\n");
+    out_file.write(u"/*\n")
+    out_file.write(u" * New descriptions for existing errors generated from\n")
+    out_file.write(u" * [MS-ERREF] http://msdn.microsoft.com/en-us/library/cc704588.aspx\n")
+    out_file.write(u" */\n")
+    out_file.write(u"#include <Python.h>\n")
+    out_file.write(u"#include \"python/py3compat.h\"\n")
+    out_file.write(u"#include \"includes.h\"\n\n")
+    out_file.write(u"static inline PyObject *ndr_PyLong_FromUnsignedLongLong(unsigned long long v)\n");
+    out_file.write(u"{\n");
+    out_file.write(u"\tif (v > LONG_MAX) {\n");
+    out_file.write(u"\t\treturn PyLong_FromUnsignedLongLong(v);\n");
+    out_file.write(u"\t} else {\n");
+    out_file.write(u"\t\treturn PyInt_FromLong(v);\n");
+    out_file.write(u"\t}\n");
+    out_file.write(u"}\n\n");
     # This is needed to avoid a missing prototype error from the C
     # compiler. There is never a prototype for this function, it is a
     # module loaded by python with dlopen() and found with dlsym().
-    out_file.write("static struct PyModuleDef moduledef = {\n")
-    out_file.write("\tPyModuleDef_HEAD_INIT,\n")
-    out_file.write("\t.m_name = \"ntstatus\",\n")
-    out_file.write("\t.m_doc = \"NTSTATUS error defines\",\n")
-    out_file.write("\t.m_size = -1,\n")
-    out_file.write("};\n\n")
-    out_file.write("MODULE_INIT_FUNC(ntstatus)\n")
-    out_file.write("{\n")
-    out_file.write("\tPyObject *m;\n\n")
-    out_file.write("\tm = PyModule_Create(&moduledef);\n");
-    out_file.write("\tif (m == NULL)\n");
-    out_file.write("\t\treturn NULL;\n\n");
+    out_file.write(u"static struct PyModuleDef moduledef = {\n")
+    out_file.write(u"\tPyModuleDef_HEAD_INIT,\n")
+    out_file.write(u"\t.m_name = \"ntstatus\",\n")
+    out_file.write(u"\t.m_doc = \"NTSTATUS error defines\",\n")
+    out_file.write(u"\t.m_size = -1,\n")
+    out_file.write(u"};\n\n")
+    out_file.write(u"MODULE_INIT_FUNC(ntstatus)\n")
+    out_file.write(u"{\n")
+    out_file.write(u"\tPyObject *m;\n\n")
+    out_file.write(u"\tm = PyModule_Create(&moduledef);\n");
+    out_file.write(u"\tif (m == NULL)\n");
+    out_file.write(u"\t\treturn NULL;\n\n");
     for err in errors:
-        line = """\tPyModule_AddObject(m, \"%s\", 
-                  \t\tndr_PyLong_FromUnsignedLongLong(NT_STATUS_V(%s)));\n""" % (err.err_define, err.err_define)
+        line = u"""\tPyModule_AddObject(m, \"%s\", 
+                  \t\tndr_PyLong_FromUnsignedLongLong(NT_STATUS_V(%s)));\n""" % (str(err.err_define), str(err.err_define))
         out_file.write(line)
-    out_file.write("\n");
-    out_file.write("\treturn m;\n");
-    out_file.write("}\n");
+    out_file.write(u"\n");
+    out_file.write(u"\treturn m;\n");
+    out_file.write(u"}\n");
 
 def transformErrorName( error_name ):
     if error_name.startswith("STATUS_"):
@@ -134,20 +136,20 @@ def main ():
         sys.exit()
 
     # read in the data
-    file_contents = open(input_file, "r")
+    file_contents = open(input_file, "r", encoding='utf8')
 
     errors = parseErrorDescriptions(file_contents, False, transformErrorName)
 
     print("writing new header file: %s" % gen_headerfile_name)
-    out_file = open(gen_headerfile_name, "w")
+    out_file = open(gen_headerfile_name, "w", encoding='utf8')
     generateHeaderFile(out_file, errors)
     out_file.close()
     print("writing new source file: %s" % gen_sourcefile_name)
-    out_file = open(gen_sourcefile_name, "w")
+    out_file = open(gen_sourcefile_name, "w", encoding='utf8')
     generateSourceFile(out_file, errors)
     out_file.close()
     print("writing new python file: %s" % gen_pythonfile_name)
-    out_file = open(gen_pythonfile_name, "w")
+    out_file = open(gen_pythonfile_name, "w", encoding='utf8')
     generatePythonFile(out_file, errors)
     out_file.close()
 
