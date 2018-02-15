@@ -345,7 +345,7 @@ static PyObject *py_nbt_name_refresh(PyObject *self, PyObject *args, PyObject *k
 		return NULL;
 	}
 
-	ret = PyTuple_New(3);
+	ret = PyTuple_New(4);
 	if (ret == NULL)
 		return NULL;
 	PyTuple_SetItem(ret, 0, PyStr_FromString(io.out.reply_from));
