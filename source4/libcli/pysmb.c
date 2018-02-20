@@ -126,18 +126,32 @@ static PyObject * py_smb_savefile(PyObject *self, PyObject *args)
 {
 	struct smb_composite_savefile io;
 	const char *filename;
-	char *data;
-	int data_len;
+    PyObject *data;
+    //PyBytesObject *bytes;
+    Py_ssize_t data_len;
 	NTSTATUS status;
 	struct smb_private_data *spdata;
 
-	if (!PyArg_ParseTuple(args, "ss#:savefile", &filename, &data, &data_len)) {
+printf("trying to save the bytes to a file\n");
+	if (!PyArg_ParseTuple(args, "sO:savefile", &filename, &data)) {
 		return NULL;
 	}
-
+printf("selected filename is %s\n", filename);
+/*
+    bytes = PyUnicode_AsUTF8String(data);
+printf("turned the py object into utf-8 bytes obj\n");
 	io.in.fname = filename;
-	io.in.data = (unsigned char *)data;
-	io.in.size = data_len;
+printf("set the filename\n");
+PyObject_Print(PyObject_Type(data), stdout, 0);
+PyObject_Print(PyObject_Type(bytes), stdout, 0);
+	io.in.data = (unsigned char *)PyBytes_AsString(bytes);
+printf("got bytes from the utf obj\n");
+printf("the bytes are: %s\n", io.in.data);
+	io.in.size = PyBytes_Size(bytes);
+*/
+    io.in.fname = filename;
+    PyBytes_AsStringAndSize(data, (char**)&(io.in.data), &data_len);
+    io.in.size = (int)data_len;
 
 	spdata = pytalloc_get_ptr(self);
 	status = smb_composite_savefile(spdata->tree, &io);

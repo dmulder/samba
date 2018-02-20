@@ -101,8 +101,10 @@ class PyBindingsTests(TestCase):
     def test_smb_savefile_ascii(self):
         self.testfile = self.testfile % 'ascii'
         contents = TEXT
+        print('trying to save file')
         self.smb.savefile(self.testfile, contents)
 
+        print('trying to read file')
         results = self.smb.loadfile(self.testfile)
         self.assertEquals(results, TEXT, 'ascii text was not correctly decoded')
 
