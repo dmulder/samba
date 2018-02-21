@@ -1276,6 +1276,22 @@ static NTSTATUS unlink_file(struct py_cli_state *self, const char *filename)
 	return status;
 }
 
+static PyObject *py_rename(struct py_cli_state *self, PyObject *args)
+{
+	NTSTATUS status;
+	const char *src, *dst;
+	bool replace = false;
+
+	if (!PyArg_ParseTuple(args, "ss|p:rename", &src, &dst, &replace)) {
+		return NULL;
+	}
+
+	status = cli_rename(self->cli, src, dst, replace);
+	PyErr_NTSTATUS_IS_ERR_RAISE(status);
+
+	Py_RETURN_NONE;
+}
+
 static PyObject *py_smb_unlink(struct py_cli_state *self, PyObject *args)
 {
 	NTSTATUS status;
@@ -1613,6 +1629,9 @@ static PyMethodDef py_cli_state_methods[] = {
 	  "\t\t\tmtime: Modification time\n" },
 	{ "get_oplock_break", (PyCFunction)py_cli_get_oplock_break,
 	  METH_VARARGS, "Wait for an oplock break" },
+	{ "rename", (PyCFunction)py_rename, METH_VARARGS,
+	  "rename(path, path, replace) -> None\n\n \
+	  Move or rename a file or directory."},
 	{ "unlink", (PyCFunction)py_smb_unlink,
 	  METH_VARARGS,
 	  "unlink(path) -> None\n\n \t\tDelete a file." },
