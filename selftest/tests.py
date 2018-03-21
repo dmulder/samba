@@ -76,6 +76,11 @@ planpythontestsuite("none", "samba.tests.dcerpc.string")
 planpythontestsuite("none", "samba.tests.hostconfig")
 planpythontestsuite("ad_dc_ntvfs:local", "samba.tests.messaging",
                     py3_compatible=True)
+planpythontestsuite("none", "samba.tests.s3param")
+planpythontestsuite("none", "samba.tests.s3passdb")
+planpythontestsuite("none", "samba.tests.s3registry")
+planpythontestsuite("none", "samba.tests.s3windb")
+planpythontestsuite("none", "samba.tests.s3idmapdb")
 planpythontestsuite("none", "samba.tests.samba3sam")
 planpythontestsuite(
     "none", "wafsamba.tests.test_suite",
