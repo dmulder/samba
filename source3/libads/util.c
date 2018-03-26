@@ -128,7 +128,8 @@ ADS_STATUS ads_change_trust_account_password(ADS_STRUCT *ads, char *host_princip
 	if (!NT_STATUS_IS_OK(status)) {
 		DEBUG(1,("Failed to save machine password\n"));
 		return ADS_ERROR_NT(status);
-	}
+	} else
+        DEBUG(1,("Succeeded saving machine password\n"));
 
 	return ADS_SUCCESS;
 }

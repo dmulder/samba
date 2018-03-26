@@ -182,14 +182,16 @@ static ADS_STATUS ads_krb5_chg_password(const char *kdc_host,
     if (ret) {
 	DEBUG(1,("Failed to init krb5 context (%s)\n", error_message(ret)));
 	return ADS_ERROR_KRB5(ret);
-    }
+    } else
+        DEBUG(1,("Succeeded init krb5 context\n"));
 
     if ((ret = smb_krb5_parse_name(context, principal,
                                     &princ))) {
 	krb5_free_context(context);
 	DEBUG(1,("Failed to parse %s (%s)\n", principal, error_message(ret)));
 	return ADS_ERROR_KRB5(ret);
-    }
+    } else
+        DEBUG(1,("Succeeded parsing %s\n", principal));
 
 	ret = krb5_get_init_creds_opt_alloc(context, &opts);
 	if (ret != 0) {
@@ -197,7 +199,8 @@ static ADS_STATUS ads_krb5_chg_password(const char *kdc_host,
 		DBG_WARNING("krb5_get_init_creds_opt_alloc failed: %s\n",
 			    error_message(ret));
 		return ADS_ERROR_KRB5(ret);
-	}
+	} else
+        DEBUG(1,("krb5_get_init_creds_opt_alloc succeeded\n"));
 
 	krb5_get_init_creds_opt_set_tkt_life(opts, 5*60);
 	krb5_get_init_creds_opt_set_renew_life(opts, 0);
@@ -214,7 +217,8 @@ static ADS_STATUS ads_krb5_chg_password(const char *kdc_host,
 	krb5_get_init_creds_opt_free(context, opts);
         krb5_free_context(context);
         return ADS_ERROR_KRB5(ret);
-    }
+    } else
+        DEBUG(1,("smb_krb5_gen_netbios_krb5_address succeeded\n"));
 	krb5_get_init_creds_opt_set_address_list(opts, addr->addrs);
 
     realm = smb_krb5_principal_get_realm(context, princ);
@@ -260,7 +264,8 @@ static ADS_STATUS ads_krb5_chg_password(const char *kdc_host,
 	DEBUG(1, ("krb5_change_password failed (%s)\n", error_message(ret)));
 	aret = ADS_ERROR_KRB5(ret);
 	goto done;
-    }
+    } else
+        DEBUG(1, ("krb5_change_password succeeded\n"));
 
     if (result_code != KRB5_KPASSWD_SUCCESS) {
 	ret = kpasswd_err_to_krb5_err(result_code);
@@ -293,12 +298,16 @@ ADS_STATUS kerberos_set_password(const char *kpasswd_server,
 	return ADS_ERROR_KRB5(ret);
     }
 
-    if (!strcmp(auth_principal, target_principal))
+    DEBUG(1,("kerberos_set_password: For auth principal %s and target principal %s\n", auth_principal, target_principal));
+    if (!strcmp(auth_principal, target_principal)) {
+        DEBUG(1,("kerberos_set_password: Changing the password for %s\n", target_principal));
 	return ads_krb5_chg_password(kpasswd_server, target_principal,
 				     auth_password, new_password, time_offset);
-    else
+    } else {
+        DEBUG(1,("kerberos_set_password: Setting password for %s\n", target_principal));
     	return ads_krb5_set_password(kpasswd_server, target_principal,
 				     new_password, time_offset);
+    }
 }
 
 #endif

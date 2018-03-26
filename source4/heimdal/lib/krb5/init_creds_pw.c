@@ -1996,12 +1996,18 @@ krb5_get_init_creds_password(krb5_context context,
 
  again:
     ret = krb5_init_creds_init(context, client, prompter, data, start_time, options, &ctx);
-    if (ret)
+    if (ret) {
+        DEBUG(1,("krb5_get_init_creds_password: krb5_init_creds_init failed\n"));
 	goto out;
+    } else
+        DEBUG(1,("krb5_get_init_creds_password: krb5_init_creds_init succeeded\n"));
 
     ret = krb5_init_creds_set_service(context, ctx, in_tkt_service);
-    if (ret)
+    if (ret) {
+        DEBUG(1,("krb5_get_init_creds_password: krb5_init_creds_set_service failed\n"));
 	goto out;
+    } else
+        DEBUG(1,("krb5_get_init_creds_password: krb5_init_creds_set_service succeeded\n"));
 
     if (prompter != NULL && ctx->password == NULL && password == NULL) {
 	krb5_prompt prompt;

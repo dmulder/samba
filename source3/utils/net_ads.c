@@ -2337,7 +2337,7 @@ static int net_ads_password(struct net_context *c, int argc, const char **argv)
 int net_ads_changetrustpw(struct net_context *c, int argc, const char **argv)
 {
 	ADS_STRUCT *ads;
-	char *host_principal;
+	char *host_principal, *name;
 	fstring my_name;
 	ADS_STATUS ret;
 
@@ -2375,6 +2375,9 @@ int net_ads_changetrustpw(struct net_context *c, int argc, const char **argv)
 	}
 	d_printf(_("Changing password for principal: %s\n"), host_principal);
 
+    asprintf(&name, "%s$", my_name);
+    DEBUG(1,("kvno for %s from kdc prior to changing host password: %d\n", host_principal, ads_get_kvno(ads, name)));
+
 	ret = ads_change_trust_account_password(ads, host_principal);
 
 	if (!ADS_ERR_OK(ret)) {
@@ -2385,13 +2388,18 @@ int net_ads_changetrustpw(struct net_context *c, int argc, const char **argv)
 	}
 
 	d_printf(_("Password change for principal %s succeeded.\n"), host_principal);
+    DEBUG(1,("Password change for principal %s succeeded.\n", host_principal));
+    DEBUG(1,("kvno for %s from kdc after changing host password: %d\n", host_principal, ads_get_kvno(ads, name)));
 
 	if (USE_SYSTEM_KEYTAB) {
 		d_printf(_("Attempting to update system keytab with new password.\n"));
+        DEBUG(1,("Attempting to update system keytab with new password.\n"));
 		if (ads_keytab_create_default(ads)) {
 			d_printf(_("Failed to update system keytab.\n"));
-		}
+		} else
+            DEBUG(1,("Succeeded updating system keytab.\n"));
 	}
+    DEBUG(1,("kvno for %s from kdc after updating system keytab: %d\n", host_principal, ads_get_kvno(ads, name)));
 
 	ads_destroy(&ads);
 	SAFE_FREE(host_principal);
