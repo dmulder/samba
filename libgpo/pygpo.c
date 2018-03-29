@@ -31,16 +31,69 @@
 
 /* A Python C API module to use LIBGPO */
 
+struct GROUP_POLICY_OBJECT_CONTAINER {
+        struct GROUP_POLICY_OBJECT *gpo;
+        struct GP_EXT *gp_ext;
+};
+
+static PyMethodDef py_gp_ext_methods[] = {
+	{NULL}
+};
+
+#define py_GP_EXT_getter(ATTR) \
+static PyObject* py_GP_EXT_get_##ATTR(PyObject *self, void *closure) \
+{ \
+	struct GP_EXT *gp_ext = pytalloc_get_ptr(self); \
+	PyObject *ret = PyList_New(gp_ext->num_exts); \
+	if (gp_ext->ATTR) { \
+		for (int i = 0; i < gp_ext->num_exts; i++) { \
+			if (gp_ext->ATTR[i]) { \
+				PyList_SetItem(ret, i, \
+				       PyStr_FromString(gp_ext->ATTR[i])); \
+			} else { \
+				PyList_SetItem(ret, i, Py_None); \
+			} \
+		} \
+		return ret; \
+	} else { \
+		return Py_None; \
+	} \
+}
+py_GP_EXT_getter(extensions)
+py_GP_EXT_getter(extensions_guid)
+py_GP_EXT_getter(snapins)
+py_GP_EXT_getter(snapins_guid)
+
+#define py_GP_EXT_getter_def(ATTR) \
+  {discard_const_p(char, #ATTR), (getter)py_GP_EXT_get_##ATTR, NULL, NULL, NULL}
+static PyGetSetDef py_gp_ext_getset[] = {
+	py_GP_EXT_getter_def(extensions),
+	py_GP_EXT_getter_def(extensions_guid),
+	py_GP_EXT_getter_def(snapins),
+	py_GP_EXT_getter_def(snapins_guid),
+	{NULL}
+};
+
+static PyTypeObject GPEXTType = {
+	PyVarObject_HEAD_INIT(NULL, 0)
+	.tp_name = "gpo.GP_EXT",
+	.tp_doc = "GP_EXT",
+	.tp_getset = py_gp_ext_getset,
+	.tp_methods = py_gp_ext_methods,
+	.tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,
+};
+
 #define GPO_getter(ATTR) \
 static PyObject* GPO_get_##ATTR(PyObject *self, void *closure) \
 { \
-	struct GROUP_POLICY_OBJECT *gpo_ptr \
-		= pytalloc_get_ptr(self); \
+	struct GROUP_POLICY_OBJECT_CONTAINER *gp = pytalloc_get_ptr(self); \
+	struct GROUP_POLICY_OBJECT *gpo_ptr = gp->gpo; \
 	\
-	if (gpo_ptr->ATTR) \
+	if (gpo_ptr->ATTR) { \
 		return PyStr_FromString(gpo_ptr->ATTR); \
-	else \
+	} else { \
 		return Py_None; \
+	} \
 }
 GPO_getter(ds_path)
 GPO_getter(file_sys_path)
@@ -50,22 +103,27 @@ GPO_getter(link)
 GPO_getter(user_extensions)
 GPO_getter(machine_extensions)
 
+static PyObject* GPO_get_gp_ext(PyObject *self, void *closure)
+{
+	struct GROUP_POLICY_OBJECT_CONTAINER *gp = pytalloc_get_ptr(self);
+	if (gp->gp_ext) {
+		return pytalloc_reference_ex(&GPEXTType, gp, gp->gp_ext);
+	} else {
+		return Py_None;
+	}
+}
+
+#define py_GPO_getter_def(ATTR) \
+  {discard_const_p(char, #ATTR), (getter)GPO_get_##ATTR, NULL, NULL, NULL}
 static PyGetSetDef GPO_setters[] = {
-	{discard_const_p(char, "ds_path"), (getter)GPO_get_ds_path, NULL, NULL,
-		NULL},
-	{discard_const_p(char, "file_sys_path"), (getter)GPO_get_file_sys_path,
-		NULL, NULL, NULL},
-	{discard_const_p(char, "display_name"), (getter)GPO_get_display_name,
-		NULL, NULL, NULL},
-	{discard_const_p(char, "name"), (getter)GPO_get_name, NULL, NULL,
-		NULL},
-	{discard_const_p(char, "link"), (getter)GPO_get_link, NULL, NULL,
-		NULL},
-	{discard_const_p(char, "user_extensions"),
-		(getter)GPO_get_user_extensions,
-		NULL, NULL, NULL},
-	{discard_const_p(char, "machine_extensions"),
-		(getter)GPO_get_machine_extensions, NULL, NULL, NULL},
+	py_GPO_getter_def(ds_path),
+	py_GPO_getter_def(file_sys_path),
+	py_GPO_getter_def(display_name),
+	py_GPO_getter_def(name),
+	py_GPO_getter_def(link),
+	py_GPO_getter_def(gp_ext),
+	py_GPO_getter_def(user_extensions),
+	py_GPO_getter_def(machine_extensions),
 	{NULL}
 };
 
@@ -78,8 +136,8 @@ static PyObject *py_gpo_get_unix_path(PyObject *self, PyObject *args,
 	char *unix_path = NULL;
 	TALLOC_CTX *frame = NULL;
 	static const char *kwlist[] = {"cache_dir", NULL};
-	struct GROUP_POLICY_OBJECT *gpo_ptr \
-		= (struct GROUP_POLICY_OBJECT *)pytalloc_get_ptr(self);
+	struct GROUP_POLICY_OBJECT_CONTAINER *gp = pytalloc_get_ptr(self);
+	struct GROUP_POLICY_OBJECT *gpo_ptr = gp->gpo;
 
 	if (!PyArg_ParseTupleAndKeywords(args, kwds, "|s",
 					 discard_const_p(char *, kwlist),
@@ -452,8 +510,18 @@ static PyObject *py_ads_get_gpo_list(ADS *self, PyObject *args, PyObject *kwds)
 	}
 
 	for (gpo = gpo_list; gpo != NULL; gpo = gpo->next) {
-		PyObject *obj = pytalloc_reference_ex(&GPOType,
-						      gpo_ctx, gpo);
+		PyObject *obj;
+		struct GROUP_POLICY_OBJECT_CONTAINER *gpc = \
+		  talloc_zero(gpo_ctx, struct GROUP_POLICY_OBJECT_CONTAINER);
+		gpc->gpo = talloc_steal(gpc, gpo);
+		if (!gpo_get_gp_ext_from_gpo(gpc,
+					     flags,
+					     gpc->gpo,
+					     &(gpc->gp_ext))) {
+			TALLOC_FREE(frame);
+			goto out;
+		}
+		obj = pytalloc_reference_ex(&GPOType, gpo_ctx, gpc);
 		if (obj == NULL) {
 			TALLOC_FREE(frame);
 			goto out;
@@ -538,6 +606,14 @@ MODULE_INIT_FUNC(gpo)
 	Py_INCREF((PyObject *)(void *)&GPOType);
 	PyModule_AddObject(m, "GROUP_POLICY_OBJECT",
 			   (PyObject *)&GPOType);
+
+	if (pytalloc_BaseObject_PyType_Ready(&GPEXTType) < 0) {
+		return m;
+	}
+
+	Py_INCREF((PyObject *)(void *)&GPEXTType);
+	PyModule_AddObject(m, "GP_EXT", (PyObject *)&GPEXTType);
+
 	return m;
 
 }
