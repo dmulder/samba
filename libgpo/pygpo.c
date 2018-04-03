@@ -115,29 +115,11 @@ GPO_getter(link)
 GPO_getter(user_extensions)
 GPO_getter(machine_extensions)
 
-static PyObject* GPO_get_gp_exts(PyObject *self, void *closure)
+static PyObject* GPO_get_gp_ext(PyObject *self, void *closure)
 {
 	struct GROUP_POLICY_OBJECT_CONTAINER *gp = pytalloc_get_ptr(self);
 	if (gp->gp_ext) {
-		PyObject *ret = Py_None;
-		struct GP_EXT *itr;
-		size_t list_size = 0;
-		int i;
-
-		for (itr = gp->gp_ext; itr != NULL; itr = itr->next) {
-			list_size++;
-		}
-
-		i = 0;
-		ret = PyList_New(list_size);
-
-		for (itr = gp->gp_ext; itr != NULL; itr = itr->next) {
-			PyList_SetItem(ret, i,
-				pytalloc_reference_ex(&GPEXTType, gp, itr));
-			i++;
-		}
-
-		return ret;
+		return pytalloc_reference_ex(&GPEXTType, gp, gp->gp_ext);
 	} else {
 		return Py_None;
 	}
@@ -151,7 +133,7 @@ static PyGetSetDef GPO_setters[] = {
 	py_GPO_getter_def(display_name),
 	py_GPO_getter_def(name),
 	py_GPO_getter_def(link),
-	py_GPO_getter_def(gp_exts),
+	py_GPO_getter_def(gp_ext),
 	py_GPO_getter_def(user_extensions),
 	py_GPO_getter_def(machine_extensions),
 	{NULL}
