@@ -72,6 +72,8 @@ struct gp_extension_methods {
 				   struct gp_extension_reg_info **info);
 
 	NTSTATUS (*shutdown)(void);
+
+	void *private_data;
 };
 
 /* The following definitions come from libgpo/gpext/gpext.c  */

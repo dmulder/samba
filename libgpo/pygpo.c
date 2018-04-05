@@ -28,8 +28,124 @@
 #include "auth/credentials/pycredentials.h"
 #include "libcli/util/pyerrors.h"
 #include "python/py3compat.h"
+#include "gpext/gpext.h"
 
 /* A Python C API module to use LIBGPO */
+
+typedef struct {
+	PyObject_HEAD
+	TALLOC_CTX *ctx;
+	struct gp_extension *gp_ext;
+} GPExtension;
+
+struct py_gp_extension_methods {
+        PyObject *initialize;
+        PyObject *process_group_policy;
+        PyObject *get_reg_config;
+        PyObject *shutdown;
+};
+
+static void py_gp_extension_dealloc(GPExtension *self)
+{
+	talloc_free(self->ctx);
+	Py_TYPE(self)->tp_free((PyObject*)self);
+}
+
+static PyObject* py_gp_extension_new(PyTypeObject *type,
+				     PyObject *args, PyObject *kwds)
+{
+	GPExtension *self = (GPExtension*)type->tp_alloc(type, 0);
+	self->ctx = talloc_new(NULL);
+	self->gp_ext = talloc_zero(self->ctx, struct gp_extension);
+	self->gp_ext->methods = talloc_zero(self->gp_ext,
+					    struct gp_extension_methods);
+	self->gp_ext->methods->private_data =
+		talloc_zero(self->gp_ext->methods,
+			    struct py_gp_extension_methods);
+
+	return (PyObject*)self;
+}
+
+static PyMethodDef py_gp_extension_methods[] = {
+	{NULL}
+};
+
+static NTSTATUS py_gp_extension_method_initialize(TALLOC_CTX *mem_ctx)
+{
+
+}
+
+static NTSTATUS py_gp_extension_method_process_group_policy(
+			TALLOC_CTX *mem_ctx,
+			uint32_t flags,
+			struct registry_key *root_key,
+			const struct security_token *token,
+			const struct GROUP_POLICY_OBJECT *deleted_gpo_list,
+			const struct GROUP_POLICY_OBJECT *changed_gpo_list)
+{
+
+}
+
+static NTSTATUS py_gp_extension_method_get_reg_config(
+			TALLOC_CTX *mem_ctx,
+			struct gp_extension_reg_info **info)
+{
+
+}
+
+static NTSTATUS py_gp_extension_method_shutdown(void)
+{
+
+}
+
+#define py_gp_extension_setter(FUNC) \
+static int py_gp_extension_set_##FUNC(PyObject *self, \
+				      PyObject *value, \
+				      void *closure) \
+{ \
+	struct gp_extension_methods *methods = ((GPExtension*)self)->methods; \
+	struct py_gp_extension_methods *funcs = \
+		(struct py_gp_extension_methods *)methods->private_data; \
+	Py_DECREF(funcs->FUNC); \
+	Py_INCREF(value); \
+	funcs->FUNC = value; \
+	methods->FUNC = py_gp_extension_method_##FUNC; \
+	return 0; \
+}
+
+#define py_gp_extension_getter(FUNC) \
+static PyObject * py_gp_extension_get_##FUNC(PyObject *self,  void *closure) \
+{ \
+	void *data = ((GPExtension*)self)->methods->private_data; \
+	struct py_gp_extension_methods *funcs = \
+		(struct py_gp_extension_methods *)data; \
+	Py_INCREF(funcs->FUNC); \
+	return funcs->FUNC; \
+}
+
+#define py_gp_extension_get_set_def(FUNC) \
+  {discard_const_p(char, #FUNC), (getter)py_gp_extension_get_##FUNC, \
+				 (setter)py_gp_extension_set_##FUNC, \
+				 NULL, NULL}
+static PyGetSetDef py_gp_extension_getset[] = {
+	py_gp_extension_get_set_def(initialize),
+	py_gp_extension_get_set_def(process_group_policy),
+	py_gp_extension_get_set_def(get_reg_config),
+	py_gp_extension_get_set_def(shutdown),
+	{NULL}
+};
+
+static PyTypeObject GPExtensionType = {
+	PyVarObject_HEAD_INIT(NULL, 0)
+	.tp_name = "gpo.gp_extension",
+	.tp_doc = "gp_extension",
+	.tp_getset = py_gp_extension_getset,
+	.tp_methods = py_gp_extension_methods,
+	.tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,
+	.tp_new = py_gp_extension_new,
+	.tp_dealloc = (destructor)py_gp_extension_dealloc,
+	.tp_basicsize = sizeof(GPExtension),
+};
 
 struct GROUP_POLICY_OBJECT_CONTAINER {
         struct GROUP_POLICY_OBJECT *gpo;
@@ -625,6 +741,13 @@ MODULE_INIT_FUNC(gpo)
 
 	Py_INCREF((PyObject *)(void *)&GPEXTType);
 	PyModule_AddObject(m, "GP_EXT", (PyObject *)&GPEXTType);
+
+	if (pytalloc_BaseObject_PyType_Ready(&GPExtensionType) < 0) {
+		return m;
+	}
+
+	Py_INCREF((PyObject *)(void *)&GPExtensionType);
+	PyModule_AddObject(m, "gp_extension", (PyObject *)&GPExtensionType);
 
 	return m;
 
