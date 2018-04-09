@@ -545,7 +545,7 @@ NTSTATUS gpext_shutdown_gp_extensions(void)
 
 	for (ext = extensions; ext; ext = ext->next) {
 		if (ext->methods && ext->methods->shutdown) {
-			ext->methods->shutdown();
+			ext->methods->shutdown(ext->methods->private_data);
 		}
 	}
 
@@ -584,16 +584,20 @@ NTSTATUS gpext_init_gp_extensions(TALLOC_CTX *mem_ctx)
 
 		if (gpext->methods->get_reg_config) {
 
-			status = gpext->methods->initialize(mem_ctx);
+			status = gpext->methods->initialize(mem_ctx,
+					gpext->methods->private_data);
 			if (!NT_STATUS_IS_OK(status)) {
-				gpext->methods->shutdown();
+				gpext->methods->shutdown(
+					gpext->methods->private_data);
 				goto out;
 			}
 
 			status = gpext->methods->get_reg_config(mem_ctx,
-								&info);
+								&info,
+					gpext->methods->private_data);
 			if (!NT_STATUS_IS_OK(status)) {
-				gpext->methods->shutdown();
+				gpext->methods->shutdown(
+					gpext->methods->private_data);
 				goto out;
 			}
 
@@ -610,7 +614,8 @@ NTSTATUS gpext_init_gp_extensions(TALLOC_CTX *mem_ctx)
 						       &reg_ctx);
 				if (!W_ERROR_IS_OK(werr)) {
 					status = werror_to_ntstatus(werr);
-					gpext->methods->shutdown();
+					gpext->methods->shutdown(
+						gpext->methods->private_data);
 					goto out;
 				}
 			}
@@ -620,7 +625,8 @@ NTSTATUS gpext_init_gp_extensions(TALLOC_CTX *mem_ctx)
 				DEBUG(1,("gp_extension_store_reg failed: %s\n",
 					win_errstr(werr)));
 				TALLOC_FREE(info);
-				gpext->methods->shutdown();
+				gpext->methods->shutdown(
+					gpext->methods->private_data);
 				status = werror_to_ntstatus(werr);
 				goto out;
 			}
@@ -817,7 +823,8 @@ NTSTATUS gpext_process_extension(TALLOC_CTX *mem_ctx,
 			}
 		}
 
-		status = ext->methods->initialize(mem_ctx);
+		status = ext->methods->initialize(mem_ctx,
+						  ext->methods->private_data);
 		NT_STATUS_NOT_OK_RETURN(status);
 
 		status = ext->methods->process_group_policy(mem_ctx,
@@ -825,9 +832,10 @@ NTSTATUS gpext_process_extension(TALLOC_CTX *mem_ctx,
 							    root_key,
 							    token,
 							    deleted_gpo_list_filtered,
-							    changed_gpo_list_filtered);
+							    changed_gpo_list_filtered,
+							    ext->methods->private_data);
 		if (!NT_STATUS_IS_OK(status)) {
-			ext->methods->shutdown();
+			ext->methods->shutdown(ext->methods->private_data);
 		}
 	}
 

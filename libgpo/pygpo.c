@@ -70,9 +70,18 @@ static PyMethodDef py_gp_extension_methods[] = {
 	{NULL}
 };
 
-static NTSTATUS py_gp_extension_method_initialize(TALLOC_CTX *mem_ctx)
+static NTSTATUS py_gp_extension_method_initialize(TALLOC_CTX *mem_ctx,
+						  void *private_data)
 {
+	struct py_gp_extension_methods *py_funcs =
+		(struct py_gp_extension_methods *)private_data;
+	PyObject *ret = NULL;
 
+	if (Py_IsInitialized()) {
+		ret = PyObject_CallObject(py_funcs->initialize, NULL);
+	}
+
+	return NT_STATUS_OK;
 }
 
 static NTSTATUS py_gp_extension_method_process_group_policy(
@@ -81,21 +90,50 @@ static NTSTATUS py_gp_extension_method_process_group_policy(
 			struct registry_key *root_key,
 			const struct security_token *token,
 			const struct GROUP_POLICY_OBJECT *deleted_gpo_list,
-			const struct GROUP_POLICY_OBJECT *changed_gpo_list)
+			const struct GROUP_POLICY_OBJECT *changed_gpo_list,
+			void *private_data)
 {
+	struct py_gp_extension_methods *py_funcs =
+		(struct py_gp_extension_methods *)private_data;
+	PyObject *ret = NULL;
+	PyObject *args = NULL;
 
+	if (Py_IsInitialized()) {
+		ret = PyObject_CallObject(py_funcs->process_group_policy,
+					  args);
+	}
+
+	return NT_STATUS_OK;
 }
 
 static NTSTATUS py_gp_extension_method_get_reg_config(
 			TALLOC_CTX *mem_ctx,
-			struct gp_extension_reg_info **info)
+			struct gp_extension_reg_info **info,
+			void *private_data)
 {
+	struct py_gp_extension_methods *py_funcs =
+		(struct py_gp_extension_methods *)private_data;
+	PyObject *ret = NULL;
+	PyObject *args = NULL;
 
+	if (Py_IsInitialized()) {
+		ret = PyObject_CallObject(py_funcs->get_reg_config, args);
+	}
+
+	return NT_STATUS_OK;
 }
 
-static NTSTATUS py_gp_extension_method_shutdown(void)
+static NTSTATUS py_gp_extension_method_shutdown(void *private_data)
 {
+	struct py_gp_extension_methods *py_funcs =
+		(struct py_gp_extension_methods *)private_data;
+	PyObject *ret = NULL;
 
+	if (Py_IsInitialized()) {
+		ret = PyObject_CallObject(py_funcs->shutdown, NULL);
+	}
+
+	return NT_STATUS_OK;
 }
 
 #define py_gp_extension_setter(FUNC) \
@@ -103,12 +141,15 @@ static int py_gp_extension_set_##FUNC(PyObject *self, \
 				      PyObject *value, \
 				      void *closure) \
 { \
-	struct gp_extension_methods *methods = ((GPExtension*)self)->methods; \
-	struct py_gp_extension_methods *funcs = \
+	struct gp_extension_methods *methods = \
+		((GPExtension*)self)->gp_ext->methods; \
+	struct py_gp_extension_methods *py_funcs = \
 		(struct py_gp_extension_methods *)methods->private_data; \
-	Py_DECREF(funcs->FUNC); \
+	if (py_funcs->FUNC) { \
+		Py_DECREF(py_funcs->FUNC); \
+	} \
 	Py_INCREF(value); \
-	funcs->FUNC = value; \
+	py_funcs->FUNC = value; \
 	methods->FUNC = py_gp_extension_method_##FUNC; \
 	return 0; \
 }
@@ -116,12 +157,24 @@ static int py_gp_extension_set_##FUNC(PyObject *self, \
 #define py_gp_extension_getter(FUNC) \
 static PyObject * py_gp_extension_get_##FUNC(PyObject *self,  void *closure) \
 { \
-	void *data = ((GPExtension*)self)->methods->private_data; \
-	struct py_gp_extension_methods *funcs = \
+	void *data = ((GPExtension*)self)->gp_ext->methods->private_data; \
+	struct py_gp_extension_methods *py_funcs = \
 		(struct py_gp_extension_methods *)data; \
-	Py_INCREF(funcs->FUNC); \
-	return funcs->FUNC; \
+	if (py_funcs->FUNC) { \
+		Py_INCREF(py_funcs->FUNC); \
+		return py_funcs->FUNC; \
+	} else { \
+		return Py_None; \
+	} \
 }
+py_gp_extension_setter(initialize)
+py_gp_extension_setter(process_group_policy)
+py_gp_extension_setter(get_reg_config)
+py_gp_extension_setter(shutdown)
+py_gp_extension_getter(initialize)
+py_gp_extension_getter(process_group_policy)
+py_gp_extension_getter(get_reg_config)
+py_gp_extension_getter(shutdown)
 
 #define py_gp_extension_get_set_def(FUNC) \
   {discard_const_p(char, #FUNC), (getter)py_gp_extension_get_##FUNC, \

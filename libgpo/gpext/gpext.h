@@ -26,7 +26,7 @@
 
 #define SAMBA_SUBSYSTEM_GPEXT "gpext"
 
-#define SMB_GPEXT_INTERFACE_VERSION 1
+#define SMB_GPEXT_INTERFACE_VERSION 2
 
 struct gp_extension {
 	struct GUID *guid;
@@ -59,19 +59,22 @@ struct gp_extension_reg_info {
 
 struct gp_extension_methods {
 
-	NTSTATUS (*initialize)(TALLOC_CTX *mem_ctx);
+	NTSTATUS (*initialize)(TALLOC_CTX *mem_ctx,
+			       void *private_data);
 
 	NTSTATUS (*process_group_policy)(TALLOC_CTX *mem_ctx,
 					 uint32_t flags,
 					 struct registry_key *root_key,
 					 const struct security_token *token,
 					 const struct GROUP_POLICY_OBJECT *deleted_gpo_list,
-					 const struct GROUP_POLICY_OBJECT *changed_gpo_list);
+					 const struct GROUP_POLICY_OBJECT *changed_gpo_list,
+					 void *private_data);
 
 	NTSTATUS (*get_reg_config)(TALLOC_CTX *mem_ctx,
-				   struct gp_extension_reg_info **info);
+				   struct gp_extension_reg_info **info,
+				   void *private_data);
 
-	NTSTATUS (*shutdown)(void);
+	NTSTATUS (*shutdown)(void *private_data);
 
 	void *private_data;
 };
