@@ -32,11 +32,13 @@
 
 /* A Python C API module to use LIBGPO */
 
+#if 0
 typedef struct {
 	PyObject_HEAD
 	TALLOC_CTX *ctx;
 	struct gp_extension *gp_ext;
 } GPExtension;
+#endif
 
 struct py_gp_extension_methods {
         PyObject *initialize;
@@ -45,6 +47,7 @@ struct py_gp_extension_methods {
         PyObject *shutdown;
 };
 
+#if 0
 static void py_gp_extension_dealloc(GPExtension *self)
 {
 	talloc_free(self->ctx);
@@ -69,6 +72,7 @@ static PyObject* py_gp_extension_new(PyTypeObject *type,
 static PyMethodDef py_gp_extension_methods[] = {
 	{NULL}
 };
+#endif
 
 static NTSTATUS py_gp_extension_method_initialize(TALLOC_CTX *mem_ctx,
 						  void *private_data)
@@ -136,6 +140,8 @@ static NTSTATUS py_gp_extension_method_shutdown(void *private_data)
 	return NT_STATUS_OK;
 }
 
+#if 0
+
 #define py_gp_extension_setter(FUNC) \
 static int py_gp_extension_set_##FUNC(PyObject *self, \
 				      PyObject *value, \
@@ -199,6 +205,7 @@ static PyTypeObject GPExtensionType = {
 	.tp_dealloc = (destructor)py_gp_extension_dealloc,
 	.tp_basicsize = sizeof(GPExtension),
 };
+#endif
 
 struct GROUP_POLICY_OBJECT_CONTAINER {
         struct GROUP_POLICY_OBJECT *gpo;
@@ -730,6 +737,71 @@ static PyMethodDef ADS_methods[] = {
 	{ NULL }
 };
 
+static PyObject* py_gpext_register_gp_extension(PyObject* self,
+						PyObject* args,
+						PyObject* kwargs)
+{
+	TALLOC_CTX *mem_ctx = talloc_new(NULL);
+	const char *name = NULL;
+	const char *guid = NULL;
+	PyObject *initialize = NULL;
+	PyObject *process_group_policy = NULL;
+	PyObject *get_reg_config = NULL;
+	PyObject *shutdown = NULL;
+	NTSTATUS ret;
+	struct gp_extension_methods *methods;
+	struct py_gp_extension_methods *py_funcs;
+	static const char *kwlist[] = {"name", "guid", "initialize",
+				       "process_group_policy",
+				       "get_reg_config", "shutdown"};
+
+	if (!PyArg_ParseTupleAndKeywords(args, kwargs, "ss|OOOO", kwlist, &name, &guid, &initialize, &process_group_policy, &get_reg_config, &shutdown)) {
+		PyErr_SetString(PyExc_SystemError,
+			"Failed to parse arguments to "
+			"py_gpext_register_gp_extension()");
+		goto out;
+	}
+
+	methods = talloc_zero(mem_ctx, struct gp_extension_methods);
+	methods->private_data = talloc_zero(methods,
+					    struct py_gp_extension_methods);
+	py_funcs = (struct py_gp_extension_methods *)methods->private_data;
+	if (initialize) {
+		methods->initialize = py_gp_extension_method_initialize;
+		Py_INCREF(initialize);
+		py_funcs->initialize = initialize;
+	}
+	if (process_group_policy) {
+		methods->process_group_policy =
+			py_gp_extension_method_process_group_policy;
+		Py_INCREF(process_group_policy);
+		py_funcs->process_group_policy = process_group_policy;
+	}
+	if (get_reg_config) {
+		methods->get_reg_config =
+			py_gp_extension_method_get_reg_config;
+		Py_INCREF(get_reg_config);
+		py_funcs->get_reg_config = get_reg_config;
+	}
+	if (shutdown) {
+		methods->shutdown = py_gp_extension_method_shutdown;
+		Py_INCREF(shutdown);
+		py_funcs->shutdown = shutdown;
+	}
+
+	ret = gpext_register_gp_extension(mem_ctx, SMB_GPEXT_INTERFACE_VERSION,
+					  name, guid, methods);
+	if (!NT_STATUS_IS_OK(ret)) {
+		PyErr_SetString(PyExc_SystemError,
+				"Failed to register gp_extension");
+		goto out;
+	}
+
+out:
+	talloc_free(mem_ctx);
+	return Py_None;
+}
+
 static PyTypeObject ads_ADSType = {
 	.tp_name = "gpo.ADS_STRUCT",
 	.tp_basicsize = sizeof(ADS),
@@ -742,6 +814,9 @@ static PyTypeObject ads_ADSType = {
 };
 
 static PyMethodDef py_gpo_methods[] = {
+	{"gpext_register_gp_extension",
+		py_gpext_register_gp_extension, METH_VARARGS | METH_KEYWORDS,
+		NULL},
 	{"gpo_get_sysvol_gpt_version",
 		(PyCFunction)py_gpo_get_sysvol_gpt_version,
 		METH_VARARGS, NULL},
@@ -795,12 +870,14 @@ MODULE_INIT_FUNC(gpo)
 	Py_INCREF((PyObject *)(void *)&GPEXTType);
 	PyModule_AddObject(m, "GP_EXT", (PyObject *)&GPEXTType);
 
+#if 0
 	if (pytalloc_BaseObject_PyType_Ready(&GPExtensionType) < 0) {
 		return m;
 	}
 
 	Py_INCREF((PyObject *)(void *)&GPExtensionType);
 	PyModule_AddObject(m, "gp_extension", (PyObject *)&GPExtensionType);
+#endif
 
 	return m;
 
