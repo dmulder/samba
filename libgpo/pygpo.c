@@ -28,6 +28,11 @@
 #include "auth/credentials/pycredentials.h"
 #include "libcli/util/pyerrors.h"
 #include "python/py3compat.h"
+#include "libgpo/gpo_proto.h"
+#include "registry.h"
+#include "registry/reg_api.h"
+#include "../libcli/registry/util_reg.h"
+#include "../libgpo/gpext/gpext.h"
 
 /* A Python C API module to use LIBGPO */
 
@@ -289,6 +294,70 @@ static PyObject* py_ads_connect(ADS *self)
 /* Parameter mapping and functions for the GP_EXT struct */
 void initgpo(void);
 
+static void get_gp_registry_context(TALLOC_CTX *ctx,
+				    struct gp_registry_context **reg_ctx)
+{
+	struct security_token *token;
+	WERROR werr;
+
+	lp_load_initial_only(get_dyn_CONFIGFILE());
+
+	token = registry_create_system_token(ctx);
+	if (!token) {
+		PyErr_SetString(PyExc_MemoryError,
+				"Failed to create system token");
+		return NULL;
+	}
+	werr = gp_init_reg_ctx(ctx, KEY_WINLOGON_GPEXT_PATH, REG_KEY_WRITE,
+			       token, reg_ctx);
+	if (!W_ERROR_IS_OK(werr)) {
+		PyErr_SetNTSTATUS(werror_to_ntstatus(werr));
+		return NULL;
+	}
+}
+
+static PyObject *py_register_gp_extension(PyObject * self, PyObject * args)
+{
+	TALLOC_CTX *frame = talloc_stackframe();
+	const char *module_path = NULL;
+	const char *guid_name = NULL;
+	WERROR werr;
+	struct gp_registry_context *reg_ctx = NULL;
+	struct registry_key *key = NULL;
+	struct registry_value module_val;
+	PyObject *ret = NULL;
+
+	if (!PyArg_ParseTuple(args, "ss", &module_path, &guid_name)) {
+		return NULL;
+	}
+
+	get_gp_registry_context(frame, &reg_ctx);
+	if (!reg_ctx) {
+		goto out;
+	}
+
+	werr = gp_store_reg_subkey(frame, guid_name,
+				   reg_ctx->curr_key, &key);
+	if (!W_ERROR_IS_OK(werr)) {
+		goto out;
+	}
+
+	module_val.type = REG_EXPAND_SZ;
+	if (!push_reg_sz(frame, &module_val.data, module_path)) {
+		PyErr_SetString(PyExc_MemoryError,
+			"Failed to push module name to registry value");
+	}
+	werr = reg_setvalue(key, "DllName", &module_val);
+	if (!W_ERROR_IS_OK(werr)) {
+		goto out;
+	}
+
+	ret = Py_True;
+out:
+	TALLOC_FREE(frame);
+	return ret;
+}
+
 /* Global methods aka do not need a special pyobject type */
 static PyObject *py_gpo_get_sysvol_gpt_version(PyObject * self,
 					       PyObject * args)
@@ -493,6 +562,8 @@ static PyTypeObject ads_ADSType = {
 };
 
 static PyMethodDef py_gpo_methods[] = {
+	{"register_gp_extension", (PyCFunction)py_register_gp_extension,
+		METH_VARARGS, NULL},
 	{"gpo_get_sysvol_gpt_version",
 		(PyCFunction)py_gpo_get_sysvol_gpt_version,
 		METH_VARARGS, NULL},
