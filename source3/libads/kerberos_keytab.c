@@ -232,13 +232,12 @@ out:
  Adds a single service principal, i.e. 'host' to the system keytab
 ***********************************************************************/
 
-int ads_keytab_add_entry(ADS_STRUCT *ads, const char *srvPrinc, bool update_ads)
+int ads_keytab_add_entry(ADS_STRUCT *ads, const char *srvPrinc, bool update_ads, krb5_kvno *kvno)
 {
 	krb5_error_code ret = 0;
 	krb5_context context = NULL;
 	krb5_keytab keytab = NULL;
 	krb5_data password;
-	krb5_kvno kvno;
         krb5_enctype enctypes[6] = {
 		ENCTYPE_DES_CBC_CRC,
 		ENCTYPE_DES_CBC_MD5,
@@ -258,6 +257,7 @@ int ads_keytab_add_entry(ADS_STRUCT *ads, const char *srvPrinc, bool update_ads)
 	char *my_fqdn;
 	TALLOC_CTX *tmpctx = NULL;
 	int i;
+	krb5_kvno lkvno;
 
 	initialize_krb5_error_table();
 	ret = krb5_init_context(&context);
@@ -359,13 +359,16 @@ int ads_keytab_add_entry(ADS_STRUCT *ads, const char *srvPrinc, bool update_ads)
 		}
 	}
 
-	kvno = (krb5_kvno)ads_get_machine_kvno(ads, lp_netbios_name());
-	if (kvno == -1) {
-		/* -1 indicates failure, everything else is OK */
-		DEBUG(1, (__location__ ": ads_get_machine_kvno failed to "
-			 "determine the system's kvno.\n"));
-		ret = -1;
-		goto out;
+	if (!kvno) {
+		lkvno = (krb5_kvno)ads_get_machine_kvno(ads, lp_netbios_name());
+		if (lkvno == -1) {
+			/* -1 indicates failure, everything else is OK */
+			DEBUG(1, (__location__ ": ads_get_machine_kvno failed to "
+				 "determine the system's kvno.\n"));
+			ret = -1;
+			goto out;
+		}
+		kvno = &lkvno;
 	}
 
 	salt_princ_s = kerberos_secrets_fetch_salt_princ();
@@ -380,7 +383,7 @@ int ads_keytab_add_entry(ADS_STRUCT *ads, const char *srvPrinc, bool update_ads)
 		/* add the fqdn principal to the keytab */
 		ret = smb_krb5_kt_add_entry(context,
 					    keytab,
-					    kvno,
+					    *kvno,
 					    princ_s,
 					    salt_princ_s,
 					    enctypes[i],
@@ -396,7 +399,7 @@ int ads_keytab_add_entry(ADS_STRUCT *ads, const char *srvPrinc, bool update_ads)
 		if (short_princ_s) {
 			ret = smb_krb5_kt_add_entry(context,
 						    keytab,
-						    kvno,
+						    *kvno,
 						    short_princ_s,
 						    salt_princ_s,
 						    enctypes[i],
@@ -490,14 +493,13 @@ out:
  Adds all the required service principals to the system keytab.
 ***********************************************************************/
 
-int ads_keytab_create_default(ADS_STRUCT *ads)
+int ads_keytab_create_default(ADS_STRUCT *ads, krb5_kvno *kvno)
 {
 	krb5_error_code ret = 0;
 	krb5_context context = NULL;
 	krb5_keytab keytab = NULL;
 	krb5_kt_cursor cursor = {0};
 	krb5_keytab_entry kt_entry = {0};
-	krb5_kvno kvno;
 	size_t found = 0;
 	char *sam_account_name, *upn;
 	char **oldEntries = NULL, *princ_s[26];
@@ -508,6 +510,7 @@ int ads_keytab_create_default(ADS_STRUCT *ads)
 	size_t i;
 	bool ok = false;
 	ADS_STATUS status;
+	krb5_kvno lkvno;
 
 	ZERO_STRUCT(kt_entry);
 	ZERO_STRUCT(cursor);
@@ -528,6 +531,22 @@ int ads_keytab_create_default(ADS_STRUCT *ads)
 		goto done;
 	}
 
+        machine_name = talloc_strdup(frame, lp_netbios_name());
+        if (!machine_name) {
+                ret = -1;
+                goto done;
+        }
+
+        if (!kvno) {
+                lkvno = (krb5_kvno)ads_get_machine_kvno(ads, machine_name);
+                if (lkvno == (krb5_kvno)-1) {
+                        DEBUG(1, (__location__ ": ads_get_machine_kvno() failed to "
+                                  "determine the system's kvno.\n"));
+                        goto done;
+                }
+                kvno = &lkvno;
+        }
+
 	for (i = 0; i < num_spns; i++) {
 		char *srv_princ;
 		char *p;
@@ -545,7 +564,7 @@ int ads_keytab_create_default(ADS_STRUCT *ads)
 		p[0] = '\0';
 
 		/* Add the SPNs found on the DC */
-		ret = ads_keytab_add_entry(ads, srv_princ, false);
+		ret = ads_keytab_add_entry(ads, srv_princ, false, kvno);
 		if (ret != 0) {
 			DEBUG(1, ("ads_keytab_add_entry failed while "
 				  "adding '%s' principal.\n",
@@ -576,12 +595,6 @@ int ads_keytab_create_default(ADS_STRUCT *ads)
 		goto done;
 	}
 
-	machine_name = talloc_strdup(frame, lp_netbios_name());
-	if (!machine_name) {
-		ret = -1;
-		goto done;
-	}
-
 	/* now add the userPrincipalName and sAMAccountName entries */
 	ok = ads_has_samaccountname(ads, frame, machine_name);
 	if (!ok) {
@@ -607,7 +620,7 @@ int ads_keytab_create_default(ADS_STRUCT *ads)
 		goto done;
 	}
 
-	ret = ads_keytab_add_entry(ads, sam_account_name, false);
+	ret = ads_keytab_add_entry(ads, sam_account_name, false, NULL);
 	if (ret != 0) {
 		DEBUG(1, (__location__ ": ads_keytab_add_entry() failed "
 			  "while adding sAMAccountName (%s)\n",
@@ -618,7 +631,7 @@ int ads_keytab_create_default(ADS_STRUCT *ads)
 	/* remember that not every machine account will have a upn */
 	upn = ads_get_upn(ads, frame, machine_name);
 	if (upn) {
-		ret = ads_keytab_add_entry(ads, upn, false);
+		ret = ads_keytab_add_entry(ads, upn, false, NULL);
 		if (ret != 0) {
 			DEBUG(1, (__location__ ": ads_keytab_add_entry() "
 				  "failed while adding UPN (%s)\n", upn));
@@ -627,12 +640,6 @@ int ads_keytab_create_default(ADS_STRUCT *ads)
 	}
 
 	/* Now loop through the keytab and update any other existing entries */
-	kvno = (krb5_kvno)ads_get_machine_kvno(ads, machine_name);
-	if (kvno == (krb5_kvno)-1) {
-		DEBUG(1, (__location__ ": ads_get_machine_kvno() failed to "
-			  "determine the system's kvno.\n"));
-		goto done;
-	}
 
 	DEBUG(3, (__location__ ": Searching for keytab entries to preserve "
 		  "and update.\n"));
@@ -680,7 +687,7 @@ int ads_keytab_create_default(ADS_STRUCT *ads)
 	}
 
 	while (krb5_kt_next_entry(context, keytab, &kt_entry, &cursor) == 0) {
-		if (kt_entry.vno != kvno) {
+		if (kt_entry.vno != *kvno) {
 			char *ktprinc = NULL;
 			char *p;
 
@@ -732,7 +739,7 @@ int ads_keytab_create_default(ADS_STRUCT *ads)
 
 	ret = 0;
 	for (i = 0; oldEntries[i]; i++) {
-		ret |= ads_keytab_add_entry(ads, oldEntries[i], false);
+		ret |= ads_keytab_add_entry(ads, oldEntries[i], false, NULL);
 		TALLOC_FREE(oldEntries[i]);
 	}
 

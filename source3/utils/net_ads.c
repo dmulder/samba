@@ -2340,6 +2340,7 @@ int net_ads_changetrustpw(struct net_context *c, int argc, const char **argv)
 	char *host_principal, *name;
 	fstring my_name;
 	ADS_STATUS ret;
+	krb5_kvno kvno;
 
 	if (c->display_usage) {
 		d_printf(  "%s\n"
@@ -2378,6 +2379,7 @@ int net_ads_changetrustpw(struct net_context *c, int argc, const char **argv)
     asprintf(&name, "%s$", my_name);
     DEBUG(1,("kvno for %s from kdc prior to changing host password: %d\n", host_principal, ads_get_kvno(ads, name)));
 
+	kvno = ads_get_kvno(ads, name)+1;
 	ret = ads_change_trust_account_password(ads, host_principal);
 
 	if (!ADS_ERR_OK(ret)) {
@@ -2390,11 +2392,14 @@ int net_ads_changetrustpw(struct net_context *c, int argc, const char **argv)
 	d_printf(_("Password change for principal %s succeeded.\n"), host_principal);
     DEBUG(1,("Password change for principal %s succeeded.\n", host_principal));
     DEBUG(1,("kvno for %s from kdc after changing host password: %d\n", host_principal, ads_get_kvno(ads, name)));
+	if (kvno != ads_get_kvno(ads, name)) {
+		DEBUG(1,("Server reported different kvno than calculated kvno!\n"));
+	}
 
 	if (USE_SYSTEM_KEYTAB) {
 		d_printf(_("Attempting to update system keytab with new password.\n"));
         DEBUG(1,("Attempting to update system keytab with new password.\n"));
-		if (ads_keytab_create_default(ads)) {
+		if (ads_keytab_create_default(ads, &kvno)) {
 			d_printf(_("Failed to update system keytab.\n"));
 		} else
             DEBUG(1,("Succeeded updating system keytab.\n"));
@@ -2637,7 +2642,7 @@ static int net_ads_keytab_add(struct net_context *c,
 		return -1;
 	}
 	for (i = 0; i < argc; i++) {
-		ret |= ads_keytab_add_entry(ads, argv[i], update_ads);
+		ret |= ads_keytab_add_entry(ads, argv[i], update_ads, NULL);
 	}
 	ads_destroy(&ads);
 	return ret;
@@ -2674,7 +2679,7 @@ static int net_ads_keytab_create(struct net_context *c, int argc, const char **a
 	if (!ADS_ERR_OK(ads_startup(c, true, &ads))) {
 		return -1;
 	}
-	ret = ads_keytab_create_default(ads);
+	ret = ads_keytab_create_default(ads, NULL);
 	ads_destroy(&ads);
 	return ret;
 }

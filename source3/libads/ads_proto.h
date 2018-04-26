@@ -32,6 +32,8 @@
 #ifndef _LIBADS_ADS_PROTO_H_
 #define _LIBADS_ADS_PROTO_H_
 
+#include "krb5.h"
+
 /* The following definitions come from libads/ads_struct.c  */
 
 char *ads_build_path(const char *realm, const char *sep, const char *field, int reverse);
@@ -50,9 +52,9 @@ void ads_disp_sd(ADS_STRUCT *ads, TALLOC_CTX *mem_ctx, struct security_descripto
 /* The following definitions come from libads/kerberos_keytab.c  */
 
 int ads_keytab_add_entry(ADS_STRUCT *ads, const char *srvPrinc,
-			 bool update_ads);
+			 bool update_ads, krb5_kvno *kvno);
 int ads_keytab_flush(ADS_STRUCT *ads);
-int ads_keytab_create_default(ADS_STRUCT *ads);
+int ads_keytab_create_default(ADS_STRUCT *ads, krb5_kvno *kvno);
 int ads_keytab_list(const char *keytab_name);
 
 /* The following definitions come from libads/net_ads_setspn.c  */

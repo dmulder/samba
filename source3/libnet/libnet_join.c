@@ -807,7 +807,7 @@ static bool libnet_join_create_keytab(TALLOC_CTX *mem_ctx,
 		return true;
 	}
 
-	if (ads_keytab_create_default(r->in.ads) != 0) {
+	if (ads_keytab_create_default(r->in.ads, NULL) != 0) {
 		return false;
 	}
 
