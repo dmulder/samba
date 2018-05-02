@@ -14,13 +14,24 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import os
+import os, re
 from samba import gpo, tests
 from samba.param import LoadParm
 
 poldir = r'\\addom.samba.example.com\sysvol\addom.samba.example.com\Policies'
 dspath = 'CN=Policies,CN=System,DC=addom,DC=samba,DC=example,DC=com'
 gpt_data = '[General]\nVersion=%d'
+
+def increment_gpt_ini(filename):
+    data = None
+    version = -1
+    with open(filename, 'r') as gpt_ini:
+        data = gpt_ini.read()
+        version = int(re.findall('.*Version=([0-9]+).*', data)[-1])
+    version += 1
+    with open(filename, 'w') as gpt_ini:
+        gpt_ini.write('[General]\r\nVersion=%d' % version)
+    return (filename, data)
 
 class GPOTests(tests.TestCase):
     def setUp(self):
@@ -29,6 +40,11 @@ class GPOTests(tests.TestCase):
         self.lp = LoadParm()
         self.lp.load_default()
         self.creds = self.insta_creds(template=self.get_credentials())
+        self.gpo_cache = self.lp.cache_path('gpo_cache')
+        self.sysvol_path = self.lp.get("path", "sysvol")
+        print(self.gpo_cache)
+        if not os.path.exists(self.gpo_cache):
+            os.mkdir(self.gpo_cache, mode=0o755)
 
     def tearDown(self):
         super(GPOTests, self).tearDown()
@@ -50,12 +66,30 @@ class GPOTests(tests.TestCase):
             assert gpos[i].ds_path == ds_paths[i], \
               'ds_path did not match expected %s' % gpos[i].ds_path
 
+    def test_check_refresh_gpo_list(self):
+        ads = gpo.ADS_STRUCT(self.server, self.lp, self.creds)
+        if ads.connect():
+            gpos = ads.get_gpo_list(self.creds.get_username())
+        local_gpo = gpos[0]
+        default_gpo = gpos[-1]
+        sysvol_gpt_ini = os.path.join(self.sysvol_path, \
+                                      'addom.samba.example.com/Policies', \
+                                      default_gpo.name, 'GPT.INI')
+        default_gpo.version = default_gpo.version+1
+
+        gpt_file = os.path.join(self.gpo_cache, \
+                                'addom.samba.example.com/Policies', \
+                                default_gpo.name, 'GPT.INI')
+
+        print(gpo.check_refresh_gpo_list(ads, gpos))
+        assert os.path.exists(gpt_file), \
+            'check_refresh_gpo_list() didn\'t cache when passed valid gpo'
+
     def test_gpt_version(self):
         global gpt_data
-        local_path = self.lp.get("path", "sysvol")
         policies = 'addom.samba.example.com/Policies'
         guid = '{31B2F340-016D-11D2-945F-00C04FB984F9}'
-        gpo_path = os.path.join(local_path, policies, guid)
+        gpo_path = os.path.join(self.sysvol_path, policies, guid)
         old_vers = gpo.gpo_get_sysvol_gpt_version(gpo_path)[1]
 
         with open(os.path.join(gpo_path, 'GPT.INI'), 'w') as gpt:

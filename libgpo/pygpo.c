@@ -50,7 +50,26 @@ GPO_getter(link)
 GPO_getter(user_extensions)
 GPO_getter(machine_extensions)
 
+static PyObject* GPO_get_version(PyObject *self, void *closure)
+{
+	struct GROUP_POLICY_OBJECT *gpo_ptr = pytalloc_get_ptr(self);
+	return PyLong_FromLong(gpo_ptr->version);
+}
+
+static int GPO_set_version(PyObject *self, PyObject *value, void *closure)
+{
+	struct GROUP_POLICY_OBJECT *gpo_ptr = pytalloc_get_ptr(self);
+	if (PyLong_Check(value)) {
+		long val = PyLong_AsLong(value);
+		gpo_ptr->version = val;
+		return 0;
+	}
+	return -1;
+}
+
 static PyGetSetDef GPO_setters[] = {
+	{discard_const_p(char, "version"), (getter)GPO_get_version,
+		(setter)GPO_set_version, NULL, NULL},
 	{discard_const_p(char, "ds_path"), (getter)GPO_get_ds_path, NULL, NULL,
 		NULL},
 	{discard_const_p(char, "file_sys_path"), (getter)GPO_get_file_sys_path,
