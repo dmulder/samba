@@ -307,8 +307,7 @@ class gp_ext(object):
     def read(self, policy):
         pass
 
-    def parse(self, afile, ldb, gp_db, lp):
-        self.ldb = ldb
+    def parse(self, afile, gp_db, lp):
         self.gp_db = gp_db
         self.lp = lp
 
@@ -325,9 +324,8 @@ class gp_ext(object):
 class gp_ext_setter():
     __metaclass__ = ABCMeta
 
-    def __init__(self, logger, ldb, gp_db, lp, attribute, val):
+    def __init__(self, logger, gp_db, lp, attribute, val):
         self.logger = logger
-        self.ldb = ldb
         self.attribute = attribute
         self.val = val
         self.lp = lp
@@ -447,7 +445,7 @@ def gpo_version(lp, path):
     gpt_path = lp.cache_path(os.path.join('gpo_cache', path))
     return int(gpo.gpo_get_sysvol_gpt_version(gpt_path)[1])
 
-def apply_gp(lp, creds, test_ldb, logger, store, gp_extensions):
+def apply_gp(lp, creds, logger, store, gp_extensions):
     gp_db = store.get_gplog(creds.get_username())
     dc_hostname = get_dc_hostname(creds, lp)
     gpos = get_gpo_list(dc_hostname, creds, lp)
@@ -473,7 +471,7 @@ def apply_gp(lp, creds, test_ldb, logger, store, gp_extensions):
         store.start()
         for ext in gp_extensions:
             try:
-                ext.parse(ext.list(path), test_ldb, gp_db, lp)
+                ext.parse(ext.list(path), gp_db, lp)
             except Exception as e:
                 logger.error('Failed to parse gpo %s for extension %s' % \
                     (guid, str(ext)))
@@ -491,14 +489,14 @@ def unapply_log(gp_db):
         else:
             break
 
-def unapply_gp(lp, creds, test_ldb, logger, store, gp_extensions):
+def unapply_gp(lp, creds, logger, store, gp_extensions):
     gp_db = store.get_gplog(creds.get_username())
     gp_db.state(GPOSTATE.UNAPPLY)
     for gpo_guid in unapply_log(gp_db):
         gp_db.set_guid(gpo_guid)
         unapply_attributes = gp_db.list(gp_extensions)
         for attr in unapply_attributes:
-            attr_obj = attr[-1](logger, test_ldb, gp_db, lp, attr[0], attr[1])
+            attr_obj = attr[-1](logger, gp_db, lp, attr[0], attr[1])
             attr_obj.mapper()[attr[0]][0](attr[1]) # Set the old value
             gp_db.delete(str(attr_obj), attr[0])
         gp_db.commit()
