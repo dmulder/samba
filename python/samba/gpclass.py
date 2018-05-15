@@ -439,6 +439,15 @@ def check_refresh_gpo_list(dc_hostname, lp, creds, gpos):
             continue
         cache_gpo_dir(conn, cache_path, check_safe_path(gpo.file_sys_path))
 
+def get_deleted_gpos_list(gp_db, gpos):
+    ret = []
+    applied_gpos = gp_db.get_applied()
+    current_guids = [p.name for p in gpos]
+    for g in applied_gpos:
+        if g[0] not in current_guids:
+            ret.append(g)
+    return ret
+
 def gpo_version(lp, path):
     # gpo.gpo_get_sysvol_gpt_version() reads the GPT.INI from a local file,
     # read from the gpo client cache.
@@ -449,6 +458,7 @@ def apply_gp(lp, creds, logger, store, gp_extensions):
     gp_db = store.get_gplog(creds.get_username())
     dc_hostname = get_dc_hostname(creds, lp)
     gpos = get_gpo_list(dc_hostname, creds, lp)
+    del_gpos = get_deleted_gpos_list(gp_db, gpos)
     try:
         check_refresh_gpo_list(dc_hostname, lp, creds, gpos)
     except:
@@ -470,7 +480,7 @@ def apply_gp(lp, creds, logger, store, gp_extensions):
     store.start()
     for ext in gp_extensions:
         try:
-            ext.process_group_policy([], changed_gpos)
+            ext.process_group_policy(del_gpos, changed_gpos)
         except Exception as e:
             logger.error('Failed to apply extension  %s' % str(ext))
             logger.error('Message was: ' + str(e))
