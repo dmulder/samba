@@ -292,8 +292,11 @@ class GPOStorage:
 class gp_ext(object):
     __metaclass__ = ABCMeta
 
-    def __init__(self, logger):
+    def __init__(self, logger, lp, creds, store):
         self.logger = logger
+        self.lp = lp
+        self.creds = creds
+        self.gp_db = store.get_gplog(creds.get_username())
 
     @abstractmethod
     def list(self, rootpath):
@@ -307,10 +310,7 @@ class gp_ext(object):
     def read(self, policy):
         pass
 
-    def parse(self, afile, gp_db, lp):
-        self.gp_db = gp_db
-        self.lp = lp
-
+    def parse(self, afile):
         local_path = self.lp.cache_path('gpo_cache')
         data_file = os.path.join(local_path, check_safe_path(afile)).lower()
         if os.path.exists(data_file):
@@ -471,7 +471,7 @@ def apply_gp(lp, creds, logger, store, gp_extensions):
         store.start()
         for ext in gp_extensions:
             try:
-                ext.parse(ext.list(path), gp_db, lp)
+                ext.parse(ext.list(path))
             except Exception as e:
                 logger.error('Failed to parse gpo %s for extension %s' % \
                     (guid, str(ext)))
