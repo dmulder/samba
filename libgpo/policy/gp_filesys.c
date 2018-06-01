@@ -18,7 +18,7 @@
  */
 #include "includes.h"
 #include "system/filesys.h"
-#include "lib/policy/policy.h"
+#include "libgpo/policy/policy.h"
 #include "libcli/raw/smb.h"
 #include "libcli/libcli.h"
 #include "param/param.h"
@@ -149,7 +149,7 @@ static NTSTATUS gp_do_list (const char *rel_path, struct gp_list_state *state)
 	return NT_STATUS_OK;
 }
 
-static NTSTATUS gp_cli_connect(struct gp_context *gp_ctx)
+NTSTATUS gp_cli_connect(struct gp_context *gp_ctx)
 {
 	struct smbcli_options options;
         struct smbcli_session_options session_options;
@@ -319,6 +319,40 @@ static NTSTATUS gp_get_files(struct smbcli_tree *tree, const char *share_path,
 			talloc_free(mem_ctx);
 			return status;
 		}
+	}
+
+	return NT_STATUS_OK;
+}
+
+NTSTATUS gp_fetch_files(struct gp_context *gp_ctx, char *nt_path,
+			char *unix_path)
+{
+	struct gp_list_state *state;
+	NTSTATUS result;
+
+	/* Prepare the state structure */
+	state = talloc_zero(gp_ctx, struct gp_list_state);
+	if (state == NULL) {
+		return NT_STATUS_NO_MEMORY;
+	}
+
+	state->tree = gp_ctx->cli->tree;
+	state->share_path = nt_path;
+
+	/* Get the file list */
+	result = gp_do_list("", state);
+	if (!NT_STATUS_IS_OK(result)) {
+		return result;
+	}
+
+	if (state->list.num_files == 0) {
+		return NT_STATUS_UNSUCCESSFUL;
+	}
+
+	/* Fetch the files */
+	result = gp_get_files(gp_ctx->cli->tree, nt_path, unix_path, &state->list);
+	if (!NT_STATUS_IS_OK(result)) {
+		return result;
 	}
 
 	return NT_STATUS_OK;

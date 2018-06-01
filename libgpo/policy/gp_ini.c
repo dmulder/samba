@@ -19,7 +19,7 @@
  */
 #include "includes.h"
 #include "lib/util/samba_util.h"
-#include "lib/policy/policy.h"
+#include "libgpo/policy/policy.h"
 
 struct gp_parse_context {
 	struct gp_ini_context *ini;

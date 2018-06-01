@@ -238,9 +238,8 @@ for env in ["ad_dc_ntvfs", "nt4_dc"]:
         plansmbtorture4testsuite('rpc.lsa.secrets', env, ["%s:$SERVER[]" % (transport), ntlmoptions, '-U$USERNAME%$PASSWORD', '--workgroup=$DOMAIN', '--option=gensec:target_hostname=$NETBIOSNAME'], "samba4.%s" % name)
     plantestsuite("samba.blackbox.pdbtest(%s)" % env, "%s:local" % env, [os.path.join(bbdir, "test_pdbtest.sh"), '$SERVER', "$PREFIX", "pdbtest", smbclient4, '$SMB_CONF_PATH', configuration])
 
-gpo = smbtorture4_testsuites("gpo.")
-for t in gpo:
-    plansmbtorture4testsuite(t, 'ad_dc:local', ['//$SERVER/sysvol', '-U$USERNAME%$PASSWORD'])
+plansmbtorture4testsuite("gpo.apply", 'ad_dc:local', ['//$SERVER/sysvol', '-U$USERNAME%$PASSWORD'])
+plansmbtorture4testsuite("gpo.client", 'ad_member:local', ['//$SERVER/sysvol', '-U$USERNAME%$PASSWORD'])
 
 transports = ["ncacn_np", "ncacn_ip_tcp"]
 
@@ -631,7 +630,7 @@ planpythontestsuite("chgdcpass:local", "samba.tests.samba_tool.dnscmd")
 planpythontestsuite("ad_dc_ntvfs:local", "samba.tests.dcerpc.rpcecho", py3_compatible=True)
 
 planoldpythontestsuite("nt4_dc", "samba.tests.netbios", extra_args=['-U"$USERNAME%$PASSWORD"'], py3_compatible=True)
-planoldpythontestsuite("ad_dc:local", "samba.tests.gpo", extra_args=['-U"$USERNAME%$PASSWORD"'], py3_compatible=True)
+planoldpythontestsuite("ad_dc:local", "samba.tests.gpo", extra_args=['-U"$USERNAME%$PASSWORD"'])
 planoldpythontestsuite("ad_dc:local", "samba.tests.dckeytab", extra_args=['-U"$USERNAME%$PASSWORD"'], py3_compatible=True)
 planoldpythontestsuite("ad_dc:local", "samba.tests.smb", extra_args=['-U"$USERNAME%$PASSWORD"'], py3_compatible=True)
 

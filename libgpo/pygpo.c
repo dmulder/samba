@@ -308,8 +308,11 @@ static PyObject *py_check_refresh_gpo_list(PyObject * self,
 					   PyObject * args)
 {
 	TALLOC_CTX *frame = talloc_stackframe();
-	ADS *ads = NULL;
 	const char *cache_dir = NULL;
+	PyObject *py_creds = Py_None;
+	struct cli_credentials *creds;
+	PyObject *py_lp = Py_None;
+	struct loadparm_context *lp;
 	struct GROUP_POLICY_OBJECT *gpo_front = NULL;
 	struct GROUP_POLICY_OBJECT *gpo_ptr = NULL;
 	PyObject *gpo_list = NULL;
@@ -320,7 +323,8 @@ static PyObject *py_check_refresh_gpo_list(PyObject * self,
 	int success = 0;
 	int i;
 
-	if (!PyArg_ParseTuple(args, "OO|s", &ads, &gpo_list, &cache_dir)) {
+	if (!PyArg_ParseTuple(args, "OOO|s", &gpo_list, &py_lp, &py_creds,
+			      &cache_dir)) {
 		goto out;
 	}
 	success = PyObject_TypeCheck(gpo_list, &PyList_Type);
@@ -361,12 +365,6 @@ static PyObject *py_check_refresh_gpo_list(PyObject * self,
 	}
 	gpo_ptr->next = NULL;
 
-	success = PyObject_TypeCheck(ads, &ads_ADSType);
-	if (!success) {
-		PyErr_SetString(PyExc_TypeError, "An ADS type was expected");
-		goto out;
-	}
-
 	if (!cache_dir) {
 		cache_dir = cache_path(GPO_CACHE_DIR);
 		if (!cache_dir) {
@@ -376,7 +374,19 @@ static PyObject *py_check_refresh_gpo_list(PyObject * self,
 		}
 	}
 
-	status = check_refresh_gpo_list(ads->ads_ptr, frame, cache_dir, 0,
+	lp = lpcfg_from_py_object(frame, py_lp);
+	if (lp == NULL) {
+		PyErr_SetString(PyExc_TypeError, "Expected loadparm context");
+		goto out;
+	}
+
+	creds = cli_credentials_from_py_object(py_creds);
+	if (creds == NULL) {
+		PyErr_SetString(PyExc_TypeError, "Expected credentials");
+		goto out;
+	}
+
+	status = check_refresh_gpo_list(frame, lp, creds, cache_dir, 0,
 					gpo_front);
 	if (!NT_STATUS_IS_OK(status)) {
 		PyErr_SetNTSTATUS(status);

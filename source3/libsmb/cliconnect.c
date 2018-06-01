@@ -3500,6 +3500,7 @@ static void cli_full_connection_creds_tcon_done(struct tevent_req *subreq)
 	tevent_req_done(req);
 }
 
+#include <unistd.h>
 NTSTATUS cli_full_connection_creds_recv(struct tevent_req *req,
 				  struct cli_state **output_cli)
 {
@@ -3508,6 +3509,7 @@ NTSTATUS cli_full_connection_creds_recv(struct tevent_req *req,
 	NTSTATUS status;
 
 	if (tevent_req_is_nterror(req, &status)) {
+DEBUG(1,("that was an error!\n"));
 		return status;
 	}
 	*output_cli = state->cli;
@@ -3541,9 +3543,11 @@ NTSTATUS cli_full_connection_creds(struct cli_state **output_cli,
 	if (!tevent_req_poll_ntstatus(req, ev, &status)) {
 		goto fail;
 	}
+DEBUG(1,("trying cli_full_connection_creds_recv\n"));
 	status = cli_full_connection_creds_recv(req, output_cli);
  fail:
 	TALLOC_FREE(ev);
+DEBUG(1,("cli_full_connection_creds_recv failed\n"));
 	return status;
 }
 
@@ -3594,12 +3598,14 @@ NTSTATUS cli_full_connection(struct cli_state **output_cli,
 		return NT_STATUS_NO_MEMORY;
 	}
 
+DEBUG(1,("trying cli_full_connection_creds\n"));
 	status = cli_full_connection_creds(output_cli, my_name,
 					   dest_host, dest_ss, port,
 					   service, service_type,
 					   creds, flags, signing_state);
 	if (!NT_STATUS_IS_OK(status)) {
 		TALLOC_FREE(frame);
+DEBUG(1,("failed cli_full_connection_creds\n"));
 		return status;
 	}
 

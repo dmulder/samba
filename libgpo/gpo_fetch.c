@@ -24,6 +24,7 @@
 
 #include "libgpo/gpo_proto.h"
 #include "libsmb/libsmb.h"
+#include "libgpo/policy/policy.h"
 
 /****************************************************************
  explode the GPO CIFS URI into their components
@@ -118,45 +119,19 @@ static NTSTATUS gpo_prepare_local_store(TALLOC_CTX *mem_ctx,
 	return NT_STATUS_OK;
 }
 
-static NTSTATUS gpo_connect_server(ADS_STRUCT *ads,
-                                   const char *server, const char *service, void *ret_cli)
-{
-	NTSTATUS result;
-	struct cli_state *cli;
-
-	result = cli_full_connection(&cli,
-			lp_netbios_name(),
-			server,
-			NULL, 0,
-			service, "A:",
-			ads->auth.user_name, NULL,
-			ads->auth.password,
-			CLI_FULL_CONNECTION_USE_KERBEROS |
-			CLI_FULL_CONNECTION_FALLBACK_AFTER_KERBEROS,
-			SMB_SIGNING_REQUIRED);
-	if (!NT_STATUS_IS_OK(result)) {
-		DEBUG(10,("check_refresh_gpo: "
-				"failed to connect: %s\n",
-				nt_errstr(result)));
-		return result;
-	}
-	*(struct cli_state **) ret_cli = cli;
-	return NT_STATUS_OK;
-}
-
 /****************************************************************
  download a full GPO via CIFS
 ****************************************************************/
 
 NTSTATUS gpo_fetch_files(TALLOC_CTX *mem_ctx,
-                         ADS_STRUCT *ads,
+			 struct loadparm_context *lp,
+			 struct cli_credentials *creds,
                          const char *cache_dir,
 			 const struct GROUP_POLICY_OBJECT *gpo)
 {
 	NTSTATUS result;
 	char *server, *service, *nt_path, *unix_path;
-	char *nt_ini_path, *unix_ini_path;
-	struct cli_state *cli = NULL;
+	struct gp_context *gp_ctx;
 
 
 	result = gpo_explode_filesyspath(mem_ctx, cache_dir, gpo->file_sys_path,
@@ -164,24 +139,28 @@ NTSTATUS gpo_fetch_files(TALLOC_CTX *mem_ctx,
 					 &unix_path);
 	NT_STATUS_NOT_OK_RETURN(result);
 
-	/* for now reuse the existing ds connection */
+	gp_ctx = talloc_zero(mem_ctx, struct gp_context);
+	if (gp_ctx == NULL) {
+		return NT_STATUS_NO_MEMORY;
+	}
 
-	result = gpo_connect_server(ads, server, service, &cli);
-	NT_STATUS_NOT_OK_RETURN(result);
+	gp_ctx->lp_ctx = lp;
+	gp_ctx->credentials = creds;
+	result = gp_cli_connect(gp_ctx);
+	if (!NT_STATUS_IS_OK(result)) {
+		return result;
+	}
 
 	result = gpo_prepare_local_store(mem_ctx, cache_dir, unix_path);
-	NT_STATUS_NOT_OK_RETURN(result);
+	if (!NT_STATUS_IS_OK(result)) {
+		return result;
+	}
 
-	unix_ini_path = talloc_asprintf(mem_ctx, "%s/%s", unix_path, GPT_INI);
-	nt_ini_path = talloc_asprintf(mem_ctx, "%s\\%s", nt_path, GPT_INI);
-	NT_STATUS_HAVE_NO_MEMORY(unix_ini_path);
-	NT_STATUS_HAVE_NO_MEMORY(nt_ini_path);
-
-	result = gpo_copy_file(mem_ctx, cli, nt_ini_path, unix_ini_path);
-	NT_STATUS_NOT_OK_RETURN(result);
-
-	result = gpo_sync_directories(mem_ctx, cli, nt_path, unix_path);
-	NT_STATUS_NOT_OK_RETURN(result);
+	/* Fetch the files */
+	result = gp_fetch_files(gp_ctx, nt_path, unix_path);
+	if (!NT_STATUS_IS_OK(result)) {
+		return result;
+	}
 
 	return NT_STATUS_OK;
 }

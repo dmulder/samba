@@ -473,9 +473,10 @@ NTSTATUS gpo_process_gpo_list(TALLOC_CTX *mem_ctx,
  locally stored version. If not, fetch the required policy via CIFS
 ****************************************************************/
 
-NTSTATUS check_refresh_gpo(ADS_STRUCT *ads,
-			   TALLOC_CTX *mem_ctx,
-                           const char *cache_dir,
+NTSTATUS check_refresh_gpo(TALLOC_CTX *mem_ctx,
+			   struct loadparm_context *lp,
+			   struct cli_credentials *creds,
+			   const char *cache_dir,
 			   uint32_t flags,
 			   const struct GROUP_POLICY_OBJECT *gpo)
 {
@@ -515,7 +516,7 @@ NTSTATUS check_refresh_gpo(ADS_STRUCT *ads,
 
 		DEBUG(1,("check_refresh_gpo: need to refresh GPO\n"));
 
-		result = gpo_fetch_files(mem_ctx, ads, cache_dir, gpo);
+		result = gpo_fetch_files(mem_ctx, lp, creds, cache_dir, gpo);
 		if (!NT_STATUS_IS_OK(result)) {
 			goto out;
 		}
@@ -559,8 +560,9 @@ NTSTATUS check_refresh_gpo(ADS_STRUCT *ads,
  not, go and get each required GPO via CIFS
  ****************************************************************/
 
-NTSTATUS check_refresh_gpo_list(ADS_STRUCT *ads,
-				TALLOC_CTX *mem_ctx,
+NTSTATUS check_refresh_gpo_list(TALLOC_CTX *mem_ctx,
+				struct loadparm_context *lp,
+				struct cli_credentials *creds,
 				const char *cache_dir,
 				uint32_t flags,
 				const struct GROUP_POLICY_OBJECT *gpo_list)
@@ -574,7 +576,8 @@ NTSTATUS check_refresh_gpo_list(ADS_STRUCT *ads,
 
 	for (gpo = gpo_list; gpo; gpo = gpo->next) {
 
-		result = check_refresh_gpo(ads, mem_ctx, cache_dir, flags, gpo);
+		result = check_refresh_gpo(mem_ctx, lp, creds, cache_dir,
+					   flags, gpo);
 		if (!NT_STATUS_IS_OK(result)) {
 			goto out;
 		}

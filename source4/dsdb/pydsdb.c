@@ -28,7 +28,7 @@
 #include "system/kerberos.h"
 #include "auth/kerberos/kerberos.h"
 #include "librpc/rpc/pyrpc_util.h"
-#include "lib/policy/policy.h"
+#include "libgpo/policy/policy.h"
 #include "param/pyparam.h"
 #include "lib/util/dlinklist.h"
 #include "dsdb/kcc/garbage_collect_tombstones.h"

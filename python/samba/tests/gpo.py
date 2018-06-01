@@ -17,10 +17,44 @@
 import os
 from samba import gpo, tests
 from samba.param import LoadParm
+import ldap, ldap.sasl
+from subprocess import Popen, PIPE
 
 poldir = r'\\addom.samba.example.com\sysvol\addom.samba.example.com\Policies'
 dspath = 'CN=Policies,CN=System,DC=addom,DC=samba,DC=example,DC=com'
 gpt_data = '[General]\nVersion=%d'
+
+def realm_to_dn(realm):
+    return ','.join(['DC=%s' % part for part in realm.lower().split('.')])
+
+def kinit_for_gssapi(creds):
+    p = Popen(['kinit', creds.get_username()], stdin=PIPE, stdout=PIPE)
+    p.stdin.write('%s\n' % creds.get_password())
+    p.stdin.flush()
+    return p.wait() == 0
+
+def get_ldap(server, creds):
+    l = ldap.initialize('ldap://%s' % server)
+    if kinit_for_gssapi(creds):
+        auth_tokens = ldap.sasl.gssapi('')
+        l.sasl_interactive_bind_s('', auth_tokens)
+        l.set_option(ldap.OPT_REFERRALS,0)
+    return l
+
+def set_gpo_version(server, lp, creds, guid, version):
+    l = get_ldap(server, creds)
+    realm = lp.get('realm')
+    realm_dn = realm_to_dn(realm)
+    dn = 'CN=%s,CN=Policies,CN=System,%s' % (guid, realm_dn)
+    ldap_mod = [(1, 'versionNumber', None),
+                (0, 'versionNumber', ['%d' % version])]
+
+    l.modify_s(dn, ldap_mod)
+
+    sysvol = lp.get("path", "sysvol")
+    gpo_path = os.path.join(sysvol, realm.lower(), 'Policies', guid)
+    with open(os.path.join(gpo_path, 'GPT.INI'), 'w') as gpt:
+        gpt.write(gpt_data % version)
 
 class GPOTests(tests.TestCase):
     def setUp(self):
@@ -91,4 +125,17 @@ class GPOTests(tests.TestCase):
         gp_exts = gpo.list_gp_extensions(self.lp.configfile)
         assert ext_guid not in gp_exts.keys(), \
             'Failed to unregister gp exts from registry'
+
+    def test_check_refresh_gpo_list(self):
+        # Increment version for {31B2F340-016D-11D2-945F-00C04FB984F9}
+        guid = '{31B2F340-016D-11D2-945F-00C04FB984F9}'
+        set_gpo_version(self.server, self.lp, self.creds, guid, 1)
+
+        cache = self.lp.cache_path('gpo_cache')
+        ads = gpo.ADS_STRUCT(self.server, self.lp, self.creds)
+        if ads.connect():
+            gpos = ads.get_gpo_list(self.creds.get_username())
+        gpo.check_refresh_gpo_list(gpos, self.lp, self.creds, cache)
+
+        assert os.path.exists(cache), 'GPO cache %s was not created' % cache
 

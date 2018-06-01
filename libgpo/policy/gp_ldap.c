@@ -29,7 +29,7 @@
 #include "../libcli/security/security.h"
 #include "libcli/ldap/ldap_ndr.h"
 #include "../lib/talloc/talloc.h"
-#include "lib/policy/policy.h"
+#include "libgpo/policy/policy.h"
 
 struct gpo_stringmap {
 	const char *str;
