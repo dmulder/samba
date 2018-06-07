@@ -21,17 +21,6 @@
 #ifndef _LIBGPO_GPO_PROTO_H_
 #define _LIBGPO_GPO_PROTO_H_
 
-/* The following definitions come from libgpo/gpo_filesync.c  */
-
-NTSTATUS gpo_copy_file(TALLOC_CTX *mem_ctx,
-		       struct cli_state *cli,
-		       const char *nt_path,
-		       const char *unix_path);
-NTSTATUS gpo_sync_directories(TALLOC_CTX *mem_ctx,
-			      struct cli_state *cli,
-			      const char *nt_path,
-			      const char *local_path);
-
 /* The following definitions come from libgpo/gpo_reg.c  */
 
 struct security_token *registry_create_system_token(TALLOC_CTX *mem_ctx);

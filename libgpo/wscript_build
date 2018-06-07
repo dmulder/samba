@@ -2,9 +2,9 @@
 
 bld.SAMBA3_LIBRARY('gpext',
                    source='''gpext/gpext.c gpo_util.c gpo_ldap.c gpo_ini.c
-                           gpo_fetch.c gpo_filesync.c
+                           gpo_fetch.c
                            gpo_sec.c gpo_reg.c''',
-                   deps='talloc ads TOKEN_UTIL auth',
+                   deps='talloc ads TOKEN_UTIL auth samba-policy',
                    private_library=True)
 
 for env in bld.gen_python_environments():

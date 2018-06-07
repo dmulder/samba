@@ -122,4 +122,6 @@ NTSTATUS gp_create_gpt_security_descriptor (TALLOC_CTX *mem_ctx, struct security
 NTSTATUS gp_set_acl (struct gp_context *gp_ctx, const char *dn_str, const struct security_descriptor *sd);
 uint32_t gp_ads_to_dir_access_mask(uint32_t access_mask);
 
+NTSTATUS gp_fetch_files(struct gp_context *gp_ctx, char *nt_path,
+			char *unix_path);
 #endif

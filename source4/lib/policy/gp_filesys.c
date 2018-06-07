@@ -324,6 +324,49 @@ static NTSTATUS gp_get_files(struct smbcli_tree *tree, const char *share_path,
 	return NT_STATUS_OK;
 }
 
+NTSTATUS gp_fetch_files(struct gp_context *gp_ctx, char *nt_path,
+			char *unix_path)
+{
+	struct gp_list_state *state;
+	NTSTATUS result;
+
+	if (gp_ctx->cli == NULL) {
+		result = gp_cli_connect(gp_ctx);
+		if (!NT_STATUS_IS_OK(result)) {
+			DEBUG(0, ("Failed to create cli connection to DC\n"));
+			return result;
+		}
+	}
+
+	/* Prepare the state structure */
+	state = talloc_zero(gp_ctx, struct gp_list_state);
+	if (state == NULL) {
+		return NT_STATUS_NO_MEMORY;
+	}
+
+	state->tree = gp_ctx->cli->tree;
+	state->share_path = nt_path;
+
+	/* Get the file list */
+	result = gp_do_list("", state);
+	if (!NT_STATUS_IS_OK(result)) {
+		return result;
+	}
+
+	if (state->list.num_files == 0) {
+		return NT_STATUS_UNSUCCESSFUL;
+	}
+
+	/* Fetch the files */
+	result = gp_get_files(gp_ctx->cli->tree, nt_path, unix_path,
+			      &state->list);
+	if (!NT_STATUS_IS_OK(result)) {
+		return result;
+	}
+
+	return NT_STATUS_OK;
+}
+
 NTSTATUS gp_fetch_gpt (struct gp_context *gp_ctx, struct gp_object *gpo,
                        const char **ret_local_path)
 {
