@@ -160,6 +160,7 @@ static int py_ads_init(ADS *self, PyObject *args, PyObject *kwds)
 	PyObject *py_creds = NULL;
 	PyObject *lp_obj = NULL;
 	struct loadparm_context *lp_ctx = NULL;
+	const char *config_file = NULL;
 
 	static const char *kwlist[] = {
 		"ldap_server", "loadparm_context", "credentials", NULL
@@ -199,6 +200,7 @@ static int py_ads_init(ADS *self, PyObject *args, PyObject *kwds)
 		if (!ok) {
 			return -1;
 		}
+		config_file = lp_ctx->szConfigFile;
 	}
 
 	if (self->cli_creds) {
@@ -216,6 +218,10 @@ static int py_ads_init(ADS *self, PyObject *args, PyObject *kwds)
 	self->ads_ptr = ads_init(realm, workgroup, ldap_server);
 	if (self->ads_ptr == NULL) {
 		return -1;
+	}
+
+	if (config_file != NULL) {
+		self->ads_ptr->config.config_path = SMB_STRDUP(config_file);
 	}
 
 	return 0;

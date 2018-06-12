@@ -134,12 +134,8 @@ NTSTATUS gpo_fetch_files(TALLOC_CTX *mem_ctx,
 	NTSTATUS result;
 	bool ret;
 	char *server, *service, *nt_path, *unix_path;
-	struct gp_context *gp_ctx = NULL;
-
-	gp_ctx = talloc_zero(mem_ctx, struct gp_context);
-	if (gp_ctx == NULL) {
-		return NT_STATUS_NO_MEMORY;
-	}
+	struct loadparm_context *lp_ctx;
+	struct cli_credentials *creds;
 
 	result = gpo_explode_filesyspath(mem_ctx, cache_dir, gpo->file_sys_path,
 					 &server, &service, &nt_path,
@@ -149,26 +145,24 @@ NTSTATUS gpo_fetch_files(TALLOC_CTX *mem_ctx,
 	result = gpo_prepare_local_store(mem_ctx, cache_dir, unix_path);
 	NT_STATUS_NOT_OK_RETURN(result);
 
-	gp_ctx->lp_ctx = talloc_zero(gp_ctx, struct loadparm_context);
-	if (gp_ctx->lp_ctx == NULL) {
-		return NT_STATUS_NO_MEMORY;
-	}
-	ret = lpcfg_load(gp_ctx->lp_ctx, ads->config.config_path);
+	ret = lp_load_initial_only(ads->config.config_path);
 	if (!ret) {
 		return NT_STATUS_UNSUCCESSFUL;
 	}
+	lp_ctx = loadparm_init_s3(NULL, loadparm_s3_helpers());
 
-	gp_ctx->credentials = talloc_zero(gp_ctx, struct cli_credentials);
-	if (gp_ctx->credentials == NULL) {
+	creds = cli_credentials_init(mem_ctx);
+	if (creds == NULL) {
 		return NT_STATUS_UNSUCCESSFUL;
 	}
-	ret = cli_credentials_set_username(gp_ctx->credentials,
+	cli_credentials_set_conf(creds, lp_ctx);
+	ret = cli_credentials_set_username(creds,
 					   ads->auth.user_name,
 					   CRED_CALLBACK_RESULT);
 	if (!ret) {
 		return NT_STATUS_UNSUCCESSFUL;
 	}
-	ret = cli_credentials_set_password(gp_ctx->credentials,
+	ret = cli_credentials_set_password(creds,
 					   ads->auth.password,
 					   CRED_CALLBACK_RESULT);
 	if (!ret) {
@@ -176,7 +170,8 @@ NTSTATUS gpo_fetch_files(TALLOC_CTX *mem_ctx,
 	}
 
 	/* Fetch the files */
-	result = gp_fetch_files(gp_ctx, nt_path, unix_path);
+	result = gp_fetch_files(mem_ctx, ads->server.realm, lp_ctx,
+				creds, nt_path, unix_path);
 	if (!NT_STATUS_IS_OK(result)) {
 		return result;
 	}

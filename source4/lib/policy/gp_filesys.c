@@ -26,6 +26,7 @@
 #include "libcli/raw/libcliraw.h"
 #include <dirent.h>
 #include <errno.h>
+#include "tevent/tevent.h"
 
 #define GP_MAX_DEPTH 25
 
@@ -324,11 +325,32 @@ static NTSTATUS gp_get_files(struct smbcli_tree *tree, const char *share_path,
 	return NT_STATUS_OK;
 }
 
-NTSTATUS gp_fetch_files(struct gp_context *gp_ctx, char *nt_path,
+NTSTATUS gp_fetch_files(TALLOC_CTX *mem_ctx,
+			const char *server,
+			struct loadparm_context *lp_ctx,
+			struct cli_credentials *creds,
+			char *nt_path,
 			char *unix_path)
 {
+	struct gp_context *gp_ctx;
 	struct gp_list_state *state;
 	NTSTATUS result;
+
+	gp_ctx = talloc_zero(mem_ctx, struct gp_context);
+	if (gp_ctx == NULL) {
+		return NT_STATUS_NO_MEMORY;
+	}
+
+	gp_ctx->credentials = talloc_steal(gp_ctx, creds);
+	gp_ctx->lp_ctx = lp_ctx;
+
+	gp_ctx->active_dc = talloc_zero(gp_ctx, struct nbt_dc_name);
+	gp_ctx->active_dc->name = server;
+
+	gp_ctx->ev_ctx = tevent_context_init(gp_ctx);
+	if(gp_ctx->ev_ctx == NULL) {
+		return NT_STATUS_NO_MEMORY;
+	}
 
 	if (gp_ctx->cli == NULL) {
 		result = gp_cli_connect(gp_ctx);
