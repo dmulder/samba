@@ -2808,6 +2808,8 @@ struct loadparm_context *loadparm_init(TALLOC_CTX *mem_ctx)
 
 	lpcfg_do_global_parameter(lp_ctx, "ldap replication sleep", "1000");
 
+	lpcfg_do_global_parameter(lp_ctx, "kvno replication sleep", "0");
+
 	lpcfg_do_global_parameter(lp_ctx, "idmap backend", "tdb");
 
 	lpcfg_do_global_parameter(lp_ctx, "enable privileges", "True");

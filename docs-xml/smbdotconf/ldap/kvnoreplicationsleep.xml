@@ -1,0 +1,18 @@
+<samba:parameter name="kvno replication sleep"
+                 context="G"
+                 type="integer"
+                 xmlns:samba="http://www.samba.org/samba/DTD/samba-doc">
+<description>
+	<para>
+	This option causes Samba to wait a short time to allow for LDAP	kvno
+	replication after a password change. This can be useful if the KDC and
+	ldap server are not the same machine.
+	Be aware that no checking is performed that the data has actually replicated.
+	</para>
+
+        <para>
+	The value is specified in milliseconds, the maximum value is 5000 (5 seconds).
+	</para>
+</description>
+<value type="default">0</value>
+</samba:parameter>

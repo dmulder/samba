@@ -39,6 +39,7 @@ ADS_STATUS ads_change_trust_account_password(ADS_STRUCT *ads, char *host_princip
 	NTTIME now = timeval_to_nttime(&tv);
 	int role = lp_server_role();
 	bool ok;
+	int sleep_time = 0;
 
 	if (role != ROLE_DOMAIN_MEMBER) {
 		DBG_ERR("Machine account password change only supported on a DOMAIN_MEMBER.\n");
@@ -128,6 +129,17 @@ ADS_STATUS ads_change_trust_account_password(ADS_STRUCT *ads, char *host_princip
 	if (!NT_STATUS_IS_OK(status)) {
 		DEBUG(1,("Failed to save machine password\n"));
 		return ADS_ERROR_NT(status);
+	}
+
+	/* Sleep briefly after the password change, since there may be a delay
+	 * replicating the kvno to other ldap servers (since the kdc and ldap
+	 * servers may be different machines) */
+	sleep_time = lp_kvno_replication_sleep();
+	sleep_time = MIN(sleep_time, MAX_LDAP_REPLICATION_SLEEP_TIME);
+	if (sleep_time > 0) {
+		DBG_INFO("ads_change_trust_account_password: waiting %d "
+			 "milliseconds for LDAP replication.\n", sleep_time);
+		smb_msleep(sleep_time);
 	}
 
 	return ADS_SUCCESS;
