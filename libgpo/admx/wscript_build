@@ -1,3 +1,15 @@
 #!/usr/bin/env python
+import os.path
 
-bld.INSTALL_FILES('${DATADIR}/samba/admx', ['samba.admx', 'en-US/samba.adml'])
+install_dir = os.path.join(ctx.out_dir, 'default/libgpo/admx')
+gen_script = os.path.join(ctx.top_dir, 'libgpo/admx', 'gen_samba_admx.py')
+docs_xml_dir = os.path.join(ctx.top_dir, 'docs-xml')
+
+admx_files = ['samba.admx', 'en-US/samba.adml']
+
+bld(
+    target=admx_files,
+    rule='python %s --install-dir=%s --docs-xml-dir=%s' % 
+        (gen_script, install_dir, docs_xml_dir)
+)
+bld.INSTALL_FILES('${DATADIR}/samba/admx', admx_files)
