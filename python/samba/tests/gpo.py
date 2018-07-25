@@ -31,6 +31,7 @@ from samba.credentials import Credentials
 from samba.compat import get_bytes
 from samba.dcerpc import preg
 from samba.ndr import ndr_pack
+from shutil import copyfile, move
 
 realm = os.environ.get('REALM')
 policies = realm + '/POLICIES'
@@ -91,9 +92,20 @@ class GPOTests(tests.TestCase):
         self.lp = LoadParm()
         self.lp.load_default()
         self.creds = self.insta_creds(template=self.get_credentials())
+        self.pol_file = None
+        with NamedTemporaryFile(delete=False,
+                                dir=os.path.dirname(self.lp.configfile)) as f:
+            self.backup_smb_conf = f.name
+        copyfile(self.lp.configfile, self.backup_smb_conf)
 
     def tearDown(self):
         super(GPOTests, self).tearDown()
+        if self.pol_file and os.path.exists(self.pol_file):
+            os.unlink(self.pol_file)
+        if os.path.exists(self.backup_smb_conf):
+            if os.path.exists(self.lp.configfile):
+                os.unlink(self.lp.configfile)
+            move(self.backup_smb_conf, self.lp.configfile)
 
     def test_gpo_list(self):
         global poldir, dspath
@@ -362,3 +374,72 @@ class GPOTests(tests.TestCase):
 
         # Unstage the Registry.pol file
         unstage_file(reg_pol)
+
+    def test_smb_conf_ext(self):
+        sysvol = self.lp.get('path', 'sysvol')
+        machine_dir = 'addom.samba.example.com/Policies/' \
+            '{31B2F340-016D-11D2-945F-00C04FB984F9}/MACHINE'
+        self.pol_file = os.path.join(sysvol, machine_dir, 'Registry.pol')
+
+        entries = []
+        e = preg.entry()
+        e.keyname = 'Software\\Policies\\Samba\\smb_conf'
+        e.type = 1
+        e.data = '/home/samba/%D/%U'
+        e.valuename = 'template homedir'
+        entries.append(e)
+        e = preg.entry()
+        e.keyname = 'Software\\Policies\\Samba\\smb_conf'
+        e.type = 4
+        e.data = 1
+        e.valuename = 'apply group policies'
+        entries.append(e)
+        e = preg.entry()
+        e.keyname = 'Software\\Policies\\Samba\\smb_conf'
+        e.type = 4
+        e.data = 9999
+        e.valuename = 'ldap timeout'
+        entries.append(e)
+        r = preg.file()
+        r.num_entries = len(entries)
+        r.entries = entries
+
+        with open(self.pol_file, 'wb') as fp:
+            fp.write(ndr_pack(r))
+
+        self.assertTrue(os.path.exists(self.pol_file),
+                        'Failed to create the Registry.pol file')
+
+        old_template_homedir = self.lp.get('template homedir')
+        old_apply_group_policies = self.lp.get('apply group policies')
+        old_ldap_timeout = self.lp.get('ldap timeout')
+
+        gpupdate_force(self.lp)
+        lp = LoadParm(self.lp.configfile)
+
+        template_homedir = lp.get('template homedir')
+        self.assertEquals(template_homedir, '/home/samba/%D/%U',
+                          'template homedir was not applied')
+        apply_group_policies = lp.get('apply group policies')
+        self.assertTrue(apply_group_policies,
+                        'apply group policies was not applied')
+        ldap_timeout = lp.get('ldap timeout')
+        self.assertEquals(ldap_timeout, 9999, 'ldap timeout was not applied')
+
+        gpupdate_unapply(self.lp)
+        lp = LoadParm(self.lp.configfile)
+
+        template_homedir = lp.get('template homedir')
+        self.assertEquals(template_homedir, old_template_homedir,
+                          'template homedir was not unapplied')
+        apply_group_policies = lp.get('apply group policies')
+        self.assertEquals(apply_group_policies, old_apply_group_policies,
+                          'apply group policies was not unapplied')
+        ldap_timeout = lp.get('ldap timeout')
+        self.assertEquals(ldap_timeout, old_ldap_timeout,
+                          'ldap timeout was not unapplied')
+
+        if self.pol_file and os.path.exists(self.pol_file):
+            os.unlink(self.pol_file)
+
+        gpupdate_force(self.lp)
