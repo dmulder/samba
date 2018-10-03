@@ -756,6 +756,7 @@ bld.SAMBA3_LIBRARY('smbd_base',
                         GNUTLS_HELPERS
                         dfsrdb
                         LZHUFFXPRESS
+                        MESSAGING
                    ''' +
                    bld.env['dmapi_lib'] +
                    bld.env['legacy_quota_libs'] +
