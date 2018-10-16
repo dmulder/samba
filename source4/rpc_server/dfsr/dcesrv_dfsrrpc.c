@@ -52,7 +52,8 @@ static NTSTATUS dcesrv_interface_frstrans_bind(struct dcesrv_call_state *dce_cal
 static WERROR dcesrv_frstrans_CheckConnectivity(struct dcesrv_call_state *dce_call, TALLOC_CTX *mem_ctx,
 		       struct frstrans_CheckConnectivity *r)
 {
-	DCESRV_FAULT(DCERPC_FAULT_OP_RNG_ERROR);
+	r->out.result = WERR_OK;
+	return r->out.result;
 }
 
 struct frstrans_connection {
@@ -101,6 +102,17 @@ static void push_frstrans_connection(struct GUID *replica_set_guid,
 	}
 	memcpy(&(connection->replica_set_guid), replica_set_guid, sizeof(struct GUID));
 	memcpy(&(connection->connection_guid), connection_guid, sizeof(struct GUID));
+}
+
+static struct frstrans_connection* fetch_frstrans_connection(struct GUID *connection_guid)
+{
+	struct frstrans_connection *connection = connections;
+	while(connection != NULL) {
+		if (memcmp(connection_guid, &(connection->connection_guid), sizeof(struct GUID)) == 0) {
+			return connection;
+		}
+	}
+	return NULL;
 }
 
 #define WERR_FRS_ERROR_INCOMPATIBLE_VERSION W_ERROR(0x0000235A)
@@ -313,6 +325,53 @@ out:
 	return r->out.result;
 }
 
+struct frstrans_session {
+	struct GUID connection_guid;
+	struct GUID content_set_guid;
+	struct frstrans_session *next;
+	struct frstrans_session *prev;
+};
+
+static struct frstrans_session *sessions = NULL;
+
+static void remove_frstrans_session(struct GUID *connection_guid,
+				    struct GUID *content_set_guid)
+{
+	struct frstrans_session *session = sessions;
+	while(session != NULL) {
+		if (memcmp(connection_guid, &(session->connection_guid), sizeof(struct GUID)) == 0 &&
+		    memcmp(content_set_guid, &(session->content_set_guid), sizeof(struct GUID)) == 0) {
+			struct frstrans_session *prev = session->prev;
+			struct frstrans_session *next = session->next;
+			if (prev) {
+				prev->next = next;
+			}
+			if (next) {
+				next->prev = prev;
+			}
+			TALLOC_FREE(session);
+			break;
+		}
+	}
+}
+
+static void push_frstrans_session(struct GUID *connection_guid,
+				  struct GUID *content_set_guid)
+{
+	struct frstrans_session *session = sessions;
+	if (session == NULL) {
+		sessions = talloc_zero(NULL, struct frstrans_session);
+		session = sessions;
+	} else {
+		remove_frstrans_session(connection_guid, content_set_guid);
+		for (; session->next; session = session->next) {}
+		session->next = talloc_zero(NULL, struct frstrans_session);
+		session->next->prev = session;
+		session = session->next;
+	}
+	memcpy(&(session->connection_guid), connection_guid, sizeof(struct GUID));
+	memcpy(&(session->content_set_guid), content_set_guid, sizeof(struct GUID));
+}
 
 /*
   frstrans_EstablishSession
@@ -320,7 +379,96 @@ out:
 static WERROR dcesrv_frstrans_EstablishSession(struct dcesrv_call_state *dce_call, TALLOC_CTX *mem_ctx,
 		       struct frstrans_EstablishSession *r)
 {
-	DCESRV_FAULT(DCERPC_FAULT_OP_RNG_ERROR);
+	WERROR ret = WERR_OK;
+	struct ldb_context *ldb;
+	struct ldb_dn *dn, *subscr_dn;
+	int ldbret;
+	struct ldb_result *res = NULL;
+	static const char *attrs[] = {
+		"distinguishedName",
+		NULL
+	};
+	static const char *subs_attrs[] = {
+		"msDFSR-ReadOnly",
+		"msDFSR-Enabled",
+		NULL
+	};
+	struct frstrans_connection *connection;
+	int read_only, enabled = 0;
+
+	ldb = samdb_connect(mem_ctx,
+			    dce_call->event_ctx,
+			    dce_call->conn->dce_ctx->lp_ctx,
+			    dce_call->conn->auth_state.session_info,
+			    dce_call->conn->remote_address,
+			    0);
+	if (ldb == NULL) {
+		ret = WERR_DS_UNAVAILABLE;
+		goto out;
+	}
+
+	/* [MS-FRS2] 3.2.4.1.3: If an outbound connection for the specified
+	   connection is not established between the client and server (see the
+	   EstablishConnection method) then the server MUST fail the call with
+	   the FRS_ERROR_CONNECTION_INVALID failure value.
+	*/
+	connection = fetch_frstrans_connection(&(r->in.connection_guid));
+	if (!connection) {
+		ret = WERR_FRS_ERROR_CONNECTION_INVALID;
+		goto out;
+	}
+
+	/* TODO: [MS-FRS2] 3.2.4.1.3: If the server is not currently participating in
+	   the replication of the specified replicated folder, then the server
+	   MUST fail the call with an implementation-defined failure value.
+	*/
+
+	/* [MS-FRS2] 3.2.4.1.3: If the specified replicated folder is read-only
+	   then the server MUST fail the call with the
+	   FRS_ERROR_CONTENTSET_READ_ONLY failure value.
+	*/
+	dn = ldb_dn_new_fmt(mem_ctx, ldb, "CN=DFSR-LocalSettings,%s",
+			    host_dn(ldb, dce_call->conn->dce_ctx->lp_ctx, mem_ctx));
+
+	ldbret = ldb_search(ldb, mem_ctx, &res, dn, LDB_SCOPE_SUBTREE, attrs,
+			    "(objectClass=msDFSR-Subscriber)");
+	if (ldbret != LDB_SUCCESS || res->count != 1) {
+		ret = WERR_FRS_ERROR_CONNECTION_INVALID;
+		goto out;
+	}
+	subscr_dn = ldb_dn_new(mem_ctx, ldb, ldb_msg_find_attr_as_string(
+			       res->msgs[0], "distinguishedName", ""));
+
+	ldbret = ldb_search(ldb, mem_ctx, &res, subscr_dn, LDB_SCOPE_SUBTREE,
+			    subs_attrs, "(objectClass=msDFSR-Subscription)");
+	if (ldbret != LDB_SUCCESS || res->count != 1) {
+		ret = WERR_FRS_ERROR_CONNECTION_INVALID;
+		goto out;
+	}
+
+	enabled = ldb_msg_find_attr_as_bool(res->msgs[0], "msDFSR-Enabled", 0);
+	read_only = ldb_msg_find_attr_as_bool(res->msgs[0],
+					      "msDFSR-ReadOnly",
+					      0);
+	if (read_only) {
+		ret = WERR_FRS_ERROR_CONTENTSET_READ_ONLY;
+		goto out;
+	}
+
+	/* [MS-FRS2] 3.2.4.1.3: If the specified replicated folder is disabled
+	   then the server MUST fail the call with an implementation-defined
+	   failure value.
+	*/
+	if (!enabled) {
+		ret = WERR_FRS_ERROR_CONNECTION_INVALID;
+		goto out;
+	}
+
+	push_frstrans_session(&(r->in.connection_guid), &(r->in.content_set_guid));
+
+out:
+	r->out.result = ret;
+	return r->out.result;
 }
 
 
