@@ -6,6 +6,6 @@ bld.SAMBA_SUBSYSTEM('LZXPRESS',
 	)
 
 bld.SAMBA_SUBSYSTEM('LZHUFFXPRESS',
-        deps='replace',
-	source='lzhuff_xpress.c'
+        deps='talloc replace',
+	source='lzhuff_xpress.c xpress_huff_compress.c'
 	)

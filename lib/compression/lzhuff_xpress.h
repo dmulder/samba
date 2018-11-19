@@ -40,4 +40,9 @@ ssize_t lzhuff_xpress_decompress(const uint8_t *input,
 				uint8_t *output,
 				uint32_t max_output_size);
 
+int lzhuff_xpress_compress(const uint8_t* in,
+			   size_t in_len,
+			   uint8_t* out,
+			   size_t* _out_len);
+
 #endif /* _LZHUFF_XPRESS_H */
