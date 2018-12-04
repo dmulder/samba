@@ -144,9 +144,9 @@ out:
 /*
  * startup the dfsr service task
  */
-static void dfsrsrv_task_init(struct task_server *task)
+static NTSTATUS dfsrsrv_task_init(struct task_server *task)
 {
-	NTSTATUS status;
+	NTSTATUS status = NT_STATUS_OK;
 	struct dfsrsrv_service *service;
 	uint32_t periodic_startup_interval;
 
@@ -156,18 +156,18 @@ static void dfsrsrv_task_init(struct task_server *task)
 	case ROLE_STANDALONE:
 		task_server_terminate(task, "dfsrsrv: no dfsr required in "
 				      "standalone configuration", false);
-		return;
+		return status;
 	case ROLE_DOMAIN_MEMBER:
 		/*
 		 * FIXME To be implemented
 		 */
 		task_server_terminate(task, "dfsrsrv: no dfsr required in "
 				      "domain member configuration", false);
-		return;
+		return status;
 	default:
 		task_server_terminate(task, "dfsrsrv: unknown server role, "
 				      "stopping service", false);
-		return;
+		return status;
 	}
 
 	/* FIXME Check domain level > 2008 */
@@ -178,7 +178,7 @@ static void dfsrsrv_task_init(struct task_server *task)
 	if (!service) {
 		task_server_terminate(task,
 			"dfsrsrv_task_init: no memory", true);
-		return;
+		return status;
 	}
 	service->task		= task;
 	service->startup_time	= timeval_current();
@@ -189,7 +189,7 @@ static void dfsrsrv_task_init(struct task_server *task)
 		task_server_terminate(task, talloc_asprintf(task,
 			"dfsrsrv: Failed to obtain server credentials: %s\n",
 			nt_errstr(status)), true);
-		return;
+		return status;
 	}
 
 	status = dfsrsrv_connect_dbs(service, task->lp_ctx);
@@ -197,7 +197,7 @@ static void dfsrsrv_task_init(struct task_server *task)
 		task_server_terminate(task, talloc_asprintf(task,
 			"dfsrsrv: Failed to connect to database: %s\n",
 			nt_errstr(status)), true);
-		return;
+		return status;
 	}
 
 	status = dfsrsrv_init_local_settings(service);
@@ -205,7 +205,7 @@ static void dfsrsrv_task_init(struct task_server *task)
 		task_server_terminate(task, talloc_asprintf(task,
 			"dfsrsrv: Failed to init DFS-R local settings: %s\n",
 			nt_errstr(status)), true);
-		return;
+		return status;
 	}
 
 	status = dfsrsrv_sysvol_subscription_check(service);
@@ -213,7 +213,7 @@ static void dfsrsrv_task_init(struct task_server *task)
 		task_server_terminate(task, talloc_asprintf(task,
 			"dfsrsrv: Failed to subscribe to sysvol replication "
 			"group: %s\n", nt_errstr(status)), true);
-		return;
+		return status;
 	}
 
 	service->meet_notify_ctx = dfsrsrv_meet_notify_init(service,
@@ -221,7 +221,7 @@ static void dfsrsrv_task_init(struct task_server *task)
 	if (service->meet_notify_ctx == NULL) {
 		task_server_terminate(task,
 			"dfsrsrv: Failed to init messaging context\n", true);
-		return;
+		return status;
 	}
 
 	periodic_startup_interval = lpcfg_parm_int(task->lp_ctx, NULL,
@@ -238,7 +238,7 @@ static void dfsrsrv_task_init(struct task_server *task)
 		task_server_terminate(task, talloc_asprintf(task,
 			"dfsrsrv: Failed to periodic schedule: %s\n",
 			nt_errstr(status)), true);
-		return;
+		return status;
 	}
 
 	service->pending.im = tevent_create_immediate(service);
@@ -247,8 +247,10 @@ static void dfsrsrv_task_init(struct task_server *task)
 				      "dfsrsrv: Failed to create immediate "
 				      "task for processing updates\n",
 				      true);
-		return;
+		return status;
 	}
+
+	return status;
 }
 
 /*
@@ -259,7 +261,7 @@ NTSTATUS server_service_dfsr_init(TALLOC_CTX *ctx)
 	struct service_details details = {
 		.inhibit_fork_on_accept = true,
 		.inhibit_pre_fork = true,
+		.task_init = dfsrsrv_task_init,
 	};
-	return register_server_service(ctx, "dfsr", dfsrsrv_task_init,
-				       &details);
+	return register_server_service(ctx, "dfsr", &details);
 }
