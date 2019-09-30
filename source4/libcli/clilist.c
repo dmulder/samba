@@ -23,6 +23,7 @@
 #include "libcli/raw/libcliraw.h"
 #include "libcli/raw/raw_proto.h"
 
+#if 0
 struct search_private {
 	struct clilist_file_info *dirlist;
 	TALLOC_CTX *mem_ctx;
@@ -348,7 +349,10 @@ int smbcli_list_old(struct smbcli_tree *tree, const char *Mask, uint16_t attribu
 int smbcli_list(struct smbcli_tree *tree, const char *Mask,uint16_t attribute, 
 		void (*fn)(struct clilist_file_info *, const char *, void *), void *state)
 {
+#if 0
 	if (tree->session->transport->negotiate.protocol <= PROTOCOL_LANMAN1)
 		return smbcli_list_old(tree, Mask, attribute, fn, state);
+#endif
 	return smbcli_list_new(tree, Mask, attribute, RAW_SEARCH_DATA_GENERIC, fn, state);
 }
+#endif

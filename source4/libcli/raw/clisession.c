@@ -25,6 +25,7 @@
 #include "system/filesys.h"
 #include "../libcli/smb/smbXcli_base.h"
 
+#if 0
 #define SETUP_REQUEST_SESSION(cmd, wct, buflen) do { \
 	req = smbcli_request_setup_session(session, cmd, wct, buflen); \
 	if (!req) return NULL; \
@@ -308,3 +309,4 @@ _PUBLIC_ NTSTATUS smb_raw_exit(struct smbcli_session *session)
 	struct smbcli_request *req = smb_raw_exit_send(session);
 	return smbcli_request_simple_recv(req);
 }
+#endif

@@ -911,14 +911,18 @@ struct tevent_req *cli_list_send(TALLOC_CTX *mem_ctx,
 		return NULL;
 	}
 
+#if 0
 	if (smbXcli_conn_protocol(cli->conn) <= PROTOCOL_LANMAN1) {
 		subreq = cli_list_old_send(state, ev, cli, mask, attribute);
 		state->recv_fn = cli_list_old_recv;
 	} else {
+#endif
 		subreq = cli_list_trans_send(state, ev, cli, mask, attribute,
 					     info_level);
 		state->recv_fn = cli_list_trans_recv;
+#if 0
 	}
+#endif
 	if (tevent_req_nomem(subreq, req)) {
 		return tevent_req_post(req, ev);
 	}

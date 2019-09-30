@@ -24,6 +24,7 @@
 #include "libcli/raw/raw_proto.h"
 #include "librpc/gen_ndr/ndr_security.h"
 
+#if 0
 #define SETUP_REQUEST(cmd, wct, buflen) do { \
 	req = smbcli_request_setup(tree, cmd, wct, buflen); \
 	if (!req) return NULL; \
@@ -1050,3 +1051,4 @@ _PUBLIC_ NTSTATUS smb_raw_seek(struct smbcli_tree *tree,
 	struct smbcli_request *req = smb_raw_seek_send(tree, parms);
 	return smb_raw_seek_recv(req, parms);
 }
+#endif

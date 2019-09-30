@@ -80,6 +80,7 @@ static void continue_smb_open(struct composite_context *c);
 static void continue_smb2_connect(struct tevent_req *subreq);
 static void continue_smbXcli_connect(struct tevent_req *subreq);
 
+#if 0
 /*
   Stage 2 of ncacn_np_smb: Open a named pipe after successful smb connection
 */
@@ -107,6 +108,7 @@ static void continue_smb_connect(struct composite_context *ctx)
 
 	continue_smb_open(c);
 }
+#endif
 
 static void continue_smb_open(struct composite_context *c)
 {
@@ -206,9 +208,11 @@ static struct composite_context *dcerpc_pipe_connect_ncacn_np_smb_send(TALLOC_CT
 		if (conn->in.options.max_protocol < PROTOCOL_SMB2_02) {
 			conn->in.options.max_protocol = PROTOCOL_LATEST;
 		}
+#if 0
 	} else if (flags & DCERPC_SMB1) {
 		conn->in.options.min_protocol = PROTOCOL_NT1;
 		conn->in.options.max_protocol = PROTOCOL_NT1;
+#endif
 	} else {
 		/* auto */
 	}
@@ -258,7 +262,9 @@ static void continue_smbXcli_connect(struct tevent_req *subreq)
 		talloc_get_type_abort(c->private_data,
 		struct pipe_np_smb_state);
 	struct smb_composite_connect *conn = &s->conn;
+#if 0
 	struct composite_context *creq = NULL;
+#endif
 	enum protocol_types protocol;
 
 	c->status = smb_connect_nego_recv(subreq, s,
@@ -289,6 +295,7 @@ static void continue_smbXcli_connect(struct tevent_req *subreq)
 		return;
 	}
 
+#if 0
 	/*
 	 * continue with smb1 session setup/tree connect
 	 * on the established connection.
@@ -299,6 +306,7 @@ static void continue_smbXcli_connect(struct tevent_req *subreq)
 	if (composite_nomem(creq, c)) return;
 
 	composite_continue(c, creq, continue_smb_connect, c);
+#endif
 	return;
 }
 

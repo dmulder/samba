@@ -713,8 +713,8 @@ sub provision_raw_step1($$)
 	log level = $ctx->{server_loglevel}
 	lanman auth = Yes
 	ntlm auth = Yes
-	client min protocol = CORE
-	server min protocol = LANMAN1
+	client min protocol = SMB2
+	server min protocol = SMB2
 	mangled names = yes
 	dns update command = $ctx->{samba_dnsupdate}
 	spn update command = $ctx->{python} $ENV{SRCDIR_ABS}/source4/scripting/bin/samba_spnupdate -s $ctx->{smb_conf}
@@ -1051,6 +1051,7 @@ sub provision($$$$$$$$$$)
 	$ctx->{smb_conf_extra_options} = "
 
 	max xmit = 32K
+	server min protocol = SMB2
 	server max protocol = SMB2
 	host msdfs = $msdfs
 	lanman auth = yes
@@ -1336,6 +1337,7 @@ sub provision_promoted_dc($$$)
 
 	$ctx->{smb_conf_extra_options} = "
 	max xmit = 32K
+	server min protocol = SMB2
 	server max protocol = SMB2
 
         ntlm auth = ntlmv2-only
@@ -1411,6 +1413,7 @@ sub provision_vampire_dc($$$)
 
 	$ctx->{smb_conf_extra_options} = "
 	max xmit = 32K
+	server min protocol = SMB2
 	server max protocol = SMB2
 
         ntlm auth = mschapv2-and-ntlmv2-only
@@ -1652,6 +1655,7 @@ sub provision_rodc($$$)
 
 	$ctx->{smb_conf_extra_options} = "
 	max xmit = 32K
+	server min protocol = SMB2
 	server max protocol = SMB2
 	password server = $dcvars->{DC_SERVER}
 
@@ -1775,6 +1779,7 @@ sub provision_ad_dc($$$$$$)
 	printing = bsd
 	printcap name = /dev/null
 
+	min protocol = SMB2
 	max protocol = SMB3
 	read only = no
 
@@ -2821,6 +2826,7 @@ sub prepare_dc_testenv
 	$ctx->{smb_conf_extra_options} = "
 	$conf_options
 	max xmit = 32K
+	server min protocol = SMB2
 	server max protocol = SMB2
 	samba kcc command = /bin/true
 	xattr_tdb:file = $ctx->{statedir}/xattr.tdb

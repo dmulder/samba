@@ -35,9 +35,11 @@ NTSTATUS smb_raw_negotiate_fill_transport(struct smbcli_transport *transport)
 	NTTIME ntt;
 
 	n->protocol = smbXcli_conn_protocol(c);
+#if 0
 	if (n->protocol > PROTOCOL_NT1) {
 		return NT_STATUS_REVISION_MISMATCH;
 	}
+#endif
 
 	n->sec_mode = smb1cli_conn_server_security_mode(c);
 	n->max_mux  = smbXcli_conn_max_requests(c);
@@ -93,9 +95,11 @@ struct tevent_req *smb_raw_negotiate_send(TALLOC_CTX *mem_ctx,
 	}
 	state->transport = transport;
 
+#if 0
 	if (maxprotocol > PROTOCOL_NT1) {
 		maxprotocol = PROTOCOL_NT1;
 	}
+#endif
 
 	if (minprotocol > maxprotocol) {
 		minprotocol = maxprotocol;

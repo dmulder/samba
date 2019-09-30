@@ -21,6 +21,7 @@
 #include "libcli/raw/libcliraw.h"
 #include "libcli/raw/raw_proto.h"
 
+#if 0
 /****************************************************************************
 send an ack for an oplock break request
 ****************************************************************************/
@@ -64,3 +65,4 @@ _PUBLIC_ void smbcli_oplock_handler(struct smbcli_transport *transport,
 	transport->oplock.handler = handler;
 	transport->oplock.private_data = private_data;
 }
+#endif

@@ -26,6 +26,7 @@
 #include "libcli/composite/composite.h"
 #include "libcli/smb_composite/smb_composite.h"
 
+#if 0
 /* the stages of this call */
 enum savefile_stage {SAVEFILE_OPEN, SAVEFILE_WRITE, SAVEFILE_CLOSE};
 
@@ -286,3 +287,4 @@ NTSTATUS smb_composite_savefile(struct smbcli_tree *tree,
 	struct composite_context *c = smb_composite_savefile_send(tree, io);
 	return smb_composite_savefile_recv(c);
 }
+#endif

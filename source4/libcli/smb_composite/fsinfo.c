@@ -9,6 +9,7 @@
 #include "libcli/smb_composite/smb_composite.h"
 #include "libcli/resolve/resolve.h"
 
+#if 0
 /* the stages of this call */
 enum fsinfo_stage {FSINFO_CONNECT, FSINFO_QUERY};
 
@@ -212,3 +213,4 @@ NTSTATUS smb_composite_fsinfo(struct smbcli_tree *tree,
 	return smb_composite_fsinfo_recv(c, mem_ctx);
 }
 
+#endif

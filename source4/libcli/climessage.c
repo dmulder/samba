@@ -24,6 +24,7 @@
 #include "libcli/libcli.h"
 
 
+#if 0
 /****************************************************************************
 start a message sequence
 ****************************************************************************/
@@ -102,3 +103,4 @@ bool smbcli_message_end(struct smbcli_tree *tree, int grp)
 	return true;
 }      
 
+#endif

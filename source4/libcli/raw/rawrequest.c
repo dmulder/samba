@@ -36,6 +36,7 @@
 /* assume that a character will not consume more than 3 bytes per char */
 #define MAX_BYTES_PER_CHAR 3
 
+#if 0
 /* setup the bufinfo used for strings and range checking */
 void smb_setup_bufinfo(struct smbcli_request *req)
 {
@@ -751,6 +752,7 @@ bool smbcli_raw_pull_data(struct request_bufinfo *bufinfo, const uint8_t *src, i
 	memcpy(dest, src, len);
 	return true;
 }
+#endif
 
 
 /*

@@ -24,6 +24,7 @@
 #include "libcli/raw/raw_proto.h"
 #include "../libcli/smb/smbXcli_base.h"
 
+#if 0
 static void smb_raw_trans_backend_done(struct tevent_req *subreq);
 
 static struct smbcli_request *smb_raw_trans_backend_send(struct smbcli_tree *tree,
@@ -444,3 +445,4 @@ NTSTATUS smb_raw_nttrans(struct smbcli_tree *tree,
 
 	return smb_raw_nttrans_recv(req, mem_ctx, parms);
 }
+#endif

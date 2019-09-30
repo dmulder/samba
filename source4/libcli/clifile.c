@@ -24,6 +24,7 @@
 #include "libcli/raw/libcliraw.h"
 #include "libcli/libcli.h"
 
+#if 0
 /****************************************************************************
  Hard/Symlink a file (UNIX extensions).
 ****************************************************************************/
@@ -673,3 +674,4 @@ int smbcli_ctemp(struct smbcli_tree *tree, const char *path, char **tmp_path)
 	talloc_free(mem_ctx);
 	return ret;
 }
+#endif

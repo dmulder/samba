@@ -144,6 +144,7 @@ bool smb_raw_setfileinfo_passthru(TALLOC_CTX *mem_ctx,
 	return false;
 }
 
+#if 0
 /*
   Handle setfileinfo/setpathinfo trans2 backend.
 */
@@ -490,3 +491,4 @@ _PUBLIC_ NTSTATUS smb_raw_setpathinfo(struct smbcli_tree *tree,
 	struct smbcli_request *req = smb_raw_setpathinfo_send(tree, parms);
 	return smbcli_request_simple_recv(req);
 }
+#endif

@@ -3470,9 +3470,11 @@ int lpcfg_client_ipc_min_protocol(struct loadparm_context *lp_ctx)
 	if (client_ipc_min_protocol == PROTOCOL_DEFAULT) {
 		client_ipc_min_protocol = lpcfg_client_min_protocol(lp_ctx);
 	}
+#if 0
 	if (client_ipc_min_protocol < PROTOCOL_NT1) {
 		return PROTOCOL_NT1;
 	}
+#endif
 	return client_ipc_min_protocol;
 }
 
@@ -3482,9 +3484,11 @@ int lpcfg_client_ipc_max_protocol(struct loadparm_context *lp_ctx)
 	if (client_ipc_max_protocol == PROTOCOL_DEFAULT) {
 		return PROTOCOL_LATEST;
 	}
+#if 0
 	if (client_ipc_max_protocol < PROTOCOL_NT1) {
 		return PROTOCOL_NT1;
 	}
+#endif
 	return client_ipc_max_protocol;
 }
 

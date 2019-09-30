@@ -23,6 +23,7 @@
 #include "smb_common.h"
 #include "smbXcli_base.h"
 
+#if 0
 struct smb1cli_writex_state {
 	uint32_t size;
 	uint16_t vwv[14];
@@ -282,3 +283,4 @@ done:
 	TALLOC_FREE(frame);
 	return status;
 }
+#endif

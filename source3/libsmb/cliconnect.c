@@ -785,7 +785,9 @@ static bool cli_sesssetup_blob_next(struct cli_sesssetup_blob_state *state,
 		if (subreq == NULL) {
 			return false;
 		}
-	} else {
+	}
+#if 0
+	else {
 		uint16_t in_buf_size = 0;
 		uint16_t in_mpx_max = 0;
 		uint16_t in_vc_num = 0;
@@ -828,6 +830,7 @@ static bool cli_sesssetup_blob_next(struct cli_sesssetup_blob_state *state,
 			return false;
 		}
 	}
+#endif
 	*psubreq = subreq;
 	return true;
 }
@@ -844,7 +847,9 @@ static void cli_sesssetup_blob_done(struct tevent_req *subreq)
 		status = smb2cli_session_setup_recv(subreq, state,
 						    &state->recv_iov,
 						    &state->ret_blob);
-	} else {
+	}
+#if 0
+	else {
 		status = smb1cli_session_setup_ext_recv(subreq, state,
 							&state->recv_iov,
 							&state->inbuf,
@@ -852,6 +857,7 @@ static void cli_sesssetup_blob_done(struct tevent_req *subreq)
 							&state->out_native_os,
 							&state->out_native_lm);
 	}
+#endif
 	TALLOC_FREE(subreq);
 	if (!NT_STATUS_IS_OK(status)
 	    && !NT_STATUS_EQUAL(status, NT_STATUS_MORE_PROCESSING_REQUIRED)) {
@@ -935,6 +941,7 @@ struct cli_session_setup_gensec_state {
 	DATA_BLOB session_key;
 };
 
+#if 0
 static int cli_session_setup_gensec_state_destructor(
 	struct cli_session_setup_gensec_state *state)
 {
@@ -942,6 +949,7 @@ static int cli_session_setup_gensec_state_destructor(
 	data_blob_clear_free(&state->session_key);
 	return 0;
 }
+#endif
 
 static void cli_session_setup_gensec_local_next(struct tevent_req *req);
 static void cli_session_setup_gensec_local_done(struct tevent_req *subreq);
@@ -949,6 +957,7 @@ static void cli_session_setup_gensec_remote_next(struct tevent_req *req);
 static void cli_session_setup_gensec_remote_done(struct tevent_req *subreq);
 static void cli_session_setup_gensec_ready(struct tevent_req *req);
 
+#if 0
 static struct tevent_req *cli_session_setup_gensec_send(
 	TALLOC_CTX *mem_ctx, struct tevent_context *ev, struct cli_state *cli,
 	struct cli_credentials *creds,
@@ -1030,6 +1039,7 @@ static struct tevent_req *cli_session_setup_gensec_send(
 
 	return req;
 }
+#endif
 
 static void cli_session_setup_gensec_local_next(struct tevent_req *req)
 {
@@ -1321,6 +1331,7 @@ static void cli_session_setup_gensec_ready(struct tevent_req *req)
 	tevent_req_done(req);
 }
 
+#if 0
 static NTSTATUS cli_session_setup_gensec_recv(struct tevent_req *req)
 {
 	struct cli_session_setup_gensec_state *state =
@@ -1334,6 +1345,7 @@ static NTSTATUS cli_session_setup_gensec_recv(struct tevent_req *req)
 	}
 	return NT_STATUS_OK;
 }
+#endif
 
 static char *cli_session_setup_get_account(TALLOC_CTX *mem_ctx,
 					   const char *principal)
@@ -1362,6 +1374,7 @@ struct cli_session_setup_spnego_state {
 	ADS_STATUS result;
 };
 
+#if 0
 static void cli_session_setup_spnego_done(struct tevent_req *subreq);
 
 static struct tevent_req *cli_session_setup_spnego_send(
@@ -1429,6 +1442,7 @@ static ADS_STATUS cli_session_setup_spnego_recv(struct tevent_req *req)
 
 	return state->result;
 }
+#endif
 
 struct cli_session_setup_creds_state {
 	struct cli_state *cli;
@@ -1441,6 +1455,7 @@ struct cli_session_setup_creds_state {
 	char *out_primary_domain;
 };
 
+#if 0
 static void cli_session_setup_creds_cleanup(struct tevent_req *req,
 					    enum tevent_req_state req_state)
 {
@@ -1536,9 +1551,12 @@ struct tevent_req *cli_session_setup_creds_send(TALLOC_CTX *mem_ctx,
 	 * do. I have split this into separate functions to make the flow a bit
 	 * easier to understand (tridge).
 	 */
+#if 0
 	if (smbXcli_conn_protocol(cli->conn) < PROTOCOL_NT1) {
 		use_spnego = false;
-	} else if (smbXcli_conn_protocol(cli->conn) >= PROTOCOL_SMB2_02) {
+	} else
+#endif
+	if (smbXcli_conn_protocol(cli->conn) >= PROTOCOL_SMB2_02) {
 		use_spnego = true;
 	} else if (smb1cli_conn_capabilities(cli->conn) & CAP_EXTENDED_SECURITY) {
 		/*
@@ -1561,6 +1579,7 @@ struct tevent_req *cli_session_setup_creds_send(TALLOC_CTX *mem_ctx,
 		return req;
 	}
 
+#if 0
 	if (smbXcli_conn_protocol(cli->conn) < PROTOCOL_LANMAN1) {
 		/*
 		 * SessionSetupAndX was introduced by LANMAN 1.0. So we skip
@@ -1569,6 +1588,7 @@ struct tevent_req *cli_session_setup_creds_send(TALLOC_CTX *mem_ctx,
 		tevent_req_done(req);
 		return tevent_req_post(req, ev);
 	}
+#endif
 
 	if (cli_credentials_is_anonymous(creds)) {
 		/*
@@ -1639,6 +1659,7 @@ struct tevent_req *cli_session_setup_creds_send(TALLOC_CTX *mem_ctx,
 
 	challenge = data_blob_const(smb1cli_conn_server_challenge(cli->conn), 8);
 
+#if 0
 	if (smbXcli_conn_protocol(cli->conn) == PROTOCOL_NT1) {
 		if (lp_client_ntlmv2_auth() && lp_client_use_spnego()) {
 			/*
@@ -1673,7 +1694,9 @@ struct tevent_req *cli_session_setup_creds_send(TALLOC_CTX *mem_ctx,
 				flags |= CLI_CRED_LANMAN_AUTH;
 			}
 		}
-	} else {
+	} else
+#endif
+	{
 		if (!lp_client_lanman_auth()) {
 			DEBUG(1, ("Server requested user level LM password but "
 				  "'client lanman auth = no' is set.\n"));
@@ -1704,6 +1727,7 @@ non_spnego_creds_done:
 	in_native_os = "Unix";
 	in_native_lm = "Samba";
 
+#if 0
 	if (smbXcli_conn_protocol(cli->conn) == PROTOCOL_NT1) {
 		uint32_t in_capabilities = 0;
 
@@ -1738,6 +1762,7 @@ non_spnego_creds_done:
 					req);
 		return req;
 	}
+#endif
 
 	/*
 	 * For now we keep the same values as before,
@@ -1869,12 +1894,14 @@ static void cli_session_setup_creds_done_lm21(struct tevent_req *subreq)
 
 	tevent_req_done(req);
 }
+#endif
 
 NTSTATUS cli_session_setup_creds_recv(struct tevent_req *req)
 {
 	return tevent_req_simple_recv_ntstatus(req);
 }
 
+#if 0
 NTSTATUS cli_session_setup_creds(struct cli_state *cli,
 				 struct cli_credentials *creds)
 {
@@ -1920,6 +1947,7 @@ NTSTATUS cli_session_setup_anon(struct cli_state *cli)
 
 	return NT_STATUS_OK;
 }
+#endif
 
 /****************************************************************************
  Send a uloggoff.
@@ -2259,7 +2287,7 @@ static void cli_tcon_andx_done(struct tevent_req *subreq)
 		}
 	}
 
-	if ((smbXcli_conn_protocol(cli->conn) >= PROTOCOL_NT1) && (num_bytes == 3)) {
+	if ((smbXcli_conn_protocol(cli->conn) >= PROTOCOL_SMB2_02) && (num_bytes == 3)) {
 		/* almost certainly win95 - enable bug fixes */
 		cli->win95 = True;
 	}
@@ -2269,7 +2297,7 @@ static void cli_tcon_andx_done(struct tevent_req *subreq)
 	 * Avoids issues when connecting to Win9x boxes sharing files
 	 */
 
-	if ((wct > 2) && (smbXcli_conn_protocol(cli->conn) >= PROTOCOL_LANMAN2)) {
+	if ((wct > 2) && (smbXcli_conn_protocol(cli->conn) >= PROTOCOL_SMB2_02)) {
 		optional_support = SVAL(vwv+2, 0);
 	}
 
@@ -2396,7 +2424,7 @@ static struct tevent_req *cli_tree_connect_send(
 		return req;
 	}
 
-	if (smbXcli_conn_protocol(cli->conn) >= PROTOCOL_LANMAN1) {
+	if (smbXcli_conn_protocol(cli->conn) >= PROTOCOL_SMB2_02) {
 		subreq = cli_tcon_andx_send(state, ev, cli, share, dev,
 					    pass, passlen);
 		if (tevent_req_nomem(subreq, req)) {
@@ -2873,14 +2901,18 @@ static struct tevent_req *cli_start_connection_send(
 		state->max_protocol = lp_client_max_protocol();
 	}
 
+#if 0
 	if (flags & CLI_FULL_CONNECTION_FORCE_SMB1) {
 		state->max_protocol = MIN(state->max_protocol, PROTOCOL_NT1);
 	}
 
 	if (flags & CLI_FULL_CONNECTION_DISABLE_SMB1) {
+#endif
 		state->min_protocol = MAX(state->max_protocol, PROTOCOL_SMB2_02);
 		state->max_protocol = MAX(state->max_protocol, PROTOCOL_LATEST);
+#if 0
 	}
+#endif
 
 	subreq = cli_connect_nb_send(state, ev, dest_host, dest_ss, port,
 				     0x20, my_name, signing_state, flags);
@@ -2990,6 +3022,7 @@ struct cli_smb1_setup_encryption_blob_state {
 	uint16_t enc_ctx_id;
 };
 
+#if 0
 static void cli_smb1_setup_encryption_blob_done(struct tevent_req *subreq);
 
 static struct tevent_req *cli_smb1_setup_encryption_blob_send(TALLOC_CTX *mem_ctx,
@@ -3395,6 +3428,7 @@ NTSTATUS cli_smb1_setup_encryption(struct cli_state *cli,
 	TALLOC_FREE(ev);
 	return status;
 }
+#endif
 
 /**
    establishes a connection right up to doing tconX, password specified.
@@ -3416,6 +3450,7 @@ struct cli_full_connection_creds_state {
 	struct cli_state *cli;
 };
 
+#if 0
 static int cli_full_connection_creds_state_destructor(
 	struct cli_full_connection_creds_state *s)
 {
@@ -3707,6 +3742,7 @@ NTSTATUS cli_full_connection(struct cli_state **output_cli,
 	TALLOC_FREE(frame);
 	return NT_STATUS_OK;
 }
+#endif
 
 /****************************************************************************
  Send an old style tcon.
@@ -3827,6 +3863,7 @@ fail:
 
 /* Return a cli_state pointing at the IPC$ share for the given server */
 
+#if 0
 struct cli_state *get_ipc_connect(char *server,
 				struct sockaddr_storage *server_ss,
 				const struct user_auth_info *user_info)
@@ -3966,3 +4003,4 @@ struct cli_state *get_ipc_connect_master_ip_bcast(TALLOC_CTX *ctx,
 
 	return NULL;
 }
+#endif

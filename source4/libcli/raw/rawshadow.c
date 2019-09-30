@@ -24,6 +24,7 @@
 #include "libcli/raw/raw_proto.h"
 #include "../libcli/smb/smb_constants.h"
 
+#if 0
 /* 
    get shadow volume data
 */
@@ -80,3 +81,4 @@ _PUBLIC_ NTSTATUS smb_raw_shadow_data(struct smbcli_tree *tree,
 	
 	return status;
 }
+#endif

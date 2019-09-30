@@ -24,6 +24,7 @@
 #include "smb_common.h"
 #include "smbXcli_base.h"
 
+#if 0
 struct smb1cli_close_state {
 	uint16_t vwv[3];
 };
@@ -186,3 +187,4 @@ done:
 	talloc_free(frame);
 	return status;
 }
+#endif

@@ -23,6 +23,7 @@
 #include "async_smb.h"
 #include "../libcli/smb/smbXcli_base.h"
 
+#if 0
 struct cli_trans_state {
 	struct cli_state *cli;
 	struct tevent_req *subreq;
@@ -222,3 +223,4 @@ fail:
 	TALLOC_FREE(frame);
 	return status;
 }
+#endif

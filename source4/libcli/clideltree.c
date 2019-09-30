@@ -22,6 +22,7 @@
 #include "libcli/libcli.h"
 #include "system/dir.h"
 
+#if 0
 struct delete_state {
 	struct smbcli_tree *tree;
 	int total_deleted;
@@ -144,3 +145,4 @@ int smbcli_deltree(struct smbcli_tree *tree, const char *dname)
 
 	return dstate.total_deleted;
 }
+#endif

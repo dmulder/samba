@@ -22,6 +22,7 @@
 #include "libcli/raw/libcliraw.h"
 #include "libcli/raw/raw_proto.h"
 
+#if 0
 /****************************************************************************
  Old style search backend - process output.
 ****************************************************************************/
@@ -323,6 +324,7 @@ static NTSTATUS smb_raw_search_next_blob(struct smbcli_tree *tree,
 
 	return NT_STATUS_OK;
 }
+#endif
 
 
 /*
@@ -475,6 +477,7 @@ NTSTATUS smb_raw_search_common(TALLOC_CTX *mem_ctx,
 }
 
 
+#if 0
 /*
   parse a trans2 search response. 
   Return the number of bytes consumed
@@ -840,3 +843,4 @@ NTSTATUS smb_raw_search_close(struct smbcli_tree *tree,
 
 	return smbcli_request_destroy(req);
 }
+#endif

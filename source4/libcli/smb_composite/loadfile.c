@@ -25,6 +25,7 @@
 #include "libcli/composite/composite.h"
 #include "libcli/smb_composite/smb_composite.h"
 
+#if 0
 /* the stages of this call */
 enum loadfile_stage {LOADFILE_OPEN, LOADFILE_READ, LOADFILE_CLOSE};
 
@@ -291,3 +292,4 @@ NTSTATUS smb_composite_loadfile(struct smbcli_tree *tree,
 	return smb_composite_loadfile_recv(c, mem_ctx);
 }
 
+#endif

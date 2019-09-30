@@ -24,6 +24,7 @@
 #include "libcli/raw/raw_proto.h"
 #include "librpc/gen_ndr/ndr_misc.h"
 
+#if 0
 /****************************************************************************
  Query FS Info - SMBdskattr call (async send)
 ****************************************************************************/
@@ -114,6 +115,7 @@ static NTSTATUS smb_raw_qfsinfo_blob_recv(struct smbcli_request *req,
 
 	return status;
 }
+#endif
 
 
 /* local macros to make the code more readable */
@@ -131,6 +133,7 @@ static NTSTATUS smb_raw_qfsinfo_blob_recv(struct smbcli_request *req,
 }
 
 
+#if 0
 /****************************************************************************
  Query FSInfo raw interface (async send)
 ****************************************************************************/
@@ -153,6 +156,7 @@ struct smbcli_request *smb_raw_fsinfo_send(struct smbcli_tree *tree,
 
 	return smb_raw_qfsinfo_send(tree, mem_ctx, info_level);
 }
+#endif
 
 /*
   parse the fsinfo 'passthru' level replies
@@ -254,6 +258,7 @@ failed:
 }
 
 
+#if 0
 /****************************************************************************
  Query FSInfo raw interface (async recv)
 ****************************************************************************/
@@ -429,3 +434,4 @@ _PUBLIC_ NTSTATUS smb_raw_setfsinfo(struct smbcli_tree *tree,
 	struct smbcli_request *req = smb_raw_setfsinfo_send(tree, mem_ctx, set_fsinfo);
 	return smb_raw_setfsinfo_recv(req, mem_ctx, set_fsinfo);
 }
+#endif

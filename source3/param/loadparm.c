@@ -4457,9 +4457,11 @@ bool lp_use_sendfile(int snum, struct smb_signing_state *signing_state)
 	bool sign_active = false;
 
 	/* Using sendfile blows the brains out of any DOS or Win9x TCP stack... JRA. */
+#if 0
 	if (get_Protocol() < PROTOCOL_NT1) {
 		return false;
 	}
+#endif
 	if (signing_state) {
 		sign_active = smb_signing_is_active(signing_state);
 	}
@@ -4607,9 +4609,11 @@ int lp_client_ipc_min_protocol(void)
 	if (client_ipc_min_protocol == PROTOCOL_DEFAULT) {
 		client_ipc_min_protocol = lp_client_min_protocol();
 	}
+#if 0
 	if (client_ipc_min_protocol < PROTOCOL_NT1) {
 		return PROTOCOL_NT1;
 	}
+#endif
 	return client_ipc_min_protocol;
 }
 
@@ -4619,9 +4623,11 @@ int lp_client_ipc_max_protocol(void)
 	if (client_ipc_max_protocol == PROTOCOL_DEFAULT) {
 		return PROTOCOL_LATEST;
 	}
+#if 0
 	if (client_ipc_max_protocol < PROTOCOL_NT1) {
 		return PROTOCOL_NT1;
 	}
+#endif
 	return client_ipc_max_protocol;
 }
 

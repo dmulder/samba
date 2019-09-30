@@ -23,6 +23,7 @@
 #include "smb_common.h"
 #include "smbXcli_base.h"
 
+#if 0
 struct smb1cli_echo_state {
 	uint16_t vwv[1];
 	DATA_BLOB data;
@@ -167,3 +168,4 @@ NTSTATUS smb1cli_echo(struct smbXcli_conn *conn, uint32_t timeout_msec,
 	TALLOC_FREE(frame);
 	return status;
 }
+#endif

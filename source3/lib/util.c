@@ -82,7 +82,10 @@
 #endif /* WITH_NISPLUS_HOME */
 #endif /* HAVE_NETGROUP && WITH_AUTOMOUNT */
 
+#if 0
 static enum protocol_types Protocol = PROTOCOL_COREPLUS;
+#endif
+static enum protocol_types Protocol = PROTOCOL_SMB2_02;
 
 enum protocol_types get_Protocol(void)
 {

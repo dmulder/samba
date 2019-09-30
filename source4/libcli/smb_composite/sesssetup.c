@@ -34,6 +34,7 @@
 #include "param/param.h"
 #include "libcli/smb/smbXcli_base.h"
 
+#if 0
 struct sesssetup_state {
 	struct smbcli_session *session;
 	union smb_sesssetup setup;
@@ -633,17 +634,22 @@ struct composite_context *smb_composite_sesssetup_send(struct smbcli_session *se
 
 	talloc_set_destructor(state, sesssetup_state_destructor);
 
+#if 0
 	/* no session setup at all in earliest protocol varients */
 	if (session->transport->negotiate.protocol < PROTOCOL_LANMAN1) {
 		ZERO_STRUCT(io->out);
 		composite_done(c);
 		return c;
 	}
+#endif
 
 	/* see what session setup interface we will use */
+#if 0
 	if (session->transport->negotiate.protocol < PROTOCOL_NT1) {
 		status = session_setup_old(c, session, io, &state->req);
-	} else if (!session->transport->options.use_spnego ||
+	} else
+#endif
+	if (!session->transport->options.use_spnego ||
 		   !(io->in.capabilities & CAP_EXTENDED_SECURITY)) {
 		status = session_setup_nt1(c, session, io, &state->req);
 	} else {
@@ -844,3 +850,4 @@ NTSTATUS smb_composite_sesssetup(struct smbcli_session *session, struct smb_comp
 	struct composite_context *c = smb_composite_sesssetup_send(session, io);
 	return smb_composite_sesssetup_recv(c);
 }
+#endif

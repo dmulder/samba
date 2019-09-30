@@ -24,6 +24,7 @@
 #include "trans2.h"
 #include "../libcli/smb/smbXcli_base.h"
 
+#if 0
 /****************************************************************************
   Calculate the recommended read buffer size
 ****************************************************************************/
@@ -268,6 +269,7 @@ NTSTATUS cli_read_andx_recv(struct tevent_req *req, ssize_t *received,
 	*rcvbuf = state->buf;
 	return NT_STATUS_OK;
 }
+#endif
 
 struct cli_pull_chunk;
 
@@ -362,9 +364,12 @@ struct tevent_req *cli_pull_send(TALLOC_CTX *mem_ctx,
 
 	if (smbXcli_conn_protocol(state->cli->conn) >= PROTOCOL_SMB2_02) {
 		state->chunk_size = smb2cli_conn_max_read_size(cli->conn);
-	} else {
+	}
+#if 0
+	else {
 		state->chunk_size = cli_read_max_bufsize(cli);
 	}
+#endif
 	if (state->chunk_size > page_size) {
 		state->chunk_size &= ~(page_size - 1);
 	}
@@ -545,7 +550,9 @@ static void cli_pull_chunk_ship(struct cli_pull_chunk *chunk)
 		if (tevent_req_nomem(chunk->subreq, req)) {
 			return;
 		}
-	} else {
+	}
+#if 0
+	else {
 		ok = smb1cli_conn_req_possible(state->cli->conn);
 		if (!ok) {
 			return;
@@ -561,6 +568,7 @@ static void cli_pull_chunk_ship(struct cli_pull_chunk *chunk)
 			return;
 		}
 	}
+#endif
 	tevent_req_set_callback(chunk->subreq,
 				cli_pull_chunk_done,
 				chunk);
@@ -587,9 +595,12 @@ static void cli_pull_chunk_done(struct tevent_req *subreq)
 
 	if (smbXcli_conn_protocol(state->cli->conn) >= PROTOCOL_SMB2_02) {
 		status = cli_smb2_read_recv(subreq, &received, &buf);
-	} else {
+	}
+#if 0
+	else {
 		status = cli_read_andx_recv(subreq, &received, &buf);
 	}
+#endif
 	if (NT_STATUS_EQUAL(status, NT_STATUS_END_OF_FILE)) {
 		received = 0;
 		status = NT_STATUS_OK;
@@ -751,7 +762,9 @@ struct tevent_req *cli_read_send(
 		if (tevent_req_nomem(subreq, req)) {
 			return tevent_req_post(req, ev);
 		}
-	} else {
+	}
+#if 0
+	else {
 		bool ok;
 		ok = smb1cli_conn_req_possible(state->cli->conn);
 		if (!ok) {
@@ -767,6 +780,7 @@ struct tevent_req *cli_read_send(
 			return tevent_req_post(req, ev);
 		}
 	}
+#endif
 
 	tevent_req_set_callback(subreq, cli_read_done, req);
 
@@ -785,9 +799,12 @@ static void cli_read_done(struct tevent_req *subreq)
 
 	if (smbXcli_conn_protocol(state->cli->conn) >= PROTOCOL_SMB2_02) {
 		status = cli_smb2_read_recv(subreq, &received, &buf);
-	} else {
+	}
+#if 0
+	else {
 		status = cli_read_andx_recv(subreq, &received, &buf);
 	}
+#endif
 
 	if (NT_STATUS_EQUAL(status, NT_STATUS_END_OF_FILE)) {
 		received = 0;
@@ -934,6 +951,7 @@ struct cli_write_andx_state {
 	struct iovec iov[2];
 };
 
+#if 0
 static void cli_write_andx_done(struct tevent_req *subreq);
 
 struct tevent_req *cli_write_andx_create(TALLOC_CTX *mem_ctx,
@@ -1053,6 +1071,7 @@ static void cli_write_andx_done(struct tevent_req *subreq)
 	}
 	tevent_req_done(req);
 }
+#endif
 
 NTSTATUS cli_write_andx_recv(struct tevent_req *req, size_t *pwritten)
 {
@@ -1125,7 +1144,9 @@ struct tevent_req *cli_write_send(TALLOC_CTX *mem_ctx,
 					     buf,
 					     offset,
 					     size);
-	} else {
+	}
+#if 0
+	else {
 		bool ok;
 
 		ok = smb1cli_conn_req_possible(state->cli->conn);
@@ -1145,6 +1166,7 @@ struct tevent_req *cli_write_send(TALLOC_CTX *mem_ctx,
 					     offset,
 					     size);
 	}
+#endif
 	if (tevent_req_nomem(subreq, req)) {
 		return tevent_req_post(req, ev);
 	}
@@ -1165,9 +1187,12 @@ static void cli_write_done(struct tevent_req *subreq)
 
 	if (smbXcli_conn_protocol(state->cli->conn) >= PROTOCOL_SMB2_02) {
 		status = cli_smb2_write_recv(subreq, &state->written);
-	} else {
+	}
+#if 0
+	else {
 		status = cli_write_andx_recv(subreq, &state->written);
 	}
+#endif
 	TALLOC_FREE(subreq);
 	if (tevent_req_nterror(req, status)) {
 		return;
@@ -1193,6 +1218,7 @@ NTSTATUS cli_write_recv(struct tevent_req *req, size_t *pwritten)
 	return NT_STATUS_OK;
 }
 
+#if 0
 struct cli_smb1_writeall_state {
 	struct tevent_context *ev;
 	struct cli_state *cli;
@@ -1295,6 +1321,7 @@ static NTSTATUS cli_smb1_writeall_recv(struct tevent_req *req,
 	}
 	return NT_STATUS_OK;
 }
+#endif
 
 struct cli_writeall_state {
 	struct cli_state *cli;
@@ -1332,7 +1359,9 @@ struct tevent_req *cli_writeall_send(
 			buf,
 			offset,
 			size);
-	} else {
+	}
+#if 0
+	else {
 		subreq = cli_smb1_writeall_send(
 			state,
 			ev,
@@ -1343,6 +1372,7 @@ struct tevent_req *cli_writeall_send(
 			offset,
 			size);
 	}
+#endif
 
 	if (tevent_req_nomem(subreq, req)) {
 		return tevent_req_post(req, ev);
@@ -1362,9 +1392,12 @@ static void cli_writeall_done(struct tevent_req *subreq)
 
 	if (smbXcli_conn_protocol(state->cli->conn) >= PROTOCOL_SMB2_02) {
 		status = cli_smb2_writeall_recv(subreq, &state->written);
-	} else {
+	}
+#if 0
+	else {
 		status = cli_smb1_writeall_recv(subreq, &state->written);
 	}
+#endif
 	TALLOC_FREE(subreq);
 	if (tevent_req_nterror(req, status)) {
 		return;
@@ -1505,9 +1538,12 @@ struct tevent_req *cli_push_send(TALLOC_CTX *mem_ctx, struct tevent_context *ev,
 
 	if (smbXcli_conn_protocol(state->cli->conn) >= PROTOCOL_SMB2_02) {
 		state->chunk_size = smb2cli_conn_max_write_size(cli->conn);
-	} else {
+	}
+#if 0
+	else {
 		state->chunk_size = cli_write_max_bufsize(cli, mode, 14);
 	}
+#endif
 	if (state->chunk_size > page_size) {
 		state->chunk_size &= ~(page_size - 1);
 	}
@@ -1668,7 +1704,9 @@ static void cli_push_chunk_ship(struct cli_push_chunk *chunk)
 		if (tevent_req_nomem(chunk->subreq, req)) {
 			return;
 		}
-	} else {
+	}
+#if 0
+	else {
 		ok = smb1cli_conn_req_possible(state->cli->conn);
 		if (!ok) {
 			return;
@@ -1686,6 +1724,7 @@ static void cli_push_chunk_ship(struct cli_push_chunk *chunk)
 			return;
 		}
 	}
+#endif
 	tevent_req_set_callback(chunk->subreq,
 				cli_push_chunk_done,
 				chunk);
@@ -1711,9 +1750,12 @@ static void cli_push_chunk_done(struct tevent_req *subreq)
 
 	if (smbXcli_conn_protocol(state->cli->conn) >= PROTOCOL_SMB2_02) {
 		status = cli_smb2_write_recv(subreq, &written);
-	} else {
+	}
+#if 0
+	else {
 		status = cli_write_andx_recv(subreq, &written);
 	}
+#endif
 	TALLOC_FREE(subreq);
 	if (tevent_req_nterror(req, status)) {
 		return;
@@ -1788,6 +1830,7 @@ NTSTATUS cli_push(struct cli_state *cli, uint16_t fnum, uint16_t mode,
 
 #define SPLICE_BLOCK_SIZE 1024 * 1024
 
+#if 0
 static NTSTATUS cli_splice_fallback(TALLOC_CTX *frame,
 				    struct cli_state *srccli,
 				    struct cli_state *dstcli,
@@ -1838,6 +1881,7 @@ static NTSTATUS cli_splice_fallback(TALLOC_CTX *frame,
 
 	return NT_STATUS_OK;
 }
+#endif
 
 NTSTATUS cli_splice(struct cli_state *srccli, struct cli_state *dstcli,
 		    uint16_t src_fnum, uint16_t dst_fnum,
@@ -1875,7 +1919,9 @@ NTSTATUS cli_splice(struct cli_state *srccli, struct cli_state *dstcli,
 						   srccli, src_fnum, dst_fnum,
 						   size, src_offset, dst_offset,
 						   splice_cb, priv);
-		} else {
+		}
+#if 0
+		else {
 			status = cli_splice_fallback(frame,
 						     srccli, dstcli,
 						     src_fnum, dst_fnum,
@@ -1885,6 +1931,7 @@ NTSTATUS cli_splice(struct cli_state *srccli, struct cli_state *dstcli,
 						     splice_cb, priv);
 			goto out;
 		}
+#endif
 		if (req == NULL) {
 			goto out;
 		}

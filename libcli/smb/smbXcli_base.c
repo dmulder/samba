@@ -1077,7 +1077,9 @@ static void smbXcli_req_cleanup(struct tevent_req *req,
 	}
 }
 
+#if 0
 static bool smb1cli_req_cancel(struct tevent_req *req);
+#endif
 static bool smb2cli_req_cancel(struct tevent_req *req);
 
 static bool smbXcli_req_cancel(struct tevent_req *req)
@@ -1098,7 +1100,10 @@ static bool smbXcli_req_cancel(struct tevent_req *req)
 		return smb2cli_req_cancel(req);
 	}
 
+#if 0
 	return smb1cli_req_cancel(req);
+#endif
+	return false;
 }
 
 static bool smbXcli_conn_receive_next(struct smbXcli_conn *conn);
@@ -1380,6 +1385,7 @@ static void smb1cli_req_flags(enum protocol_types protocol,
 	uint8_t flags = 0;
 	uint16_t flags2 = 0;
 
+#if 0
 	if (protocol >= PROTOCOL_LANMAN1) {
 		flags |= FLAG_CASELESS_PATHNAMES;
 		flags |= FLAG_CANONICAL_PATHNAMES;
@@ -1391,6 +1397,7 @@ static void smb1cli_req_flags(enum protocol_types protocol,
 	}
 
 	if (protocol >= PROTOCOL_NT1) {
+#endif
 		flags2 |= FLAGS2_IS_LONG_NAME;
 
 		if (smb1_capabilities & CAP_UNICODE) {
@@ -1402,7 +1409,9 @@ static void smb1cli_req_flags(enum protocol_types protocol,
 		if (smb1_capabilities & CAP_EXTENDED_SECURITY) {
 			flags2 |= FLAGS2_EXTENDED_SECURITY;
 		}
+#if 0
 	}
+#endif
 
 	flags |= additional_flags;
 	flags &= ~clear_flags;
@@ -1413,6 +1422,7 @@ static void smb1cli_req_flags(enum protocol_types protocol,
 	*_flags2 = flags2;
 }
 
+#if 0
 static void smb1cli_req_cancel_done(struct tevent_req *subreq);
 
 static bool smb1cli_req_cancel(struct tevent_req *req)
@@ -1466,6 +1476,7 @@ static void smb1cli_req_cancel_done(struct tevent_req *subreq)
 	/* we do not care about the result */
 	TALLOC_FREE(subreq);
 }
+#endif
 
 struct tevent_req *smb1cli_req_create(TALLOC_CTX *mem_ctx,
 				      struct tevent_context *ev,
@@ -1687,12 +1698,14 @@ static NTSTATUS smb1cli_req_writev_submit(struct tevent_req *req,
 		return NT_STATUS_CONNECTION_DISCONNECTED;
 	}
 
+#if 0
 	if (state->conn->protocol > PROTOCOL_NT1) {
 		DBG_ERR("called for dialect[%s] server[%s]\n",
 			smb_protocol_types_string(state->conn->protocol),
 			smbXcli_conn_remote_name(state->conn));
 		return NT_STATUS_REVISION_MISMATCH;
 	}
+#endif
 
 	if (iov_count < 4) {
 		return NT_STATUS_INVALID_PARAMETER_MIX;
@@ -2420,6 +2433,7 @@ static NTSTATUS smb1cli_conn_dispatch_incoming(struct smbXcli_conn *conn,
 	return NT_STATUS_RETRY;
 }
 
+#if 0
 NTSTATUS smb1cli_req_recv(struct tevent_req *req,
 			  TALLOC_CTX *mem_ctx,
 			  struct iovec **piov,
@@ -2587,6 +2601,7 @@ size_t smb1cli_req_wct_ofs(struct tevent_req **reqs, int num_reqs)
 	}
 	return wct_ofs;
 }
+#endif
 
 NTSTATUS smb1cli_req_chain_submit(struct tevent_req **reqs, int num_reqs)
 {
@@ -4104,6 +4119,7 @@ static const struct {
 	enum protocol_types proto;
 	const char *smb1_name;
 } smb1cli_prots[] = {
+#if 0
 	{PROTOCOL_CORE,		"PC NETWORK PROGRAM 1.0"},
 	{PROTOCOL_COREPLUS,	"MICROSOFT NETWORKS 1.03"},
 	{PROTOCOL_LANMAN1,	"MICROSOFT NETWORKS 3.0"},
@@ -4114,6 +4130,7 @@ static const struct {
 	{PROTOCOL_LANMAN2,	"Samba"},
 	{PROTOCOL_NT1,		"NT LANMAN 1.0"},
 	{PROTOCOL_NT1,		"NT LM 0.12"},
+#endif
 	{PROTOCOL_SMB2_02,	"SMB 2.002"},
 	{PROTOCOL_SMB2_10,	"SMB 2.???"},
 };
@@ -4144,7 +4161,9 @@ struct smbXcli_negprot_state {
 
 static void smbXcli_negprot_invalid_done(struct tevent_req *subreq);
 static struct tevent_req *smbXcli_negprot_smb1_subreq(struct smbXcli_negprot_state *state);
+#if 0
 static void smbXcli_negprot_smb1_done(struct tevent_req *subreq);
+#endif
 static struct tevent_req *smbXcli_negprot_smb2_subreq(struct smbXcli_negprot_state *state);
 static void smbXcli_negprot_smb2_done(struct tevent_req *subreq);
 static NTSTATUS smbXcli_negprot_dispatch_incoming(struct smbXcli_conn *conn,
@@ -4196,6 +4215,7 @@ struct tevent_req *smbXcli_negprot_send(TALLOC_CTX *mem_ctx,
 
 	if ((min_protocol < PROTOCOL_SMB2_02) &&
 	    (max_protocol < PROTOCOL_SMB2_02)) {
+#if 0
 		/*
 		 * SMB1 only...
 		 */
@@ -4207,6 +4227,8 @@ struct tevent_req *smbXcli_negprot_send(TALLOC_CTX *mem_ctx,
 		}
 		tevent_req_set_callback(subreq, smbXcli_negprot_smb1_done, req);
 		return req;
+#endif
+		return NULL;
 	}
 
 	if ((min_protocol >= PROTOCOL_SMB2_02) &&
@@ -4314,6 +4336,7 @@ static struct tevent_req *smbXcli_negprot_smb1_subreq(struct smbXcli_negprot_sta
 				bytes.length, bytes.data);
 }
 
+#if 0
 static void smbXcli_negprot_smb1_done(struct tevent_req *subreq)
 {
 	struct tevent_req *req =
@@ -4416,19 +4439,24 @@ static void smbXcli_negprot_smb1_done(struct tevent_req *subreq)
 		return;
 	}
 
+#if 0
 	if ((conn->protocol < PROTOCOL_NT1) && conn->mandatory_signing) {
 		DEBUG(0,("smbXcli_negprot: SMB signing is mandatory "
 			 "and the selected protocol level doesn't support it.\n"));
 		tevent_req_nterror(req, NT_STATUS_ACCESS_DENIED);
 		return;
 	}
+#endif
 
 	if (flags & FLAG_SUPPORT_LOCKREAD) {
 		server_lockread = true;
 		server_writeunlock = true;
 	}
 
+#if 0
 	if (conn->protocol >= PROTOCOL_NT1) {
+#endif
+	{
 		const char *client_signing = NULL;
 		bool server_mandatory = false;
 		bool server_allowed = false;
@@ -4585,6 +4613,8 @@ static void smbXcli_negprot_smb1_done(struct tevent_req *subreq)
 			return;
 		}
 
+	}
+#if 0
 	} else if (conn->protocol >= PROTOCOL_LANMAN1) {
 		DATA_BLOB blob1;
 		uint8_t key_len;
@@ -4651,6 +4681,7 @@ static void smbXcli_negprot_smb1_done(struct tevent_req *subreq)
 		server_max_xmit = 1024;
 		server_max_mux = 1;
 	}
+#endif
 
 	if (server_max_xmit < 1024) {
 		tevent_req_nterror(req, NT_STATUS_INVALID_NETWORK_RESPONSE);
@@ -4705,6 +4736,7 @@ static void smbXcli_negprot_smb1_done(struct tevent_req *subreq)
 
 	tevent_req_done(req);
 }
+#endif
 
 static size_t smbXcli_padding_helper(uint32_t offset, size_t n)
 {
@@ -5208,10 +5240,12 @@ static NTSTATUS smbXcli_negprot_dispatch_incoming(struct smbXcli_conn *conn,
 	protocol_magic = IVAL(inbuf, 4);
 
 	switch (protocol_magic) {
+#if 0
 	case SMB_MAGIC:
 		tevent_req_set_callback(subreq, smbXcli_negprot_smb1_done, req);
 		conn->dispatch_incoming = smb1cli_conn_dispatch_incoming;
 		return smb1cli_conn_dispatch_incoming(conn, tmp_mem, inbuf);
+#endif
 
 	case SMB2_MAGIC:
 		if (substate->smb2.recv_iov == NULL) {

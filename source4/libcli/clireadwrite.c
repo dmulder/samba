@@ -23,6 +23,7 @@
 #include "libcli/raw/raw_proto.h"
 #include "libcli/libcli.h"
 
+#if 0
 /****************************************************************************
   Read size bytes at offset offset using SMBreadX.
 ****************************************************************************/
@@ -165,3 +166,4 @@ ssize_t smbcli_smbwrite(struct smbcli_tree *tree,
 
 	return total;
 }
+#endif

@@ -21,6 +21,7 @@
 #include "libcli/raw/libcliraw.h"
 #include "libcli/libcli.h"
 
+#if 0
 /****************************************************************************
 send a qpathinfo call
 ****************************************************************************/
@@ -222,3 +223,4 @@ NTSTATUS smbcli_qpathinfo_alt_name(struct smbcli_tree *tree, const char *fname,
 
 	return NT_STATUS_OK;
 }
+#endif

@@ -191,6 +191,7 @@ int ms_fnmatch_protocol(const char *pattern, const char *string, int protocol,
 		return strcasecmp_m(pattern, string);
 	}
 
+#if 0
 	if (protocol <= PROTOCOL_LANMAN2) {
 		char *p = talloc_strdup(NULL, pattern);
 		if (p == NULL) {
@@ -219,6 +220,7 @@ int ms_fnmatch_protocol(const char *pattern, const char *string, int protocol,
 		talloc_free(p);
 		return ret;
 	}
+#endif
 
 	for (count=i=0;pattern[i];i++) {
 		if (pattern[i] == '*' || pattern[i] == '<') count++;
@@ -244,5 +246,8 @@ int ms_fnmatch_protocol(const char *pattern, const char *string, int protocol,
 /** a generic fnmatch function - uses for non-CIFS pattern matching */
 int gen_fnmatch(const char *pattern, const char *string)
 {
+#if 0
 	return ms_fnmatch_protocol(pattern, string, PROTOCOL_NT1, false);
+#endif
+	return ms_fnmatch_protocol(pattern, string, PROTOCOL_SMB2_02, false);
 }

@@ -5,6 +5,7 @@
 #include "libcli/security/security.h"
 #include "libcli/smb_composite/smb_composite.h"
 
+#if 0
 /* the stages of this call */
 enum appendacl_stage {APPENDACL_OPENPATH, APPENDACL_GET, 
 		       APPENDACL_SET, APPENDACL_GETAGAIN, APPENDACL_CLOSEPATH};
@@ -311,3 +312,4 @@ NTSTATUS smb_composite_appendacl(struct smbcli_tree *tree,
 	return smb_composite_appendacl_recv(c, mem_ctx);
 }
 
+#endif

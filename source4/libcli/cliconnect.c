@@ -28,6 +28,7 @@
 #include "libcli/smb_composite/smb_composite.h"
 #include "libcli/smb/smbXcli_base.h"
 
+#if 0
 /*
   wrapper around smbcli_sock_connect()
 */
@@ -77,7 +78,7 @@ NTSTATUS smbcli_negprot(struct smbcli_state *cli, bool unicode, int maxprotocol)
 		return NT_STATUS_NO_MEMORY;
 	}
 
-	return smb_raw_negotiate(cli->transport, unicode, PROTOCOL_CORE, maxprotocol);
+	return smb_raw_negotiate(cli->transport, unicode, PROTOCOL_SMB2_02, maxprotocol);
 }
 
 /* wrapper around smb_raw_sesssetup() */
@@ -220,6 +221,7 @@ struct smbcli_state *smbcli_state_init(TALLOC_CTX *mem_ctx)
 {
 	return talloc_zero(mem_ctx, struct smbcli_state);
 }
+#endif
 
 /* Insert a NULL at the first separator of the given path and return a pointer
  * to the remainder of the string.

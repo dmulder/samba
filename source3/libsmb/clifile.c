@@ -36,6 +36,7 @@ struct cli_setpathinfo_state {
 
 static void cli_setpathinfo_done(struct tevent_req *subreq);
 
+#if 0
 struct tevent_req *cli_setpathinfo_send(TALLOC_CTX *mem_ctx,
 					struct tevent_context *ev,
 					struct cli_state *cli,
@@ -108,6 +109,7 @@ static void cli_setpathinfo_done(struct tevent_req *subreq)
 					 NULL, 0, NULL, NULL, 0, NULL);
 	tevent_req_simple_finish_ntstatus(subreq, status);
 }
+#endif
 
 NTSTATUS cli_setpathinfo_recv(struct tevent_req *req)
 {
@@ -2134,6 +2136,7 @@ struct doc_state {
 	uint8_t data[1];
 };
 
+#if 0
 static void cli_nt_delete_on_close_smb1_done(struct tevent_req *subreq);
 static void cli_nt_delete_on_close_smb2_done(struct tevent_req *subreq);
 
@@ -2207,6 +2210,7 @@ static void cli_nt_delete_on_close_smb1_done(struct tevent_req *subreq)
 					 NULL, 0, NULL, NULL, 0, NULL);
 	tevent_req_simple_finish_ntstatus(subreq, status);
 }
+#endif
 
 static void cli_nt_delete_on_close_smb2_done(struct tevent_req *subreq)
 {
@@ -2595,6 +2599,7 @@ struct cli_nttrans_create_state {
 	struct smb_create_returns cr;
 };
 
+#if 0
 static void cli_nttrans_create_done(struct tevent_req *subreq);
 
 struct tevent_req *cli_nttrans_create_send(TALLOC_CTX *mem_ctx,
@@ -2726,6 +2731,7 @@ static void cli_nttrans_create_done(struct tevent_req *subreq)
 	TALLOC_FREE(param);
 	tevent_req_done(req);
 }
+#endif
 
 NTSTATUS cli_nttrans_create_recv(struct tevent_req *req,
 			uint16_t *fnum,
@@ -3294,6 +3300,7 @@ struct ftrunc_state {
 	uint8_t data[8];
 };
 
+#if 0
 static void cli_ftruncate_done(struct tevent_req *subreq)
 {
 	NTSTATUS status = cli_trans_recv(subreq, NULL, NULL, NULL, 0, NULL,
@@ -3351,6 +3358,7 @@ struct tevent_req *cli_ftruncate_send(TALLOC_CTX *mem_ctx,
 	tevent_req_set_callback(subreq, cli_ftruncate_done, req);
 	return req;
 }
+#endif
 
 NTSTATUS cli_ftruncate_recv(struct tevent_req *req)
 {
@@ -3790,6 +3798,7 @@ struct posix_lock_state {
         uint8_t data[POSIX_LOCK_DATA_SIZE];
 };
 
+#if 0
 static void cli_posix_unlock_internal_done(struct tevent_req *subreq)
 {
 	NTSTATUS status = cli_trans_recv(subreq, NULL, NULL, NULL, 0, NULL,
@@ -4013,6 +4022,7 @@ NTSTATUS cli_posix_unlock(struct cli_state *cli, uint16_t fnum, uint64_t offset,
 	TALLOC_FREE(frame);
 	return status;
 }
+#endif
 
 /****************************************************************************
  Do a SMBgetattrE call.
@@ -5498,6 +5508,7 @@ struct cli_posix_open_internal_state {
 	uint16_t fnum; /* Out */
 };
 
+#if 0
 static void cli_posix_open_internal_done(struct tevent_req *subreq);
 
 static struct tevent_req *cli_posix_open_internal_send(TALLOC_CTX *mem_ctx,
@@ -6016,6 +6027,7 @@ NTSTATUS cli_posix_rmdir(struct cli_state *cli, const char *fname)
 	TALLOC_FREE(frame);
 	return status;
 }
+#endif
 
 /****************************************************************************
  filechangenotify
@@ -6072,6 +6084,7 @@ struct tevent_req *cli_notify_send(TALLOC_CTX *mem_ctx,
 		goto done;
 	}
 
+#if 0
 	SIVAL(state->setup, 0, completion_filter);
 	SSVAL(state->setup, 4, fnum);
 	SSVAL(state->setup, 6, recursive);
@@ -6107,6 +6120,8 @@ struct tevent_req *cli_notify_send(TALLOC_CTX *mem_ctx,
 		return tevent_req_post(req, ev);
 	}
 	tevent_req_set_callback(state->subreq, cli_notify_done, req);
+#endif
+
 done:
 	tevent_req_set_cancel_fn(req, cli_notify_cancel);
 	return req;
@@ -6122,6 +6137,7 @@ static bool cli_notify_cancel(struct tevent_req *req)
 	return ok;
 }
 
+#if 0
 static void cli_notify_done(struct tevent_req *subreq)
 {
 	struct tevent_req *req = tevent_req_callback_data(
@@ -6193,6 +6209,7 @@ static void cli_notify_done(struct tevent_req *subreq)
 	TALLOC_FREE(params);
 	tevent_req_done(req);
 }
+#endif
 
 static void cli_notify_done_smb2(struct tevent_req *subreq)
 {
@@ -6277,6 +6294,7 @@ struct cli_qpathinfo_state {
 	uint32_t num_rdata;
 };
 
+#if 0
 static void cli_qpathinfo_done(struct tevent_req *subreq);
 
 struct tevent_req *cli_qpathinfo_send(TALLOC_CTX *mem_ctx,
@@ -6356,6 +6374,7 @@ static void cli_qpathinfo_done(struct tevent_req *subreq)
 	}
 	tevent_req_done(req);
 }
+#endif
 
 NTSTATUS cli_qpathinfo_recv(struct tevent_req *req, TALLOC_CTX *mem_ctx,
 			    uint8_t **rdata, uint32_t *num_rdata)
@@ -6423,6 +6442,7 @@ struct cli_qfileinfo_state {
 	uint32_t num_rdata;
 };
 
+#if 0
 static void cli_qfileinfo_done(struct tevent_req *subreq);
 
 struct tevent_req *cli_qfileinfo_send(TALLOC_CTX *mem_ctx,
@@ -6489,6 +6509,7 @@ static void cli_qfileinfo_done(struct tevent_req *subreq)
 	}
 	tevent_req_done(req);
 }
+#endif
 
 NTSTATUS cli_qfileinfo_recv(struct tevent_req *req, TALLOC_CTX *mem_ctx,
 			    uint16_t *recv_flags2,
@@ -6637,6 +6658,7 @@ struct cli_shadow_copy_data_state {
 	bool get_names;
 };
 
+#if 0
 static void cli_shadow_copy_data_done(struct tevent_req *subreq);
 
 struct tevent_req *cli_shadow_copy_data_send(TALLOC_CTX *mem_ctx,
@@ -6693,6 +6715,7 @@ static void cli_shadow_copy_data_done(struct tevent_req *subreq)
 	}
 	tevent_req_done(req);
 }
+#endif
 
 NTSTATUS cli_shadow_copy_data_recv(struct tevent_req *req, TALLOC_CTX *mem_ctx,
 				   char ***pnames, int *pnum_names)

@@ -22,6 +22,7 @@
 #include "libcli/raw/libcliraw.h"
 #include "libcli/raw/raw_proto.h"
 
+#if 0
 /****************************************************************************
 change notify (async send)
 ****************************************************************************/
@@ -120,3 +121,4 @@ NTSTATUS smb_raw_ntcancel(struct smbcli_request *oldreq)
 
 	return NT_STATUS_OK;
 }
+#endif

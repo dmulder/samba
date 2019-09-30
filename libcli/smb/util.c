@@ -30,6 +30,7 @@ const char *smb_protocol_types_string(enum protocol_types protocol)
 		return "DEFAULT";
 	case PROTOCOL_NONE:
 		return "NONE";
+#if 0
 	case PROTOCOL_CORE:
 		return "CORE";
 	case PROTOCOL_COREPLUS:
@@ -40,6 +41,7 @@ const char *smb_protocol_types_string(enum protocol_types protocol)
 		return "LANMAN2";
 	case PROTOCOL_NT1:
 		return "NT1";
+#endif
 	case PROTOCOL_SMB2_02:
 		return "SMB2_02";
 	case PROTOCOL_SMB2_10:

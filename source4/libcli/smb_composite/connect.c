@@ -33,6 +33,7 @@
 #include "lib/util/util_net.h"
 #include "libcli/smb/smbXcli_base.h"
 
+#if 0
 /* the stages of this call */
 enum connect_stage {CONNECT_SOCKET, 
 		    CONNECT_NEGPROT,
@@ -508,3 +509,4 @@ NTSTATUS smb_composite_connect(struct smb_composite_connect *io, TALLOC_CTX *mem
 	struct composite_context *c = smb_composite_connect_send(io, mem_ctx, resolve_ctx, ev);
 	return smb_composite_connect_recv(c, mem_ctx);
 }
+#endif

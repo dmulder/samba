@@ -22,6 +22,7 @@
 #include "libcli/raw/libcliraw.h"
 #include "libcli/raw/raw_proto.h"
 
+#if 0
 #define SETUP_REQUEST(cmd, wct, buflen) do { \
 	req = smbcli_request_setup(tree, cmd, wct, buflen); \
 	if (!req) return NULL; \
@@ -343,3 +344,4 @@ _PUBLIC_ NTSTATUS smb_raw_write(struct smbcli_tree *tree, union smb_write *parms
 	struct smbcli_request *req = smb_raw_write_send(tree, parms);
 	return smb_raw_write_recv(req, parms);
 }
+#endif

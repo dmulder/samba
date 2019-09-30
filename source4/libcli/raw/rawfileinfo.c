@@ -280,6 +280,7 @@ NTSTATUS smb_raw_fileinfo_passthru_parse(const DATA_BLOB *blob, TALLOC_CTX *mem_
 }
 
 
+#if 0
 /****************************************************************************
  Handle qfileinfo/qpathinfo trans2 backend.
 ****************************************************************************/
@@ -803,3 +804,4 @@ _PUBLIC_ NTSTATUS smb_raw_pathinfo(struct smbcli_tree *tree,
 	struct smbcli_request *req = smb_raw_pathinfo_send(tree, parms);
 	return smb_raw_pathinfo_recv(req, mem_ctx, parms);
 }
+#endif

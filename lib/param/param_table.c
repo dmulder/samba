@@ -52,12 +52,14 @@ static const struct enum_list enum_protocol[] = {
 	{PROTOCOL_SMB2_22, "SMB2_22"},
 	{PROTOCOL_SMB2_10, "SMB2_10"},
 	{PROTOCOL_SMB2_02, "SMB2_02"},
+#if 0
 	{PROTOCOL_NT1, "NT1"},
 	{PROTOCOL_LANMAN2, "LANMAN2"},
 	{PROTOCOL_LANMAN1, "LANMAN1"},
 	{PROTOCOL_CORE, "CORE"},
 	{PROTOCOL_COREPLUS, "COREPLUS"},
 	{PROTOCOL_COREPLUS, "CORE+"},
+#endif
 	{-1, NULL}
 };
 

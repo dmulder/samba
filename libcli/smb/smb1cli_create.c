@@ -24,6 +24,7 @@
 #include "smb_common.h"
 #include "smbXcli_base.h"
 
+#if 0
 struct smb1cli_ntcreatex_state {
 	uint16_t vwv[24];
 	uint16_t fnum;
@@ -294,3 +295,4 @@ fail:
 	TALLOC_FREE(frame);
 	return status;
 }
+#endif

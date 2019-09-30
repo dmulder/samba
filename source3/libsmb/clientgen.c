@@ -490,13 +490,16 @@ struct tevent_req *cli_echo_send(TALLOC_CTX *mem_ctx, struct tevent_context *ev,
 		subreq = smb2cli_echo_send(state, ev,
 					   cli->conn,
 					   cli->timeout);
-	} else {
+	}
+#if 0
+	else {
 		subreq = smb1cli_echo_send(state, ev,
 					   cli->conn,
 					   cli->timeout,
 					   num_echos,
 					   data);
 	}
+#endif
 	if (tevent_req_nomem(subreq, req)) {
 		return tevent_req_post(req, ev);
 	}
@@ -515,9 +518,12 @@ static void cli_echo_done(struct tevent_req *subreq)
 
 	if (state->is_smb2) {
 		status = smb2cli_echo_recv(subreq);
-	} else {
+	}
+#if 0
+	else {
 		status = smb1cli_echo_recv(subreq);
 	}
+#endif
 	TALLOC_FREE(subreq);
 	if (!NT_STATUS_IS_OK(status)) {
 		tevent_req_nterror(req, status);

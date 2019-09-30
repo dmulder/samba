@@ -26,6 +26,7 @@
 #include "libcli/smb_composite/smb_composite.h"
 #include "../libcli/smb/smbXcli_base.h"
 
+#if 0
 #define SETUP_REQUEST_TREE(cmd, wct, buflen) do { \
 	req = smbcli_request_setup(tree, cmd, wct, buflen); \
 	if (!req) return NULL; \
@@ -226,3 +227,4 @@ NTSTATUS smbcli_tree_full_connection(TALLOC_CTX *parent_ctx,
 	talloc_free(tmp_ctx);
 	return status;
 }
+#endif

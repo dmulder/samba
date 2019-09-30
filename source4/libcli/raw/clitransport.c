@@ -32,6 +32,7 @@
 #include "../libcli/smb/smbXcli_base.h"
 #include "../libcli/smb/read_smb.h"
 
+#if 0
 /*
   destroy a transport
  */
@@ -59,12 +60,17 @@ struct smbcli_transport *smbcli_transport_init(struct smbcli_socket *sock,
 	transport->options = *options;
 
 	if (transport->options.max_protocol == PROTOCOL_DEFAULT) {
+#if 0
 		transport->options.max_protocol = PROTOCOL_NT1;
+#endif
+		transport->options.max_protocol = PROTOCOL_SMB2_02;
 	}
 
+#if 0
 	if (transport->options.max_protocol > PROTOCOL_NT1) {
 		transport->options.max_protocol = PROTOCOL_NT1;
 	}
+#endif
 
 	TALLOC_FREE(sock->event.fde);
 	TALLOC_FREE(sock->event.te);
@@ -670,3 +676,4 @@ NTSTATUS smb_raw_echo(struct smbcli_transport *transport, struct smb_echo *p)
 	struct smbcli_request *req = smb_raw_echo_send(transport, p);
 	return smbcli_request_simple_recv(req);
 }
+#endif

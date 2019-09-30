@@ -23,6 +23,7 @@
 #include "libcli/raw/raw_proto.h"
 #include "librpc/gen_ndr/ndr_security.h"
 
+#if 0
 /****************************************************************************
 fetch file ACL (async send)
 ****************************************************************************/
@@ -161,3 +162,4 @@ NTSTATUS smb_raw_set_secdesc(struct smbcli_tree *tree,
 	struct smbcli_request *req = smb_raw_set_secdesc_send(tree, io);
 	return smbcli_request_simple_recv(req);
 }
+#endif

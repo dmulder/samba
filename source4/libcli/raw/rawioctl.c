@@ -22,6 +22,7 @@
 #include "libcli/raw/libcliraw.h"
 #include "libcli/raw/raw_proto.h"
 
+#if 0
 #define SETUP_REQUEST(cmd, wct, buflen) do { \
 	req = smbcli_request_setup(tree, cmd, wct, buflen); \
 	if (!req) return NULL; \
@@ -171,3 +172,4 @@ NTSTATUS smb_raw_ioctl(struct smbcli_tree *tree,
 	req = smb_raw_ioctl_send(tree, parms);
 	return smb_raw_ioctl_recv(req, mem_ctx, parms);
 }
+#endif

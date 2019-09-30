@@ -23,6 +23,7 @@
 #include "smb_common.h"
 #include "smbXcli_base.h"
 
+#if 0
 struct smb1cli_readx_state {
 	uint32_t size;
 	uint16_t vwv[12];
@@ -239,3 +240,4 @@ NTSTATUS smb1cli_readx_recv(struct tevent_req *req,
 	*rcvbuf = state->buf;
 	return status;
 }
+#endif

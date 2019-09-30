@@ -23,6 +23,7 @@
 #include "../libcli/smb/smb_common.h"
 #include "../libcli/smb/smbXcli_base.h"
 
+#if 0
 struct trans_recvblob {
 	uint8_t *data;
 	uint32_t max, total, received;
@@ -904,3 +905,4 @@ NTSTATUS smb1cli_trans(TALLOC_CTX *mem_ctx, struct smbXcli_conn *conn,
 	TALLOC_FREE(frame);
 	return status;
 }
+#endif

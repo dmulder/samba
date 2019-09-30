@@ -25,6 +25,7 @@
 #include "libcli/smb_composite/smb_composite.h"
 #include "libcli/resolve/resolve.h"
 
+#if 0
 enum fetchfile_stage {FETCHFILE_CONNECT,
 		      FETCHFILE_READ};
 
@@ -192,3 +193,4 @@ NTSTATUS smb_composite_fetchfile(struct smb_composite_fetchfile *io,
 	struct composite_context *c = smb_composite_fetchfile_send(io, NULL);
 	return smb_composite_fetchfile_recv(c, mem_ctx);
 }
+#endif

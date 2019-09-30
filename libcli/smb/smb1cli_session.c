@@ -28,6 +28,7 @@
 #include "../libcli/smb/smbXcli_base.h"
 
 
+#if 0
 struct smb1cli_session_setup_lm21_state {
 	struct smbXcli_session *session;
 	uint16_t vwv[10];
@@ -819,3 +820,4 @@ NTSTATUS smb1cli_session_setup_ext_recv(struct tevent_req *req,
 	tevent_req_received(req);
 	return status;
 }
+#endif

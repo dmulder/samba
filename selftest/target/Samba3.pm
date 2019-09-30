@@ -264,6 +264,7 @@ sub setup_nt4_dc_schannel
 	rpc_daemon:lsasd = fork
 
 	server schannel = yes
+	server min protocol = SMB2_02
 	# used to reproduce bug #12772
 	server max protocol = SMB2_02
 ";
@@ -1703,8 +1704,8 @@ sub provision($$$$$$$$$)
 	panic action = cd $self->{srcdir} && $self->{srcdir}/selftest/gdb_backtrace %d %\$(MAKE_TEST_BINARY)
 	smbd:suicide mode = yes
 
-	client min protocol = CORE
-	server min protocol = LANMAN1
+	client min protocol = SMB2
+	server min protocol = SMB2
 
 	workgroup = $domain
 
