@@ -27,6 +27,7 @@
 
 #include "includes.h"
 #include "libcli/raw/libcliraw.h"
+#include "libcli/smb2/smb2.h"
 #include "libcli/libcli.h"
 #include "libcli/security/security.h"
 #include "librpc/gen_ndr/ndr_lsa.h"
@@ -142,6 +143,81 @@ static NTSTATUS smblsa_connect(struct smbcli_state *cli)
 }
 
 
+static NTSTATUS smb2lsa_connect(struct smb2cli_state *cli)
+{
+	struct smb2lsa_state *lsa;
+	struct dcerpc_pipe *lsa_pipe;
+	NTSTATUS status;
+	struct lsa_OpenPolicy2 r;
+	const char *system_name = "\\";
+	struct lsa_ObjectAttribute attr;
+	struct lsa_QosInfo qos;
+
+	if (cli->lsa != NULL) {
+		return NT_STATUS_OK;
+	}
+
+	lsa = talloc(cli, struct smb2lsa_state);
+	if (lsa == NULL) {
+		return NT_STATUS_NO_MEMORY;
+	}
+
+	lsa_pipe = dcerpc_pipe_init(lsa, cli->transport->ev);
+	if (lsa_pipe == NULL) {
+		talloc_free(lsa);
+		return NT_STATUS_NO_MEMORY;
+	}
+
+	/* open the LSA pipe */
+	status = dcerpc_pipe_open_smb2(lsa_pipe, cli->tree, NDR_LSARPC_NAME);
+	if (!NT_STATUS_IS_OK(status)) {
+		talloc_free(lsa);
+		return status;
+	}
+
+	/* bind to the LSA pipe */
+	status = dcerpc_bind_auth_none(lsa_pipe, &ndr_table_lsarpc);
+	if (!NT_STATUS_IS_OK(status)) {
+		talloc_free(lsa);
+		return status;
+	}
+	lsa->binding_handle = lsa_pipe->binding_handle;
+
+	/* open a lsa policy handle */
+	qos.len = 0;
+	qos.impersonation_level = 2;
+	qos.context_mode = 1;
+	qos.effective_only = 0;
+
+	attr.len = 0;
+	attr.root_dir = NULL;
+	attr.object_name = NULL;
+	attr.attributes = 0;
+	attr.sec_desc = NULL;
+	attr.sec_qos = &qos;
+
+	r.in.system_name = system_name;
+	r.in.attr = &attr;
+	r.in.access_mask = SEC_FLAG_MAXIMUM_ALLOWED;
+	r.out.handle = &lsa->handle;
+
+	status = dcerpc_lsa_OpenPolicy2_r(lsa->binding_handle, lsa, &r);
+	if (!NT_STATUS_IS_OK(status)) {
+		talloc_free(lsa);
+		return status;
+	}
+
+	if (!NT_STATUS_IS_OK(r.out.result)) {
+		talloc_free(lsa);
+		return r.out.result;
+	}
+
+	cli->lsa = lsa;
+
+	return NT_STATUS_OK;
+}
+
+
 /*
   return the set of privileges for the given sid
 */
@@ -153,6 +229,31 @@ NTSTATUS smblsa_sid_privileges(struct smbcli_state *cli, struct dom_sid *sid,
 	struct lsa_EnumAccountRights r;
 
 	status = smblsa_connect(cli);
+	if (!NT_STATUS_IS_OK(status)) {
+		return status;
+	}
+
+	r.in.handle = &cli->lsa->handle;
+	r.in.sid = sid;
+	r.out.rights = rights;
+
+	status = dcerpc_lsa_EnumAccountRights_r(cli->lsa->binding_handle, mem_ctx, &r);
+	if (!NT_STATUS_IS_OK(status)) {
+		return status;
+	}
+
+	return r.out.result;
+}
+
+
+NTSTATUS smb2lsa_sid_privileges(struct smb2cli_state *cli, struct dom_sid *sid,
+				TALLOC_CTX *mem_ctx,
+				struct lsa_RightSet *rights)
+{
+	NTSTATUS status;
+	struct lsa_EnumAccountRights r;
+
+	status = smb2lsa_connect(cli);
 	if (!NT_STATUS_IS_OK(status)) {
 		return status;
 	}
@@ -190,6 +291,40 @@ NTSTATUS smblsa_sid_check_privilege(struct smbcli_state *cli,
 	}
 
 	status = smblsa_sid_privileges(cli, sid, mem_ctx, &rights);
+	if (!NT_STATUS_IS_OK(status)) {
+		talloc_free(mem_ctx);
+		return status;
+	}
+
+	for (i=0;i<rights.count;i++) {
+		if (strcmp(rights.names[i].string, privilege) == 0) {
+			talloc_free(mem_ctx);
+			return NT_STATUS_OK;
+		}
+	}
+
+	talloc_free(mem_ctx);
+	return NT_STATUS_NOT_FOUND;
+}
+
+
+NTSTATUS smb2lsa_sid_check_privilege(struct smb2cli_state *cli,
+				     const char *sid_str,
+				     const char *privilege)
+{
+	struct lsa_RightSet rights;
+	NTSTATUS status;
+	TALLOC_CTX *mem_ctx = talloc_new(cli);
+	struct dom_sid *sid;
+	unsigned i;
+
+	sid = dom_sid_parse_talloc(mem_ctx, sid_str);
+	if (sid == NULL) {
+		talloc_free(mem_ctx);
+		return NT_STATUS_INVALID_SID;
+	}
+
+	status = smb2lsa_sid_privileges(cli, sid, mem_ctx, &rights);
 	if (!NT_STATUS_IS_OK(status)) {
 		talloc_free(mem_ctx);
 		return status;

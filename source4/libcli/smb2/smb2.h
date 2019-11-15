@@ -119,6 +119,29 @@ struct smb2_session {
 	bool needs_bind;
 };
 
+/*
+  SMB2 LSA state
+*/
+struct smb2lsa_state {
+	struct dcerpc_binding_handle *binding_handle;
+	struct smb2_tree *ipc_tree;
+	struct policy_handle handle;
+};
+
+
+/*
+   smb2cli_state: internal state used in libcli library for single-threaded callers,
+   i.e. a single session on a single socket.
+ */
+struct smb2cli_state {
+	struct smbcli_options *options;
+	struct smbcli_socket *sock; /* NULL if connected */
+	struct smb2_transport *transport;
+	struct smb2_session *session;
+	struct smb2_tree *tree;
+	struct substitute_context *substitute;
+	struct smb2lsa_state *lsa;
+};
 
 
 /*

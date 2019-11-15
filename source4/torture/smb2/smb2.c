@@ -28,30 +28,20 @@ static bool wrap_simple_1smb2_test(struct torture_context *torture_ctx,
 				   struct torture_tcase *tcase,
 				   struct torture_test *test)
 {
-	bool (*fn) (struct torture_context *, struct smb2_tree *);
-	bool ret;
-	struct smb2_tree *tree1;
-	TALLOC_CTX *mem_ctx = talloc_new(torture_ctx);
+	bool (*fn) (struct torture_context *, struct smb2cli_state *);
+	bool ret = true;
 
-	if (!torture_smb2_connection(torture_ctx, &tree1)) {
-		torture_fail(torture_ctx,
-			    "Establishing SMB2 connection failed\n");
-		return false;
-	}
+	struct smb2cli_state *cli1 = NULL;
 
-	/*
-	 * This is a trick:
-	 * The test might close the connection. If we steal the tree context
-	 * before that and free the parent instead of tree directly, we avoid
-	 * a double free error.
-	 */
-	talloc_steal(mem_ctx, tree1);
+	torture_assert_goto(torture_ctx,
+			    torture_smb2_open_connection(cli1, torture_ctx, 0),
+			    ret, fail, "Failed to open connection");
 
 	fn = test->fn;
 
-	ret = fn(torture_ctx, tree1);
-
-	talloc_free(mem_ctx);
+	ret = fn(torture_ctx, cli1);
+fail:
+	talloc_free(cli1);
 
 	return ret;
 }
@@ -59,7 +49,7 @@ static bool wrap_simple_1smb2_test(struct torture_context *torture_ctx,
 struct torture_test *torture_suite_add_1smb2_test(struct torture_suite *suite,
 						  const char *name,
 						  bool (*run)(struct torture_context *,
-							      struct smb2_tree *))
+							      struct smb2cli_state *))
 {
 	struct torture_test *test;
 	struct torture_tcase *tcase;
@@ -84,36 +74,25 @@ static bool wrap_simple_2smb2_test(struct torture_context *torture_ctx,
 				   struct torture_tcase *tcase,
 				   struct torture_test *test)
 {
-	bool (*fn) (struct torture_context *, struct smb2_tree *, struct smb2_tree *);
-	bool ret = false;
+	bool (*fn) (struct torture_context *, struct smb2cli_state *,
+		    struct smb2cli_state *);
+	bool ret = true;
 
-	struct smb2_tree *tree1;
-	struct smb2_tree *tree2;
-	TALLOC_CTX *mem_ctx = talloc_new(torture_ctx);
+	struct smb2cli_state *cli1 = NULL, *cli2 = NULL;
 
-	if (!torture_smb2_connection(torture_ctx, &tree1)) {
-		torture_fail(torture_ctx,
-		    "Establishing SMB2 connection failed\n");
-		goto done;
-	}
-
-	talloc_steal(mem_ctx, tree1);
-
-	if (!torture_smb2_connection(torture_ctx, &tree2)) {
-		torture_fail(torture_ctx,
-		    "Establishing SMB2 connection failed\n");
-		goto done;
-	}
-
-	talloc_steal(mem_ctx, tree2);
+	torture_assert_goto(torture_ctx,
+			    torture_smb2_open_connection(cli1, torture_ctx, 0),
+			    ret, fail, "Failed to open connection");
+	torture_assert_goto(torture_ctx,
+			    torture_smb2_open_connection(cli2, torture_ctx, 1),
+			    ret, fail, "Failed to open connection");
 
 	fn = test->fn;
 
-	ret = fn(torture_ctx, tree1, tree2);
-
-done:
-	/* the test may already have closed some of the connections */
-	talloc_free(mem_ctx);
+	ret = fn(torture_ctx, cli1, cli2);
+fail:
+	talloc_free(cli1);
+	talloc_free(cli2);
 
 	return ret;
 }
@@ -122,8 +101,8 @@ done:
 struct torture_test *torture_suite_add_2smb2_test(struct torture_suite *suite,
 						  const char *name,
 						  bool (*run)(struct torture_context *,
-							      struct smb2_tree *,
-							      struct smb2_tree *))
+							      struct smb2cli_state *,
+							      struct smb2cli_state *))
 {
 	struct torture_test *test;
 	struct torture_tcase *tcase;

@@ -712,6 +712,177 @@ bool smb2_util_setup_dir(struct torture_context *tctx, struct smb2_tree *tree,
 	return true;
 }
 
+/*
+  create a directory, returning a handle to it
+*/
+NTSTATUS smb2_create_directory_handle(struct smb2_tree *tree,
+				      const char *dname,
+				      struct smb2_handle *handle)
+{
+	NTSTATUS status;
+	struct smb2_create io;
+	TALLOC_CTX *mem_ctx;
+
+	mem_ctx = talloc_named_const(tree, 0, "smb2_create_directory_handle");
+
+	io.in.desired_access = SEC_RIGHTS_FILE_ALL;
+	io.in.create_options = NTCREATEX_OPTIONS_DIRECTORY;
+	io.in.file_attributes = FILE_ATTRIBUTE_NORMAL;
+	io.in.share_access = NTCREATEX_SHARE_ACCESS_READ | NTCREATEX_SHARE_ACCESS_WRITE | NTCREATEX_SHARE_ACCESS_DELETE;
+	io.in.alloc_size = 0;
+	io.in.create_disposition = NTCREATEX_DISP_OPEN_IF;
+	io.in.impersonation_level = NTCREATEX_IMPERSONATION_ANONYMOUS;
+	io.in.security_flags = 0;
+	io.in.fname = dname;
+
+	status = smb2_create(tree, mem_ctx, &io);
+	talloc_free(mem_ctx);
+
+	if (NT_STATUS_IS_OK(status)) {
+		memcpy(handle, &io.out.file.handle, sizeof(struct smb2_handle));
+	}
+
+	return status;
+}
+
+/**
+  check that a wire string matches the flags specified
+  not 100% accurate, but close enough for testing
+*/
+bool smb2_wire_bad_flags(struct smb_wire_string *str, int flags,
+			 struct smb2_transport *transport)
+{
+	bool server_unicode;
+	int len;
+	if (!str || !str->s) return true;
+	len = strlen(str->s);
+	if (flags & STR_TERMINATE) len++;
+
+	server_unicode = smbXcli_conn_use_unicode(transport->conn);
+
+	if ((flags & STR_UNICODE) || server_unicode) {
+		len *= 2;
+	} else if (flags & STR_TERMINATE_ASCII) {
+		len++;
+	}
+	if (str->private_length != len) {
+		printf("Expected wire_length %d but got %d for '%s'\n",
+		       len, str->private_length, str->s);
+		return true;
+	}
+	return false;
+}
+
+/*
+  set a attribute on a file
+*/
+bool torture_smb2_set_file_attribute(struct smb2_tree *tree, const char *fname,
+				     uint16_t attrib)
+{
+	union smb_setfileinfo sfinfo;
+	NTSTATUS status;
+
+	ZERO_STRUCT(sfinfo.basic_info.in);
+	sfinfo.basic_info.level = RAW_SFILEINFO_BASIC_INFORMATION;
+	sfinfo.basic_info.in.file.path = fname;
+	sfinfo.basic_info.in.attrib = attrib;
+	status = smb2_composite_setpathinfo(tree, &sfinfo);
+	return NT_STATUS_IS_OK(status);
+}
+
+/*
+  set a file descriptor as sparse
+*/
+NTSTATUS torture_smb2_set_sparse(struct smb2_tree *tree,
+				 struct smb2_handle *handle)
+{
+	struct smb2_ioctl nt;
+	NTSTATUS status;
+	TALLOC_CTX *mem_ctx;
+
+	mem_ctx = talloc_named_const(tree, 0, "torture_smb2_set_sparse");
+	if (!mem_ctx) {
+		return NT_STATUS_NO_MEMORY;
+	}
+
+	nt.level = RAW_IOCTL_NTIOCTL;
+	nt.in.function = FSCTL_SET_SPARSE;
+	memcpy(&nt.in.file.handle, handle, sizeof(struct smb2_handle));
+
+	status = smb2_ioctl(tree, mem_ctx, &nt);
+
+	talloc_free(mem_ctx);
+
+	return status;
+}
+
+/*
+  check that an EA has the right value
+*/
+NTSTATUS torture_smb2_check_ea(struct smb2cli_state *cli,
+			       const char *fname, const char *eaname,
+			       const char *value)
+{
+	union smb_fileinfo info;
+	NTSTATUS status;
+	struct ea_name ea;
+	TALLOC_CTX *mem_ctx = talloc_new(cli);
+
+	info.ea_list.level = RAW_FILEINFO_EA_LIST;
+	info.ea_list.in.file.path = fname;
+	info.ea_list.in.num_names = 1;
+	info.ea_list.in.ea_names = &ea;
+
+	ea.name.s = eaname;
+
+	status = smb2_getinfo_file(cli->tree, mem_ctx, &info);
+	if (!NT_STATUS_IS_OK(status)) {
+		talloc_free(mem_ctx);
+		return status;
+	}
+
+	if (info.ea_list.out.num_eas != 1) {
+		printf("Expected 1 ea in ea_list\n");
+		talloc_free(mem_ctx);
+		return NT_STATUS_EA_CORRUPT_ERROR;
+	}
+
+	if (strcasecmp_m(eaname, info.ea_list.out.eas[0].name.s) != 0) {
+		printf("Expected ea '%s' not '%s' in ea_list\n",
+		       eaname, info.ea_list.out.eas[0].name.s);
+		talloc_free(mem_ctx);
+		return NT_STATUS_EA_CORRUPT_ERROR;
+	}
+
+	if (value == NULL) {
+		if (info.ea_list.out.eas[0].value.length != 0) {
+			printf("Expected zero length ea for %s\n", eaname);
+			talloc_free(mem_ctx);
+			return NT_STATUS_EA_CORRUPT_ERROR;
+		}
+		talloc_free(mem_ctx);
+		return NT_STATUS_OK;
+	}
+
+	if (strlen(value) == info.ea_list.out.eas[0].value.length &&
+	    memcmp(value, info.ea_list.out.eas[0].value.data,
+		   info.ea_list.out.eas[0].value.length) == 0) {
+		talloc_free(mem_ctx);
+		return NT_STATUS_OK;
+	}
+
+	printf("Expected value '%s' not '%*.*s' for ea %s\n",
+	       value,
+	       (int)info.ea_list.out.eas[0].value.length,
+	       (int)info.ea_list.out.eas[0].value.length,
+	       info.ea_list.out.eas[0].value.data,
+	       eaname);
+
+	talloc_free(mem_ctx);
+
+	return NT_STATUS_EA_CORRUPT_ERROR;
+}
+
 #define CHECK_STATUS(status, correct) do { \
 	if (!NT_STATUS_EQUAL(status, correct)) { \
 		torture_result(tctx, TORTURE_FAIL, "(%s) Incorrect status %s - should be %s\n", \
@@ -979,3 +1150,363 @@ void smb2_oplock_create(struct smb2_create *io, const char *name, uint8_t oplock
 				 oplock);
 }
 
+_PUBLIC_ bool torture_smb2_open_connection_share(TALLOC_CTX *mem_ctx,
+						 struct smb2cli_state *c,
+						 struct torture_context *tctx,
+						 const char *hostname,
+						 const char *sharename,
+						 struct tevent_context *ev)
+{
+	NTSTATUS status;
+
+	struct smbcli_options options;
+	struct smbcli_session_options session_options;
+
+	lpcfg_smbcli_options(tctx->lp_ctx, &options);
+	lpcfg_smbcli_session_options(tctx->lp_ctx, &session_options);
+
+	options.use_oplocks = torture_setting_bool(tctx, "use_oplocks", true);
+	options.use_level2_oplocks = torture_setting_bool(tctx, "use_level2_oplocks", true);
+
+	status = smb2_connect(mem_ctx, hostname, lpcfg_smb_ports(tctx->lp_ctx),
+			      sharename, lpcfg_resolve_context(tctx->lp_ctx),
+			      popt_get_cmdline_credentials(), &(c->tree),
+			      ev, &options, lpcfg_socket_options(tctx->lp_ctx),
+			      lpcfg_gensec_settings(tctx, tctx->lp_ctx));
+	if (!NT_STATUS_IS_OK(status)) {
+		printf("Failed to open connection - %s\n", nt_errstr(status));
+		return false;
+	}
+
+	return true;
+}
+
+_PUBLIC_ bool torture_smb2_open_connection_ev(struct smb2cli_state *c,
+					      int conn_index,
+					      struct torture_context *tctx,
+					      struct tevent_context *ev)
+{
+	char *host, *share;
+	bool ret;
+
+	if (!torture_get_conn_index(conn_index, ev, tctx, &host, &share)) {
+		return false;
+	}
+
+	ret = torture_smb2_open_connection_share(NULL, c, tctx, host, share, ev);
+	talloc_free(host);
+	talloc_free(share);
+
+	return ret;
+}
+
+_PUBLIC_ bool torture_smb2_open_connection(struct smb2cli_state *c,
+					   struct torture_context *tctx,
+					   int conn_index)
+{
+	return torture_smb2_open_connection_ev(c, conn_index, tctx, tctx->ev);
+}
+
+
+
+_PUBLIC_ bool torture_smb2_close_connection(struct smb2cli_state *c)
+{
+	NTSTATUS status;
+	bool ret = true;
+	if (!c) return true;
+	status = smb2_tdis(c->tree);
+	if (NT_STATUS_IS_ERR(status)) {
+		printf("tdis failed (%s)\n", nt_errstr(status));
+		ret = false;
+	}
+	talloc_free(c);
+	return ret;
+}
+
+
+static struct smb2cli_state *current_cli;
+static int procnum; /* records process count number when forking */
+
+static void sigcont(int sig)
+{
+}
+
+struct child_status {
+	pid_t pid;
+	bool start;
+	enum torture_result result;
+	char reason[1024];
+};
+
+double torture_smb2_create_procs(struct torture_context *tctx,
+	bool (*fn)(struct torture_context *, struct smb2cli_state *, int),
+	bool *result)
+{
+	int status;
+	size_t i;
+	struct child_status *child_status;
+	size_t synccount;
+	size_t tries = 8;
+	size_t torture_nprocs = torture_setting_int(tctx, "nprocs", 4);
+	double start_time_limit = 10 + (torture_nprocs * 1.5);
+	struct timeval tv;
+
+	*result = true;
+
+	synccount = 0;
+
+	signal(SIGCONT, sigcont);
+
+	child_status = (struct child_status *)anonymous_shared_allocate(
+				sizeof(struct child_status)*torture_nprocs);
+	if (child_status == NULL) {
+		printf("Failed to setup shared memory\n");
+		return -1;
+	}
+
+	for (i = 0; i < torture_nprocs; i++) {
+		ZERO_STRUCT(child_status[i]);
+	}
+
+	tv = timeval_current();
+
+	for (i=0;i<torture_nprocs;i++) {
+		procnum = i;
+		if (fork() == 0) {
+			char *myname;
+			bool ok;
+
+			pid_t mypid = getpid();
+			srandom(((int)mypid) ^ ((int)time(NULL)));
+
+			if (asprintf(&myname, "CLIENT%zu", i) == -1) {
+				printf("asprintf failed\n");
+				return -1;
+			}
+			lpcfg_set_cmdline(tctx->lp_ctx, "netbios name", myname);
+			free(myname);
+
+
+			while (1) {
+				if (torture_smb2_open_connection(current_cli, tctx, i)) {
+					break;
+				}
+				if (tries-- == 0) {
+					printf("pid %d failed to start\n", (int)getpid());
+					_exit(1);
+				}
+				smb_msleep(100);
+			}
+
+			child_status[i].pid = getpid();
+
+			pause();
+
+			if (!child_status[i].start) {
+				child_status[i].result = TORTURE_ERROR;
+				printf("Child %zu failed to start!\n", i);
+				_exit(1);
+			}
+
+			ok = fn(tctx, current_cli, i);
+			if (!ok) {
+				if (tctx->last_result == TORTURE_OK) {
+					torture_result(tctx, TORTURE_ERROR,
+						"unknown error: missing "
+						"torture_result call?\n");
+				}
+
+				child_status[i].result = tctx->last_result;
+
+				if (strlen(tctx->last_reason) > 1023) {
+					/* note: reason already contains \n */
+					torture_comment(tctx,
+						"child %zu (pid %u) failed: %s",
+						i,
+						(unsigned)child_status[i].pid,
+						tctx->last_reason);
+				}
+
+				snprintf(child_status[i].reason,
+					 1024, "child %zu (pid %u) failed: %s",
+					 i, (unsigned)child_status[i].pid,
+					 tctx->last_reason);
+				/* ensure proper "\n\0" termination: */
+				if (child_status[i].reason[1022] != '\0') {
+					child_status[i].reason[1022] = '\n';
+					child_status[i].reason[1023] = '\0';
+				}
+			}
+			_exit(0);
+		}
+	}
+
+	do {
+		synccount = 0;
+		for (i=0;i<torture_nprocs;i++) {
+			if (child_status[i].pid != 0) {
+				synccount++;
+			}
+		}
+		if (synccount == torture_nprocs) {
+			break;
+		}
+		smb_msleep(100);
+	} while (timeval_elapsed(&tv) < start_time_limit);
+
+	if (synccount != torture_nprocs) {
+		printf("FAILED TO START %zu CLIENTS (started %zu)\n", torture_nprocs, synccount);
+
+		/* cleanup child processes */
+		for (i = 0; i < torture_nprocs; i++) {
+			if (child_status[i].pid != 0) {
+				kill(child_status[i].pid, SIGTERM);
+			}
+		}
+
+		*result = false;
+		return timeval_elapsed(&tv);
+	}
+
+	printf("Starting %zu clients\n", torture_nprocs);
+
+	/* start the client load */
+	tv = timeval_current();
+	for (i=0;i<torture_nprocs;i++) {
+		child_status[i].start = true;
+	}
+
+	printf("%zu clients started\n", torture_nprocs);
+
+	kill(0, SIGCONT);
+
+	for (i=0;i<torture_nprocs;i++) {
+		int ret;
+		while ((ret=waitpid(0, &status, 0)) == -1 && errno == EINTR) /* noop */ ;
+		if (ret == -1 || WEXITSTATUS(status) != 0) {
+			*result = false;
+		}
+	}
+
+	printf("\n");
+
+	for (i=0;i<torture_nprocs;i++) {
+		if (child_status[i].result != TORTURE_OK) {
+			*result = false;
+			torture_result(tctx, child_status[i].result,
+				       "%s", child_status[i].reason);
+		}
+	}
+
+	return timeval_elapsed(&tv);
+}
+
+static bool wrap_smb2_multi_test(struct torture_context *torture,
+				 struct torture_tcase *tcase,
+				 struct torture_test *test)
+{
+	bool (*fn)(struct torture_context *, struct smb2cli_state *, int ) = test->fn;
+	bool result;
+
+	torture_smb2_create_procs(torture, fn, &result);
+
+	return result;
+}
+
+_PUBLIC_ struct torture_test *torture_suite_add_smb2_multi_test(
+					struct torture_suite *suite,
+					const char *name,
+					bool (*run) (struct torture_context *,
+					struct smb2cli_state *,
+					int i))
+{
+	struct torture_test *test;
+	struct torture_tcase *tcase;
+
+	tcase = torture_suite_add_tcase(suite, name);
+
+	test = talloc(tcase, struct torture_test);
+
+	test->name = talloc_strdup(test, name);
+	test->description = NULL;
+	test->run = wrap_smb2_multi_test;
+	test->fn = run;
+	test->dangerous = false;
+
+	DLIST_ADD_END(tcase->tests, test);
+
+	return test;
+
+}
+
+
+NTSTATUS torture_smb2_second_tcon(TALLOC_CTX *mem_ctx,
+				  struct smb2_session *session,
+				  const char *sharename,
+				  struct smb2_tree **res)
+{
+	struct smb2_tree_connect tcon;
+	struct smb2_tree *result;
+	TALLOC_CTX *tmp_ctx;
+	NTSTATUS status;
+
+	if ((tmp_ctx = talloc_new(mem_ctx)) == NULL) {
+		return NT_STATUS_NO_MEMORY;
+	}
+
+	result = smb2_tree_init(session, tmp_ctx, false);
+	if (result == NULL) {
+		talloc_free(tmp_ctx);
+		return NT_STATUS_NO_MEMORY;
+	}
+
+	tcon.level = RAW_TCON_SMB2;
+	tcon.in.path = sharename;
+
+	status = smb2_tcon(result, tmp_ctx, &tcon);
+	if (!NT_STATUS_IS_OK(status)) {
+		talloc_free(tmp_ctx);
+		return status;
+	}
+
+	*res = talloc_steal(mem_ctx, result);
+	talloc_free(tmp_ctx);
+	return NT_STATUS_OK;
+}
+
+/*
+   a wrapper around smblsa_sid_check_privilege, that tries to take
+   account of the fact that the lsa privileges calls don't expand
+   group memberships, using an explicit check for administrator. There
+   must be a better way ...
+ */
+NTSTATUS torture_smb2_check_privilege(struct smb2cli_state *cli,
+				      const char *sid_str,
+				      const char *privilege)
+{
+	struct dom_sid *sid;
+	TALLOC_CTX *tmp_ctx = talloc_new(cli);
+	uint32_t rid;
+	NTSTATUS status;
+
+	sid = dom_sid_parse_talloc(tmp_ctx, sid_str);
+	if (sid == NULL) {
+		talloc_free(tmp_ctx);
+		return NT_STATUS_INVALID_SID;
+	}
+
+	status = dom_sid_split_rid(tmp_ctx, sid, NULL, &rid);
+	if (!NT_STATUS_IS_OK(status)) {
+		TALLOC_FREE(tmp_ctx);
+		return status;
+	}
+
+	if (rid == DOMAIN_RID_ADMINISTRATOR) {
+		/* assume the administrator has them all */
+		return NT_STATUS_OK;
+	}
+
+	talloc_free(tmp_ctx);
+
+	return smb2lsa_sid_check_privilege(cli, sid_str, privilege);
+}
