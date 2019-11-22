@@ -448,3 +448,76 @@ NTSTATUS smb2_create(struct smb2_tree *tree, TALLOC_CTX *mem_ctx, struct smb2_cr
 	struct smb2_request *req = smb2_create_send(tree, io);
 	return smb2_create_recv(req, mem_ctx, io);
 }
+
+/****************************************************************************
+ Open a file
+****************************************************************************/
+void smb2_open(struct smb2_tree *tree, const char *fname, int flags,
+	       int share_mode, struct smb2_handle *ret)
+{
+	struct smb2_create open_parms;
+	uint32_t share_access = 0;
+	uint32_t desired_access = 0;
+	uint32_t create_disposition = 0;
+	TALLOC_CTX *mem_ctx;
+	NTSTATUS status;
+
+	mem_ctx = talloc_init("raw_open");
+	if (!mem_ctx) return;
+
+	if (flags & SMB_O_CREAT) {
+		create_disposition |= FILE_OPEN_IF;
+	} else {
+		create_disposition |= FILE_OPEN;
+	}
+	if (!(flags & SMB_O_EXCL)) {
+		if (flags & SMB_O_TRUNC) {
+			create_disposition |= FILE_OVERWRITE;
+		}
+	}
+
+	switch (share_mode) {
+		case DENY_DOS:
+		case DENY_ALL:
+		case DENY_FCB:
+			share_access = NTCREATEX_SHARE_ACCESS_NONE;
+			break;
+		case DENY_WRITE:
+			share_access = NTCREATEX_SHARE_ACCESS_READ |
+				       NTCREATEX_SHARE_ACCESS_DELETE;
+			break;
+		case DENY_READ:
+			share_access = NTCREATEX_SHARE_ACCESS_WRITE |
+				       NTCREATEX_SHARE_ACCESS_DELETE;
+			break;
+		case DENY_NONE:
+			share_access = NTCREATEX_SHARE_ACCESS_READ |
+				       NTCREATEX_SHARE_ACCESS_WRITE |
+				       NTCREATEX_SHARE_ACCESS_DELETE;
+			break;
+	}
+
+	if ((flags & SMB_ACCMODE) == SMB_O_RDWR) {
+		desired_access |= SEC_FILE_READ_DATA | SEC_FILE_WRITE_DATA;
+	} else if ((flags & SMB_ACCMODE) == SMB_O_WRONLY) {
+		desired_access |= SEC_FILE_WRITE_DATA;
+	}
+
+	open_parms.level = RAW_OPEN_SMB2;
+	open_parms.in.create_flags = 0;
+	open_parms.in.share_access = share_access;
+	open_parms.in.desired_access = desired_access;
+	open_parms.in.file_attributes = FILE_ATTRIBUTE_SYSTEM |
+					FILE_ATTRIBUTE_HIDDEN;
+	open_parms.in.create_disposition = create_disposition;
+	open_parms.in.timeout = 0;
+	open_parms.in.fname = fname;
+
+	status = smb2_create(tree, mem_ctx, &open_parms);
+	talloc_free(mem_ctx);
+
+	if (NT_STATUS_IS_OK(status)) {
+		memcpy(ret, &open_parms.out.file.handle,
+		       sizeof(struct smb2_handle));
+	}
+}
