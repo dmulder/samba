@@ -109,7 +109,7 @@
 	} while (0)
 
 static bool test_ioctl_network_interface_info(struct torture_context *tctx,
-					      struct smb2_tree *tree,
+					      struct smb2cli_state *cli,
 					      struct fsctl_net_iface_info *info)
 {
 	union smb_ioctl ioctl;
@@ -156,7 +156,7 @@ static bool test_ioctl_network_interface_info(struct torture_context *tctx,
 }
 
 static bool test_multichannel_interface_info(struct torture_context *tctx,
-					     struct smb2_tree *tree)
+					     struct smb2cli_state *cli)
 {
 	struct fsctl_net_iface_info info;
 
@@ -309,7 +309,7 @@ static void test_multichannel_free_channels(struct smb2_tree *tree2A,
 }
 
 static bool test_multichannel_initial_checks(struct torture_context *tctx,
-					     struct smb2_tree *tree1)
+					     struct smb2cli_state *cli1)
 {
 	struct smb2_transport *transport1 = tree1->session->transport;
 	uint32_t server_capabilities;
@@ -464,7 +464,7 @@ static void timeout_cb(struct tevent_context *ev,
  * Cleanup
  */
 static bool test_multichannel_oplock_break_test1(struct torture_context *tctx,
-					   struct smb2_tree *tree1)
+					   struct smb2cli_state *cli1)
 {
 	const char *host = torture_setting_string(tctx, "host", NULL);
 	const char *share = torture_setting_string(tctx, "share", NULL);
@@ -647,7 +647,7 @@ done:
  *      receive break
  */
 static bool test_multichannel_oplock_break_test2(struct torture_context *tctx,
-					   struct smb2_tree *tree1)
+					   struct smb2cli_state *cli1)
 {
 	const char *host = torture_setting_string(tctx, "host", NULL);
 	const char *share = torture_setting_string(tctx, "share", NULL);
@@ -896,7 +896,7 @@ static const uint64_t LEASE2F3 = 0xBAD0FFEDD00DF00Dull;
  *           lease break sent
  */
 static bool test_multichannel_lease_break_test1(struct torture_context *tctx,
-						struct smb2_tree *tree1)
+						struct smb2cli_state *cli1)
 {
 	const char *host = torture_setting_string(tctx, "host", NULL);
 	const char *share = torture_setting_string(tctx, "share", NULL);
@@ -1106,7 +1106,7 @@ done:
  *            break for handle leases.)
  */
 static bool test_multichannel_lease_break_test2(struct torture_context *tctx,
-						struct smb2_tree *tree1)
+						struct smb2cli_state *cli1)
 {
 	const char *host = torture_setting_string(tctx, "host", NULL);
 	const char *share = torture_setting_string(tctx, "share", NULL);
@@ -1406,7 +1406,7 @@ done:
  *      session 1 allowed to open file
  */
 static bool test_multichannel_lease_break_test3(struct torture_context *tctx,
-						struct smb2_tree *tree1)
+						struct smb2cli_state *cli1)
 {
 	const char *host = torture_setting_string(tctx, "host", NULL);
 	const char *share = torture_setting_string(tctx, "share", NULL);
@@ -1580,7 +1580,7 @@ done:
  *      Cleanup
  */
 static bool test_multichannel_lease_break_test4(struct torture_context *tctx,
-						struct smb2_tree *tree1)
+						struct smb2cli_state *cli1)
 {
 	const char *host = torture_setting_string(tctx, "host", NULL);
 	const char *share = torture_setting_string(tctx, "share", NULL);
@@ -1724,7 +1724,7 @@ done:
  * Test limits of channels
  */
 static bool test_multichannel_num_channels(struct torture_context *tctx,
-					   struct smb2_tree *tree1)
+					   struct smb2cli_state *cli1)
 {
 	const char *host = torture_setting_string(tctx, "host", NULL);
 	const char *share = torture_setting_string(tctx, "share", NULL);

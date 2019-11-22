@@ -39,7 +39,7 @@
 		return false; \
 	}} while (0)
 
-static bool create_dir(struct torture_context *tctx, struct smb2_tree *tree)
+static bool create_dir(struct torture_context *tctx, struct smb2cli_state *cli)
 {
 	NTSTATUS status;
 	struct smb2_create io;
@@ -69,7 +69,7 @@ static bool create_dir(struct torture_context *tctx, struct smb2_tree *tree)
 	io.in.impersonation_level = NTCREATEX_IMPERSONATION_ANONYMOUS;
 	io.in.security_flags = 0;
 	io.in.fname = DNAME;
-	status = smb2_create(tree, tctx, &io);
+	status = smb2_create(cli->tree, tctx, &io);
 	CHECK_STATUS(status, NT_STATUS_OK);
 	handle = io.out.file.handle;
 
@@ -77,7 +77,7 @@ static bool create_dir(struct torture_context *tctx, struct smb2_tree *tree)
 	q.query_secdesc.level = RAW_FILEINFO_SEC_DESC;
 	q.query_secdesc.in.file.handle = handle;
 	q.query_secdesc.in.secinfo_flags = SECINFO_DACL | SECINFO_OWNER;
-	status = smb2_getinfo_file(tree, tctx, &q);
+	status = smb2_getinfo_file(cli->tree, tctx, &q);
 	CHECK_STATUS(status, NT_STATUS_OK);
 	sd_orig = q.query_secdesc.out.sd;
 
@@ -109,15 +109,15 @@ static bool create_dir(struct torture_context *tctx, struct smb2_tree *tree)
 	set.set_secdesc.in.secinfo_flags = SECINFO_DACL | SECINFO_OWNER;
 	set.set_secdesc.in.sd = sd;
 
-	status = smb2_setinfo_file(tree, &set);
+	status = smb2_setinfo_file(cli->tree, &set);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
-	status = smb2_util_close(tree, handle);
+	status = smb2_util_close(cli->tree, handle);
 
 	return true;
 }
 
-static bool set_dir_delete_perms(struct torture_context *tctx, struct smb2_tree *tree)
+static bool set_dir_delete_perms(struct torture_context *tctx, struct smb2cli_state *cli)
 {
 	NTSTATUS status;
 	struct smb2_create io;
@@ -147,7 +147,7 @@ static bool set_dir_delete_perms(struct torture_context *tctx, struct smb2_tree 
 	io.in.impersonation_level = NTCREATEX_IMPERSONATION_ANONYMOUS;
 	io.in.security_flags = 0;
 	io.in.fname = DNAME;
-	status = smb2_create(tree, tctx, &io);
+	status = smb2_create(cli->tree, tctx, &io);
 	CHECK_STATUS(status, NT_STATUS_OK);
 	handle = io.out.file.handle;
 
@@ -155,7 +155,7 @@ static bool set_dir_delete_perms(struct torture_context *tctx, struct smb2_tree 
 	q.query_secdesc.level = RAW_FILEINFO_SEC_DESC;
 	q.query_secdesc.in.file.handle = handle;
 	q.query_secdesc.in.secinfo_flags = SECINFO_DACL | SECINFO_OWNER;
-	status = smb2_getinfo_file(tree, tctx, &q);
+	status = smb2_getinfo_file(cli->tree, tctx, &q);
 	CHECK_STATUS(status, NT_STATUS_OK);
 	sd_orig = q.query_secdesc.out.sd;
 
@@ -188,26 +188,26 @@ static bool set_dir_delete_perms(struct torture_context *tctx, struct smb2_tree 
 	set.set_secdesc.in.secinfo_flags = SECINFO_DACL | SECINFO_OWNER;
 	set.set_secdesc.in.sd = sd;
 
-	status = smb2_setinfo_file(tree, &set);
+	status = smb2_setinfo_file(cli->tree, &set);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
-	status = smb2_util_close(tree, handle);
+	status = smb2_util_close(cli->tree, handle);
 
 	return true;
 }
 
-static bool test_doc_overwrite_if(struct torture_context *tctx, struct smb2_tree *tree)
+static bool test_doc_overwrite_if(struct torture_context *tctx, struct smb2cli_state *cli)
 {
 	struct smb2_create io;
 	NTSTATUS status;
 	uint32_t perms = 0;
 
 	/* File should not exist for this first test, so make sure */
-	set_dir_delete_perms(tctx, tree);
+	set_dir_delete_perms(tctx, cli);
 
-	smb2_deltree(tree, DNAME);
+	smb2_deltree(cli->tree, DNAME);
 
-	create_dir(tctx, tree);
+	create_dir(tctx, cli);
 
 	torture_comment(tctx, "Create file with DeleteOnClose on non-existent file (OVERWRITE_IF)\n");
 	torture_comment(tctx, "We expect NT_STATUS_OK\n");
@@ -226,10 +226,10 @@ static bool test_doc_overwrite_if(struct torture_context *tctx, struct smb2_tree
 				   NTCREATEX_OPTIONS_NON_DIRECTORY_FILE;
 	io.in.fname              = FNAME;
 
-	status = smb2_create(tree, tctx, &io);
+	status = smb2_create(cli->tree, tctx, &io);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
-	status = smb2_util_close(tree, io.out.file.handle);
+	status = smb2_util_close(cli->tree, io.out.file.handle);
 
 	/* Check it was deleted */
 	ZERO_STRUCT(io);
@@ -243,13 +243,13 @@ static bool test_doc_overwrite_if(struct torture_context *tctx, struct smb2_tree
 	torture_comment(tctx, "Testing if the file was deleted when closed\n");
 	torture_comment(tctx, "We expect NT_STATUS_OBJECT_NAME_NOT_FOUND\n");
 
-	status = smb2_create(tree, tctx, &io);
+	status = smb2_create(cli->tree, tctx, &io);
 	CHECK_STATUS(status, NT_STATUS_OBJECT_NAME_NOT_FOUND);
 
 	return true;
 }
 
-static bool test_doc_overwrite_if_exist(struct torture_context *tctx, struct smb2_tree *tree)
+static bool test_doc_overwrite_if_exist(struct torture_context *tctx, struct smb2cli_state *cli)
 {
 	struct smb2_create io;
 	NTSTATUS status;
@@ -257,11 +257,11 @@ static bool test_doc_overwrite_if_exist(struct torture_context *tctx, struct smb
 
 	/* File should not exist for this first test, so make sure */
 	/* And set the SEC Descriptor appropriately */
-	set_dir_delete_perms(tctx, tree);
+	set_dir_delete_perms(tctx, cli);
 
-	smb2_deltree(tree, DNAME);
+	smb2_deltree(cli->tree, DNAME);
 
-	create_dir(tctx, tree);
+	create_dir(tctx, cli);
 
 	torture_comment(tctx, "Create file with DeleteOnClose on existing file (OVERWRITE_IF)\n");
 	torture_comment(tctx, "We expect NT_STATUS_ACCESS_DENIED\n");
@@ -280,10 +280,10 @@ static bool test_doc_overwrite_if_exist(struct torture_context *tctx, struct smb
 	io.in.create_options     = 0x0;
 	io.in.fname              = FNAME;
 
-	status = smb2_create(tree, tctx, &io);
+	status = smb2_create(cli->tree, tctx, &io);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
-	status = smb2_util_close(tree, io.out.file.handle);
+	status = smb2_util_close(cli->tree, io.out.file.handle);
 
 	/* Next, try to open it for Delete On Close */
 	ZERO_STRUCT(io);
@@ -295,26 +295,26 @@ static bool test_doc_overwrite_if_exist(struct torture_context *tctx, struct smb
 				   NTCREATEX_OPTIONS_NON_DIRECTORY_FILE;
 	io.in.fname              = FNAME;
 
-	status = smb2_create(tree, tctx, &io);
+	status = smb2_create(cli->tree, tctx, &io);
 	CHECK_STATUS(status, NT_STATUS_ACCESS_DENIED);
 
-	status = smb2_util_close(tree, io.out.file.handle);
+	status = smb2_util_close(cli->tree, io.out.file.handle);
 
 	return true;
 }
 
-static bool test_doc_create(struct torture_context *tctx, struct smb2_tree *tree)
+static bool test_doc_create(struct torture_context *tctx, struct smb2cli_state *cli)
 {
 	struct smb2_create io;
 	NTSTATUS status;
 	uint32_t perms = 0;
 
 	/* File should not exist for this first test, so make sure */
-	set_dir_delete_perms(tctx, tree);
+	set_dir_delete_perms(tctx, cli);
 
-	smb2_deltree(tree, DNAME);
+	smb2_deltree(cli->tree, DNAME);
 
-	create_dir(tctx, tree);
+	create_dir(tctx, cli);
 
 	torture_comment(tctx, "Create file with DeleteOnClose on non-existent file (CREATE) \n");
 	torture_comment(tctx, "We expect NT_STATUS_OK\n");
@@ -333,10 +333,10 @@ static bool test_doc_create(struct torture_context *tctx, struct smb2_tree *tree
 				   NTCREATEX_OPTIONS_NON_DIRECTORY_FILE;
 	io.in.fname              = FNAME;
 
-	status = smb2_create(tree, tctx, &io);
+	status = smb2_create(cli->tree, tctx, &io);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
-	status = smb2_util_close(tree, io.out.file.handle);
+	status = smb2_util_close(cli->tree, io.out.file.handle);
 
 	/* Check it was deleted */
 	ZERO_STRUCT(io);
@@ -350,24 +350,24 @@ static bool test_doc_create(struct torture_context *tctx, struct smb2_tree *tree
 	torture_comment(tctx, "Testing if the file was deleted when closed\n");
 	torture_comment(tctx, "We expect NT_STATUS_OBJECT_NAME_NOT_FOUND\n");
 
-	status = smb2_create(tree, tctx, &io);
+	status = smb2_create(cli->tree, tctx, &io);
 	CHECK_STATUS(status, NT_STATUS_OBJECT_NAME_NOT_FOUND);
 
 	return true;
 }
 
-static bool test_doc_create_exist(struct torture_context *tctx, struct smb2_tree *tree)
+static bool test_doc_create_exist(struct torture_context *tctx, struct smb2cli_state *cli)
 {
 	struct smb2_create io;
 	NTSTATUS status;
 	uint32_t perms = 0;
 
 	/* File should not exist for this first test, so make sure */
-	set_dir_delete_perms(tctx, tree);
+	set_dir_delete_perms(tctx, cli);
 
-	smb2_deltree(tree, DNAME);
+	smb2_deltree(cli->tree, DNAME);
 
-	create_dir(tctx, tree);
+	create_dir(tctx, cli);
 
 	torture_comment(tctx, "Create file with DeleteOnClose on non-existent file (CREATE) \n");
 	torture_comment(tctx, "We expect NT_STATUS_OBJECT_NAME_COLLISION\n");
@@ -386,13 +386,13 @@ static bool test_doc_create_exist(struct torture_context *tctx, struct smb2_tree
 	io.in.create_options     = 0x0;
 	io.in.fname              = FNAME;
 
-	status = smb2_create(tree, tctx, &io);
+	status = smb2_create(cli->tree, tctx, &io);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
-	status = smb2_util_close(tree, io.out.file.handle);
+	status = smb2_util_close(cli->tree, io.out.file.handle);
 
 	/* Next, try to open it for Delete on Close */
-	status = smb2_util_close(tree, io.out.file.handle);
+	status = smb2_util_close(cli->tree, io.out.file.handle);
 	ZERO_STRUCT(io);
 	io.in.desired_access	 = perms;
 	io.in.file_attributes	 = 0;
@@ -402,26 +402,26 @@ static bool test_doc_create_exist(struct torture_context *tctx, struct smb2_tree
 				   NTCREATEX_OPTIONS_NON_DIRECTORY_FILE;
 	io.in.fname              = FNAME;
 
-	status = smb2_create(tree, tctx, &io);
+	status = smb2_create(cli->tree, tctx, &io);
 	CHECK_STATUS(status, NT_STATUS_OBJECT_NAME_COLLISION);
 
-	status = smb2_util_close(tree, io.out.file.handle);
+	status = smb2_util_close(cli->tree, io.out.file.handle);
 
 	return true;
 }
 
-static bool test_doc_create_if(struct torture_context *tctx, struct smb2_tree *tree)
+static bool test_doc_create_if(struct torture_context *tctx, struct smb2cli_state *cli)
 {
 	struct smb2_create io;
 	NTSTATUS status;
 	uint32_t perms = 0;
 
 	/* File should not exist for this first test, so make sure */
-	set_dir_delete_perms(tctx, tree);
+	set_dir_delete_perms(tctx, cli);
 
-	smb2_deltree(tree, DNAME);
+	smb2_deltree(cli->tree, DNAME);
 
-	create_dir(tctx, tree);
+	create_dir(tctx, cli);
 
 	torture_comment(tctx, "Create file with DeleteOnClose on non-existent file (OPEN_IF)\n");
 	torture_comment(tctx, "We expect NT_STATUS_OK\n");
@@ -440,10 +440,10 @@ static bool test_doc_create_if(struct torture_context *tctx, struct smb2_tree *t
 				   NTCREATEX_OPTIONS_NON_DIRECTORY_FILE;
 	io.in.fname              = FNAME;
 
-	status = smb2_create(tree, tctx, &io);
+	status = smb2_create(cli->tree, tctx, &io);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
-	status = smb2_util_close(tree, io.out.file.handle);
+	status = smb2_util_close(cli->tree, io.out.file.handle);
 
 	/* Check it was deleted */
 	ZERO_STRUCT(io);
@@ -457,24 +457,24 @@ static bool test_doc_create_if(struct torture_context *tctx, struct smb2_tree *t
 	torture_comment(tctx, "Testing if the file was deleted when closed\n");
 	torture_comment(tctx, "We expect NT_STATUS_OBJECT_NAME_NOT_FOUND\n");
 
-	status = smb2_create(tree, tctx, &io);
+	status = smb2_create(cli->tree, tctx, &io);
 	CHECK_STATUS(status, NT_STATUS_OBJECT_NAME_NOT_FOUND);
 
 	return true;
 }
 
-static bool test_doc_create_if_exist(struct torture_context *tctx, struct smb2_tree *tree)
+static bool test_doc_create_if_exist(struct torture_context *tctx, struct smb2cli_state *cli)
 {
 	struct smb2_create io;
 	NTSTATUS status;
 	uint32_t perms = 0;
 
 	/* File should not exist for this first test, so make sure */
-	set_dir_delete_perms(tctx, tree);
+	set_dir_delete_perms(tctx, cli);
 
-	smb2_deltree(tree, DNAME);
+	smb2_deltree(cli->tree, DNAME);
 
-	create_dir(tctx, tree);
+	create_dir(tctx, cli);
 
 	torture_comment(tctx, "Create file with DeleteOnClose on existing file (OPEN_IF)\n");
 	torture_comment(tctx, "We expect NT_STATUS_ACCESS_DENIED\n");
@@ -493,10 +493,10 @@ static bool test_doc_create_if_exist(struct torture_context *tctx, struct smb2_t
 	io.in.create_options     = 0x0;
 	io.in.fname              = FNAME;
 
-	status = smb2_create(tree, tctx, &io);
+	status = smb2_create(cli->tree, tctx, &io);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
-	status = smb2_util_close(tree, io.out.file.handle);
+	status = smb2_util_close(cli->tree, io.out.file.handle);
 
 	/* Now try to create it for delete on close */
 	ZERO_STRUCT(io);
@@ -508,15 +508,15 @@ static bool test_doc_create_if_exist(struct torture_context *tctx, struct smb2_t
 				   NTCREATEX_OPTIONS_NON_DIRECTORY_FILE;
 	io.in.fname              = FNAME;
 
-	status = smb2_create(tree, tctx, &io);
+	status = smb2_create(cli->tree, tctx, &io);
 	CHECK_STATUS(status, NT_STATUS_ACCESS_DENIED);
 
-	status = smb2_util_close(tree, io.out.file.handle);
+	status = smb2_util_close(cli->tree, io.out.file.handle);
 
 	return true;
 }
 
-static bool test_doc_find_and_set_doc(struct torture_context *tctx, struct smb2_tree *tree)
+static bool test_doc_find_and_set_doc(struct torture_context *tctx, struct smb2cli_state *cli)
 {
 	struct smb2_create io;
 	struct smb2_find find;
@@ -532,11 +532,11 @@ static bool test_doc_find_and_set_doc(struct torture_context *tctx, struct smb2_
 		SEC_FILE_WRITE_DATA | SEC_DIR_LIST;
 
 	/* File should not exist for this first test, so make sure */
-	set_dir_delete_perms(tctx, tree);
+	set_dir_delete_perms(tctx, cli);
 
-	smb2_deltree(tree, DNAME);
+	smb2_deltree(cli->tree, DNAME);
 
-	create_dir(tctx, tree);
+	create_dir(tctx, cli);
 
 	torture_comment(tctx, "FIND and delete directory\n");
 	torture_comment(tctx, "We expect NT_STATUS_OK\n");
@@ -551,7 +551,7 @@ static bool test_doc_find_and_set_doc(struct torture_context *tctx, struct smb2_
 	io.in.create_options     = NTCREATEX_OPTIONS_DIRECTORY;
 	io.in.fname              = DNAME;
 
-	status = smb2_create(tree, tctx, &io);
+	status = smb2_create(cli->tree, tctx, &io);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	/* list directory */
@@ -563,7 +563,7 @@ static bool test_doc_find_and_set_doc(struct torture_context *tctx, struct smb2_
 	find.in.level              = SMB2_FIND_BOTH_DIRECTORY_INFO;
 
 	/* start enumeration on directory */
-	status = smb2_find_level(tree, tree, &find, &count, &d);
+	status = smb2_find_level(cli->tree, cli->tree, &find, &count, &d);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	/* set delete-on-close */
@@ -571,17 +571,17 @@ static bool test_doc_find_and_set_doc(struct torture_context *tctx, struct smb2_
 	sfinfo.generic.level = RAW_SFILEINFO_DISPOSITION_INFORMATION;
 	sfinfo.disposition_info.in.delete_on_close = 1;
 	sfinfo.generic.in.file.handle = io.out.file.handle;
-	status = smb2_setinfo_file(tree, &sfinfo);
+	status = smb2_setinfo_file(cli->tree, &sfinfo);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	/* close directory */
-	status = smb2_util_close(tree, io.out.file.handle);
+	status = smb2_util_close(cli->tree, io.out.file.handle);
 	CHECK_STATUS(status, NT_STATUS_OK);
 	return true;
 }
 
 static bool test_doc_read_only(struct torture_context *tctx,
-			       struct smb2_tree *tree)
+			       struct smb2cli_state *cli)
 {
 	struct smb2_handle dir_handle;
 	union smb_setfileinfo sfinfo = {{0}};
@@ -597,9 +597,9 @@ static bool test_doc_read_only(struct torture_context *tctx,
 	expected_status = delete_readonly ?
 		NT_STATUS_OK : NT_STATUS_CANNOT_DELETE;
 
-	smb2_deltree(tree, DNAME);
+	smb2_deltree(cli->tree, DNAME);
 
-	status = torture_smb2_testdir(tree, DNAME, &dir_handle);
+	status = torture_smb2_testdir(cli->tree, DNAME, &dir_handle);
 	torture_assert_ntstatus_ok_goto(tctx, status, ret, done,
 					"CREATE directory failed\n");
 
@@ -613,14 +613,14 @@ static bool test_doc_read_only(struct torture_context *tctx,
 		NTCREATEX_SHARE_ACCESS_DELETE;
 	create.in.create_disposition = NTCREATEX_DISP_CREATE;
 	create.in.fname = FNAME;
-	status = smb2_create(tree, tctx, &create);
+	status = smb2_create(cli->tree, tctx, &create);
 	torture_assert_ntstatus_equal_goto(tctx, status, expected_status, ret,
 					   done, "Unexpected status for CREATE "
 					   "of new file.\n");
 
 	if (delete_readonly) {
 		close.in.file.handle = create.out.file.handle;
-		status = smb2_close(tree, &close);
+		status = smb2_close(cli->tree, &close);
 		torture_assert_ntstatus_ok_goto(tctx, status, ret, done,
 						"CLOSE of READONLY file "
 						"failed.\n");
@@ -637,12 +637,12 @@ static bool test_doc_read_only(struct torture_context *tctx,
 		NTCREATEX_SHARE_ACCESS_DELETE;
 	create.in.create_disposition = NTCREATEX_DISP_CREATE;
 	create.in.fname = FNAME;
-	status = smb2_create(tree, tctx, &create);
+	status = smb2_create(cli->tree, tctx, &create);
 	torture_assert_ntstatus_ok_goto(tctx, status, ret, done,
 					"CREATE of READONLY file failed.\n");
 
 	close.in.file.handle = create.out.file.handle;
-	status = smb2_close(tree, &close);
+	status = smb2_close(cli->tree, &close);
 	torture_assert_ntstatus_ok_goto(tctx, status, ret, done,
 					"CLOSE of READONLY file failed.\n");
 
@@ -658,7 +658,7 @@ static bool test_doc_read_only(struct torture_context *tctx,
 		NTCREATEX_SHARE_ACCESS_DELETE;
 	create.in.create_disposition = NTCREATEX_DISP_OPEN;
 	create.in.fname = FNAME;
-	status = smb2_create(tree, tctx, &create);
+	status = smb2_create(cli->tree, tctx, &create);
 	torture_assert_ntstatus_equal_goto(tctx, status,
 					   expected_status, ret, done,
 					   "CREATE returned unexpected "
@@ -676,7 +676,7 @@ static bool test_doc_read_only(struct torture_context *tctx,
 		NTCREATEX_SHARE_ACCESS_DELETE;
 	create.in.create_disposition = NTCREATEX_DISP_OPEN;
 	create.in.fname = FNAME;
-	status = smb2_create(tree, tctx, &create);
+	status = smb2_create(cli->tree, tctx, &create);
 	torture_assert_ntstatus_ok_goto(tctx, status, ret, done,
 					"Opening file failed.\n");
 
@@ -684,17 +684,17 @@ static bool test_doc_read_only(struct torture_context *tctx,
 	sfinfo.generic.level = RAW_SFILEINFO_DISPOSITION_INFORMATION;
 	sfinfo.generic.in.file.handle = create.out.file.handle;
 
-	status = smb2_setinfo_file(tree, &sfinfo);
+	status = smb2_setinfo_file(cli->tree, &sfinfo);
 	torture_assert_ntstatus_equal(tctx, status, expected_status,
 				      "Set DELETE_ON_CLOSE disposition "
 				      "returned un expected status.\n");
 
-	status = smb2_util_close(tree, create.out.file.handle);
+	status = smb2_util_close(cli->tree, create.out.file.handle);
 	torture_assert_ntstatus_ok_goto(tctx, status, ret, done,
 					"CLOSE failed\n");
 
 done:
-	smb2_deltree(tree, DNAME);
+	smb2_deltree(cli->tree, DNAME);
 	return ret;
 }
 

@@ -34,6 +34,7 @@
 #include "torture/torture.h"
 #include "torture/smb2/proto.h"
 #include "source4/torture/util.h"
+#include "libcli/smb_composite/smb_composite.h"
 
 
 /*
@@ -1150,12 +1151,12 @@ void smb2_oplock_create(struct smb2_create *io, const char *name, uint8_t oplock
 				 oplock);
 }
 
-_PUBLIC_ bool torture_smb2_open_connection_share(TALLOC_CTX *mem_ctx,
-						 struct smb2cli_state *c,
-						 struct torture_context *tctx,
-						 const char *hostname,
-						 const char *sharename,
-						 struct tevent_context *ev)
+bool torture_smb2_open_connection_share(TALLOC_CTX *mem_ctx,
+					struct smb2cli_state *c,
+					struct torture_context *tctx,
+					const char *hostname,
+					const char *sharename,
+					struct tevent_context *ev)
 {
 	NTSTATUS status;
 
@@ -1181,10 +1182,10 @@ _PUBLIC_ bool torture_smb2_open_connection_share(TALLOC_CTX *mem_ctx,
 	return true;
 }
 
-_PUBLIC_ bool torture_smb2_open_connection_ev(struct smb2cli_state *c,
-					      int conn_index,
-					      struct torture_context *tctx,
-					      struct tevent_context *ev)
+bool torture_smb2_open_connection_ev(struct smb2cli_state *c,
+				     int conn_index,
+				     struct torture_context *tctx,
+				     struct tevent_context *ev)
 {
 	char *host, *share;
 	bool ret;
@@ -1200,7 +1201,7 @@ _PUBLIC_ bool torture_smb2_open_connection_ev(struct smb2cli_state *c,
 	return ret;
 }
 
-_PUBLIC_ bool torture_smb2_open_connection(struct smb2cli_state *c,
+bool torture_smb2_open_connection(struct smb2cli_state *c,
 					   struct torture_context *tctx,
 					   int conn_index)
 {
@@ -1209,7 +1210,7 @@ _PUBLIC_ bool torture_smb2_open_connection(struct smb2cli_state *c,
 
 
 
-_PUBLIC_ bool torture_smb2_close_connection(struct smb2cli_state *c)
+bool torture_smb2_close_connection(struct smb2cli_state *c)
 {
 	NTSTATUS status;
 	bool ret = true;
@@ -1413,12 +1414,12 @@ static bool wrap_smb2_multi_test(struct torture_context *torture,
 	return result;
 }
 
-_PUBLIC_ struct torture_test *torture_suite_add_smb2_multi_test(
+struct torture_test *torture_suite_add_smb2_multi_test(
 					struct torture_suite *suite,
 					const char *name,
 					bool (*run) (struct torture_context *,
-					struct smb2cli_state *,
-					int i))
+						struct smb2cli_state *,
+						int i))
 {
 	struct torture_test *test;
 	struct torture_tcase *tcase;

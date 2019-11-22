@@ -39,30 +39,30 @@
 #define FNAME "smb2_readtest.dat"
 #define DNAME "smb2_readtest.dir"
 
-static bool test_read_eof(struct torture_context *torture, struct smb2_tree *tree)
+static bool test_read_eof(struct torture_context *torture, struct smb2cli_state *cli)
 {
 	bool ret = true;
 	NTSTATUS status;
 	struct smb2_handle h;
 	uint8_t buf[64*1024];
 	struct smb2_read rd;
-	TALLOC_CTX *tmp_ctx = talloc_new(tree);
+	TALLOC_CTX *tmp_ctx = talloc_new(cli->tree);
 
 	ZERO_STRUCT(buf);
 
-	smb2_util_unlink(tree, FNAME);
+	smb2_util_unlink(cli->tree, FNAME);
 
-	status = torture_smb2_testfile(tree, FNAME, &h);
+	status = torture_smb2_testfile(cli->tree, FNAME, &h);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	ZERO_STRUCT(rd);
 	rd.in.file.handle = h;
 	rd.in.length      = 5;
 	rd.in.offset      = 0;
-	status = smb2_read(tree, tree, &rd);
+	status = smb2_read(cli->tree, cli->tree, &rd);
 	CHECK_STATUS(status, NT_STATUS_END_OF_FILE);
 
-	status = smb2_util_write(tree, h, buf, 0, ARRAY_SIZE(buf));
+	status = smb2_util_write(cli->tree, h, buf, 0, ARRAY_SIZE(buf));
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	ZERO_STRUCT(rd);
@@ -71,58 +71,58 @@ static bool test_read_eof(struct torture_context *torture, struct smb2_tree *tre
 	rd.in.offset = 0;
 	rd.in.min_count = 1;
 
-	status = smb2_read(tree, tmp_ctx, &rd);
+	status = smb2_read(cli->tree, tmp_ctx, &rd);
 	CHECK_STATUS(status, NT_STATUS_OK);
 	CHECK_VALUE(rd.out.data.length, 10);
 
 	rd.in.min_count = 0;
 	rd.in.length = 10;
 	rd.in.offset = sizeof(buf);
-	status = smb2_read(tree, tmp_ctx, &rd);
+	status = smb2_read(cli->tree, tmp_ctx, &rd);
 	CHECK_STATUS(status, NT_STATUS_END_OF_FILE);
 
 	rd.in.min_count = 0;
 	rd.in.length = 0;
 	rd.in.offset = sizeof(buf);
-	status = smb2_read(tree, tmp_ctx, &rd);
+	status = smb2_read(cli->tree, tmp_ctx, &rd);
 	CHECK_STATUS(status, NT_STATUS_OK);
 	CHECK_VALUE(rd.out.data.length, 0);
 
 	rd.in.min_count = 1;
 	rd.in.length = 0;
 	rd.in.offset = sizeof(buf);
-	status = smb2_read(tree, tmp_ctx, &rd);
+	status = smb2_read(cli->tree, tmp_ctx, &rd);
 	CHECK_STATUS(status, NT_STATUS_END_OF_FILE);
 
 	rd.in.min_count = 0;
 	rd.in.length = 2;
 	rd.in.offset = sizeof(buf) - 1;
-	status = smb2_read(tree, tmp_ctx, &rd);
+	status = smb2_read(cli->tree, tmp_ctx, &rd);
 	CHECK_STATUS(status, NT_STATUS_OK);
 	CHECK_VALUE(rd.out.data.length, 1);
 
 	rd.in.min_count = 2;
 	rd.in.length = 1;
 	rd.in.offset = sizeof(buf) - 1;
-	status = smb2_read(tree, tmp_ctx, &rd);
+	status = smb2_read(cli->tree, tmp_ctx, &rd);
 	CHECK_STATUS(status, NT_STATUS_END_OF_FILE);
 
 	rd.in.min_count = 0x10000;
 	rd.in.length = 1;
 	rd.in.offset = 0;
-	status = smb2_read(tree, tmp_ctx, &rd);
+	status = smb2_read(cli->tree, tmp_ctx, &rd);
 	CHECK_STATUS(status, NT_STATUS_END_OF_FILE);
 
 	rd.in.min_count = 0x10000 - 2;
 	rd.in.length = 1;
 	rd.in.offset = 0;
-	status = smb2_read(tree, tmp_ctx, &rd);
+	status = smb2_read(cli->tree, tmp_ctx, &rd);
 	CHECK_STATUS(status, NT_STATUS_END_OF_FILE);
 
 	rd.in.min_count = 10;
 	rd.in.length = 5;
 	rd.in.offset = 0;
-	status = smb2_read(tree, tmp_ctx, &rd);
+	status = smb2_read(cli->tree, tmp_ctx, &rd);
 	CHECK_STATUS(status, NT_STATUS_END_OF_FILE);
 
 done:
@@ -131,22 +131,22 @@ done:
 }
 
 
-static bool test_read_position(struct torture_context *torture, struct smb2_tree *tree)
+static bool test_read_position(struct torture_context *torture, struct smb2cli_state *cli)
 {
 	bool ret = true;
 	NTSTATUS status;
 	struct smb2_handle h;
 	uint8_t buf[64*1024];
 	struct smb2_read rd;
-	TALLOC_CTX *tmp_ctx = talloc_new(tree);
+	TALLOC_CTX *tmp_ctx = talloc_new(cli->tree);
 	union smb_fileinfo info;
 
 	ZERO_STRUCT(buf);
 
-	status = torture_smb2_testfile(tree, FNAME, &h);
+	status = torture_smb2_testfile(cli->tree, FNAME, &h);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
-	status = smb2_util_write(tree, h, buf, 0, ARRAY_SIZE(buf));
+	status = smb2_util_write(cli->tree, h, buf, 0, ARRAY_SIZE(buf));
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	ZERO_STRUCT(rd);
@@ -155,14 +155,14 @@ static bool test_read_position(struct torture_context *torture, struct smb2_tree
 	rd.in.offset = 0;
 	rd.in.min_count = 1;
 
-	status = smb2_read(tree, tmp_ctx, &rd);
+	status = smb2_read(cli->tree, tmp_ctx, &rd);
 	CHECK_STATUS(status, NT_STATUS_OK);
 	CHECK_VALUE(rd.out.data.length, 10);
 
 	info.generic.level = RAW_FILEINFO_SMB2_ALL_INFORMATION;
 	info.generic.in.file.handle = h;
 
-	status = smb2_getinfo_file(tree, tmp_ctx, &info);
+	status = smb2_getinfo_file(cli->tree, tmp_ctx, &info);
 	CHECK_STATUS(status, NT_STATUS_OK);
 	if (torture_setting_bool(torture, "windows", false)) {
 		CHECK_VALUE(info.all_info2.out.position, 0);
@@ -176,15 +176,15 @@ done:
 	return ret;
 }
 
-static bool test_read_dir(struct torture_context *torture, struct smb2_tree *tree)
+static bool test_read_dir(struct torture_context *torture, struct smb2cli_state *cli)
 {
 	bool ret = true;
 	NTSTATUS status;
 	struct smb2_handle h;
 	struct smb2_read rd;
-	TALLOC_CTX *tmp_ctx = talloc_new(tree);
+	TALLOC_CTX *tmp_ctx = talloc_new(cli->tree);
 
-	status = torture_smb2_testdir(tree, DNAME, &h);
+	status = torture_smb2_testdir(cli->tree, DNAME, &h);
 	if (!NT_STATUS_IS_OK(status)) {
 		printf(__location__ " Unable to create test directory '%s' - %s\n", DNAME, nt_errstr(status));
 		return false;
@@ -196,16 +196,16 @@ static bool test_read_dir(struct torture_context *torture, struct smb2_tree *tre
 	rd.in.offset = 0;
 	rd.in.min_count = 1;
 
-	status = smb2_read(tree, tmp_ctx, &rd);
+	status = smb2_read(cli->tree, tmp_ctx, &rd);
 	CHECK_STATUS(status, NT_STATUS_INVALID_DEVICE_REQUEST);
 	
 	rd.in.min_count = 11;
-	status = smb2_read(tree, tmp_ctx, &rd);
+	status = smb2_read(cli->tree, tmp_ctx, &rd);
 	CHECK_STATUS(status, NT_STATUS_INVALID_DEVICE_REQUEST);
 
 	rd.in.length = 0;
 	rd.in.min_count = 2592;
-	status = smb2_read(tree, tmp_ctx, &rd);
+	status = smb2_read(cli->tree, tmp_ctx, &rd);
 	if (torture_setting_bool(torture, "windows", false)) {
 		CHECK_STATUS(status, NT_STATUS_END_OF_FILE);
 	} else {
@@ -215,7 +215,7 @@ static bool test_read_dir(struct torture_context *torture, struct smb2_tree *tre
 	rd.in.length = 0;
 	rd.in.min_count = 0;
 	rd.in.channel = 0;
-	status = smb2_read(tree, tmp_ctx, &rd);
+	status = smb2_read(cli->tree, tmp_ctx, &rd);
 	if (torture_setting_bool(torture, "windows", false)) {
 		CHECK_STATUS(status, NT_STATUS_OK);
 	} else {
@@ -228,61 +228,61 @@ done:
 }
 
 static bool test_read_access(struct torture_context *torture,
-			     struct smb2_tree *tree)
+			     struct smb2cli_state *cli)
 {
 	bool ret = true;
 	NTSTATUS status;
 	struct smb2_handle h;
 	uint8_t buf[64 * 1024];
 	struct smb2_read rd;
-	TALLOC_CTX *tmp_ctx = talloc_new(tree);
+	TALLOC_CTX *tmp_ctx = talloc_new(cli->tree);
 
 	ZERO_STRUCT(buf);
 
 	/* create a file */
-	smb2_util_unlink(tree, FNAME);
+	smb2_util_unlink(cli->tree, FNAME);
 
-	status = torture_smb2_testfile(tree, FNAME, &h);
+	status = torture_smb2_testfile(cli->tree, FNAME, &h);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
-	status = smb2_util_write(tree, h, buf, 0, ARRAY_SIZE(buf));
+	status = smb2_util_write(cli->tree, h, buf, 0, ARRAY_SIZE(buf));
 	CHECK_STATUS(status, NT_STATUS_OK);
 
-	status = smb2_util_close(tree, h);
+	status = smb2_util_close(cli->tree, h);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	/* open w/ READ access - success */
 	status = torture_smb2_testfile_access(
-	    tree, FNAME, &h, SEC_FILE_READ_ATTRIBUTE | SEC_FILE_READ_DATA);
+	    cli->tree, FNAME, &h, SEC_FILE_READ_ATTRIBUTE | SEC_FILE_READ_DATA);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	ZERO_STRUCT(rd);
 	rd.in.file.handle = h;
 	rd.in.length = 5;
 	rd.in.offset = 0;
-	status = smb2_read(tree, tree, &rd);
+	status = smb2_read(cli->tree, cli->tree, &rd);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
-	status = smb2_util_close(tree, h);
+	status = smb2_util_close(cli->tree, h);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	/* open w/ EXECUTE access - success */
 	status = torture_smb2_testfile_access(
-	    tree, FNAME, &h, SEC_FILE_READ_ATTRIBUTE | SEC_FILE_EXECUTE);
+	    cli->tree, FNAME, &h, SEC_FILE_READ_ATTRIBUTE | SEC_FILE_EXECUTE);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	ZERO_STRUCT(rd);
 	rd.in.file.handle = h;
 	rd.in.length = 5;
 	rd.in.offset = 0;
-	status = smb2_read(tree, tree, &rd);
+	status = smb2_read(cli->tree, cli->tree, &rd);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
-	status = smb2_util_close(tree, h);
+	status = smb2_util_close(cli->tree, h);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	/* open without READ or EXECUTE access - access denied */
-	status = torture_smb2_testfile_access(tree, FNAME, &h,
+	status = torture_smb2_testfile_access(cli->tree, FNAME, &h,
 					      SEC_FILE_READ_ATTRIBUTE);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
@@ -290,10 +290,10 @@ static bool test_read_access(struct torture_context *torture,
 	rd.in.file.handle = h;
 	rd.in.length = 5;
 	rd.in.offset = 0;
-	status = smb2_read(tree, tree, &rd);
+	status = smb2_read(cli->tree, cli->tree, &rd);
 	CHECK_STATUS(status, NT_STATUS_ACCESS_DENIED);
 
-	status = smb2_util_close(tree, h);
+	status = smb2_util_close(cli->tree, h);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 done:
@@ -319,7 +319,7 @@ struct torture_suite *torture_smb2_read_init(TALLOC_CTX *ctx)
 }
 
 static bool test_aio_cancel(struct torture_context *tctx,
-			    struct smb2_tree *tree)
+			    struct smb2cli_state *cli)
 {
 	struct smb2_handle h;
 	uint8_t buf[64 * 1024];
@@ -331,9 +331,9 @@ static bool test_aio_cancel(struct torture_context *tctx,
 
 	ZERO_STRUCT(buf);
 
-	smb2_util_unlink(tree, FNAME);
+	smb2_util_unlink(cli->tree, FNAME);
 
-	status = torture_smb2_testfile(tree, FNAME, &h);
+	status = torture_smb2_testfile(cli->tree, FNAME, &h);
 	torture_assert_ntstatus_ok_goto(
 		tctx,
 		status,
@@ -341,7 +341,7 @@ static bool test_aio_cancel(struct torture_context *tctx,
 		done,
 		"torture_smb2_testfile failed\n");
 
-	status = smb2_util_write(tree, h, buf, 0, ARRAY_SIZE(buf));
+	status = smb2_util_write(cli->tree, h, buf, 0, ARRAY_SIZE(buf));
 	torture_assert_ntstatus_ok_goto(
 		tctx,
 		status,
@@ -349,7 +349,7 @@ static bool test_aio_cancel(struct torture_context *tctx,
 		done,
 		"smb2_util_write failed\n");
 
-	status = smb2_util_close(tree, h);
+	status = smb2_util_close(cli->tree, h);
 	torture_assert_ntstatus_ok_goto(
 		tctx,
 		status,
@@ -358,7 +358,7 @@ static bool test_aio_cancel(struct torture_context *tctx,
 		"smb2_util_close failed\n");
 
 	status = torture_smb2_testfile_access(
-		tree, FNAME, &h, SEC_RIGHTS_FILE_ALL);
+		cli->tree, FNAME, &h, SEC_RIGHTS_FILE_ALL);
 	torture_assert_ntstatus_ok_goto(
 		tctx,
 		status,
@@ -373,7 +373,7 @@ static bool test_aio_cancel(struct torture_context *tctx,
 		.in.min_count   = 1,
 	};
 
-	req = smb2_read_send(tree, &r);
+	req = smb2_read_send(cli->tree, &r);
 	torture_assert_goto(
 		tctx,
 		req != NULL,
@@ -399,7 +399,7 @@ static bool test_aio_cancel(struct torture_context *tctx,
 		done,
 		"smb2_cancel failed\n");
 
-	status = smb2_read_recv(req, tree, &r);
+	status = smb2_read_recv(req, cli->tree, &r);
 	torture_assert_ntstatus_ok_goto(
 		tctx,
 		status,
@@ -407,7 +407,7 @@ static bool test_aio_cancel(struct torture_context *tctx,
 		done,
 		"smb2_read_recv failed\n");
 
-	status = smb2_util_close(tree, h);
+	status = smb2_util_close(cli->tree, h);
 	torture_assert_ntstatus_ok_goto(
 		tctx,
 		status,
@@ -416,7 +416,7 @@ static bool test_aio_cancel(struct torture_context *tctx,
 		"smb2_util_close failed\n");
 
 done:
-	smb2_util_unlink(tree, FNAME);
+	smb2_util_unlink(cli->tree, FNAME);
 	return ret;
 }
 

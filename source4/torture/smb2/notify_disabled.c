@@ -49,7 +49,7 @@
    basic testing of change notify on directories
 */
 static bool torture_smb2_notify_disabled(struct torture_context *torture,
-					 struct smb2_tree *tree1)
+					 struct smb2cli_state *cli1)
 {
 	bool ret = true;
 	NTSTATUS status;
@@ -60,8 +60,8 @@ static bool torture_smb2_notify_disabled(struct torture_context *torture,
 
 	torture_comment(torture, "TESTING CHANGE NOTIFY DISABLED\n");
 
-	smb2_deltree(tree1, BASEDIR);
-	smb2_util_rmdir(tree1, BASEDIR);
+	smb2_deltree(cli1->tree, BASEDIR);
+	smb2_util_rmdir(cli1->tree, BASEDIR);
 	/*
 	  get a handle on the directory
 	*/
@@ -79,7 +79,7 @@ static bool torture_smb2_notify_disabled(struct torture_context *torture,
 	io.smb2.in.security_flags = 0;
 	io.smb2.in.fname = BASEDIR;
 
-	status = smb2_create(tree1, torture, &(io.smb2));
+	status = smb2_create(cli1->tree, torture, &(io.smb2));
 	torture_assert_ntstatus_equal_goto(torture, status, NT_STATUS_OK,
 					   ret, done, "smb2_create");
 	h1 = io.smb2.out.file.handle;
@@ -91,17 +91,17 @@ static bool torture_smb2_notify_disabled(struct torture_context *torture,
 	notify.smb2.in.file.handle = h1;
 	notify.smb2.in.recursive = true;
 
-	req = smb2_notify_send(tree1, &(notify.smb2));
+	req = smb2_notify_send(cli1->tree, &(notify.smb2));
 	status = smb2_notify_recv(req, torture, &(notify.smb2));
 	torture_assert_ntstatus_equal_goto(torture, status, NT_STATUS_NOT_IMPLEMENTED,
 					   ret, done, "smb2_notify_recv");
 
-	status = smb2_util_close(tree1, h1);
+	status = smb2_util_close(cli1->tree, h1);
 	torture_assert_ntstatus_equal_goto(torture, status, NT_STATUS_OK,
 					   ret, done, "smb2_create");
 
 done:
-	smb2_deltree(tree1, BASEDIR);
+	smb2_deltree(cli1->tree, BASEDIR);
 	return ret;
 }
 

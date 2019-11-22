@@ -69,7 +69,7 @@
 	}
 
 static bool test_valid_request(struct torture_context *torture,
-			       struct smb2_tree *tree)
+			       struct smb2cli_state *cli)
 {
 	bool ret = true;
 	NTSTATUS status;
@@ -80,10 +80,10 @@ static bool test_valid_request(struct torture_context *torture,
 
 	ZERO_STRUCT(buf);
 
-	status = torture_smb2_testfile(tree, "lock1.txt", &h);
+	status = torture_smb2_testfile(cli->tree, "lock1.txt", &h);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
-	status = smb2_util_write(tree, h, buf, 0, ARRAY_SIZE(buf));
+	status = smb2_util_write(cli->tree, h, buf, 0, ARRAY_SIZE(buf));
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	lck.in.locks		= el;
@@ -97,7 +97,7 @@ static bool test_valid_request(struct torture_context *torture,
 	el[0].length		= 0x0000000000000000;
 	el[0].reserved		= 0x0000000000000000;
 	el[0].flags		= 0x00000000;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_INVALID_PARAMETER);
 
 	lck.in.lock_count	= 0x0000;
@@ -107,7 +107,7 @@ static bool test_valid_request(struct torture_context *torture,
 	el[0].length		= 0;
 	el[0].reserved		= 0x00000000;
 	el[0].flags		= SMB2_LOCK_FLAG_SHARED;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_INVALID_PARAMETER);
 
 	lck.in.lock_count	= 0x0001;
@@ -117,7 +117,7 @@ static bool test_valid_request(struct torture_context *torture,
 	el[0].length		= 0;
 	el[0].reserved		= 0x00000000;
 	el[0].flags		= SMB2_LOCK_FLAG_NONE;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	if (TARGET_IS_W2K8(torture)) {
 		CHECK_STATUS(status, NT_STATUS_OK);
 		torture_warning(torture, "Target has bug validating lock flags "
@@ -129,7 +129,7 @@ static bool test_valid_request(struct torture_context *torture,
 	torture_comment(torture, "Test >63-bit lock requests.\n");
 
 	lck.in.file.handle.data[0] +=1;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_FILE_CLOSED);
 	lck.in.file.handle.data[0] -=1;
 
@@ -141,7 +141,7 @@ static bool test_valid_request(struct torture_context *torture,
 	el[0].reserved		= 0x00000000;
 	el[0].flags		= SMB2_LOCK_FLAG_EXCLUSIVE |
 				  SMB2_LOCK_FLAG_FAIL_IMMEDIATELY;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	if (TARGET_SUPPORTS_INVALID_LOCK_RANGE(torture)) {
 		CHECK_STATUS(status, NT_STATUS_INVALID_LOCK_RANGE);
 	} else {
@@ -150,7 +150,7 @@ static bool test_valid_request(struct torture_context *torture,
 	}
 
 	lck.in.lock_sequence	= 0x123ab2;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	if (TARGET_SUPPORTS_INVALID_LOCK_RANGE(torture)) {
 		CHECK_STATUS(status, NT_STATUS_INVALID_LOCK_RANGE);
 	} else {
@@ -167,16 +167,16 @@ static bool test_valid_request(struct torture_context *torture,
 	el[0].reserved		= 0x87654321;
 	el[0].flags		= SMB2_LOCK_FLAG_EXCLUSIVE |
 				  SMB2_LOCK_FLAG_FAIL_IMMEDIATELY;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_OK);
 	CHECK_VALUE(lck.out.reserved, 0);
 
 	el[0].flags		= SMB2_LOCK_FLAG_SHARED;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_OK);
 	CHECK_VALUE(lck.out.reserved, 0);
 
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_OK);
 	CHECK_VALUE(lck.out.reserved, 0);
 
@@ -187,7 +187,7 @@ static bool test_valid_request(struct torture_context *torture,
 	el[0].length		= 0x00000000FFFFFFFF;
 	el[0].reserved		= 0x1234567;
 	el[0].flags		= SMB2_LOCK_FLAG_UNLOCK;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	lck.in.lock_count	= 0x0001;
@@ -197,12 +197,12 @@ static bool test_valid_request(struct torture_context *torture,
 	el[0].length		= 0x00000000FFFFFFFF;
 	el[0].reserved		= 0x00000000;
 	el[0].flags		= SMB2_LOCK_FLAG_UNLOCK;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_OK);
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_RANGE_NOT_LOCKED);
 
 	torture_comment(torture, "Test flags field permutations.\n");
@@ -215,7 +215,7 @@ static bool test_valid_request(struct torture_context *torture,
 	el[0].reserved		= 0x00000000;
 	el[0].flags		= ~SMB2_LOCK_FLAG_ALL_MASK;
 
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	if (TARGET_IS_W2K8(torture)) {
 		CHECK_STATUS(status, NT_STATUS_OK);
 		torture_warning(torture, "Target has bug validating lock flags "
@@ -226,27 +226,27 @@ static bool test_valid_request(struct torture_context *torture,
 
 	if (TARGET_IS_W2K8(torture)) {
 		el[0].flags		= SMB2_LOCK_FLAG_UNLOCK;
-		status = smb2_lock(tree, &lck);
+		status = smb2_lock(cli->tree, &lck);
 		CHECK_STATUS(status, NT_STATUS_OK);
 	}
 
 	el[0].flags		= SMB2_LOCK_FLAG_UNLOCK;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_RANGE_NOT_LOCKED);
 
 	el[0].flags		= SMB2_LOCK_FLAG_UNLOCK |
 				  SMB2_LOCK_FLAG_EXCLUSIVE;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_INVALID_PARAMETER);
 
 	el[0].flags		= SMB2_LOCK_FLAG_UNLOCK |
 				  SMB2_LOCK_FLAG_SHARED;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_INVALID_PARAMETER);
 
 	el[0].flags		= SMB2_LOCK_FLAG_UNLOCK |
 				  SMB2_LOCK_FLAG_FAIL_IMMEDIATELY;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	if (TARGET_IS_W2K8(torture)) {
 		CHECK_STATUS(status, NT_STATUS_RANGE_NOT_LOCKED);
 		torture_warning(torture, "Target has bug validating lock flags "
@@ -271,19 +271,19 @@ static bool test_valid_request(struct torture_context *torture,
 	lck.in.lock_count	= 2;
 	el[0].flags		= 0;
 	el[1].flags		= SMB2_LOCK_FLAG_UNLOCK;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_INVALID_PARAMETER);
 
 	lck.in.lock_count	= 2;
 	el[0].flags = SMB2_LOCK_FLAG_SHARED|SMB2_LOCK_FLAG_FAIL_IMMEDIATELY;
 	el[1].flags = SMB2_LOCK_FLAG_SHARED;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_INVALID_PARAMETER);
 
 	lck.in.lock_count	= 2;
 	el[0].flags		= 0;
 	el[1].flags		= 0;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	if (TARGET_IS_W2K8(torture)) {
 		CHECK_STATUS(status, NT_STATUS_OK);
 		torture_warning(torture, "Target has bug validating lock flags "
@@ -295,7 +295,7 @@ static bool test_valid_request(struct torture_context *torture,
 	lck.in.lock_count	= 2;
 	el[0].flags		= SMB2_LOCK_FLAG_UNLOCK;
 	el[1].flags		= 0;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	if (TARGET_IS_W2K8(torture)) {
 		CHECK_STATUS(status, NT_STATUS_OK);
 		torture_warning(torture, "Target has bug validating lock flags "
@@ -306,36 +306,36 @@ static bool test_valid_request(struct torture_context *torture,
 
 	lck.in.lock_count	= 1;
 	el[0].flags		= SMB2_LOCK_FLAG_UNLOCK;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_RANGE_NOT_LOCKED);
 
 	lck.in.lock_count	= 1;
 	el[0].flags		= SMB2_LOCK_FLAG_UNLOCK;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_RANGE_NOT_LOCKED);
 
 	lck.in.lock_count	= 1;
 	el[0].flags		= SMB2_LOCK_FLAG_UNLOCK;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_RANGE_NOT_LOCKED);
 
 	lck.in.lock_count	= 1;
 	el[0].flags		= SMB2_LOCK_FLAG_SHARED;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	lck.in.lock_count	= 2;
 	el[0].flags		= SMB2_LOCK_FLAG_UNLOCK;
 	el[1].flags		= SMB2_LOCK_FLAG_UNLOCK;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	lck.in.lock_count	= 1;
 	el[0].flags		= SMB2_LOCK_FLAG_UNLOCK;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_RANGE_NOT_LOCKED);
 
 done:
@@ -352,7 +352,7 @@ struct test_lock_read_write_state {
 };
 
 static bool test_lock_read_write(struct torture_context *torture,
-				 struct smb2_tree *tree,
+				 struct smb2cli_state *cli,
 				 struct test_lock_read_write_state *s)
 {
 	bool ret = true;
@@ -369,10 +369,10 @@ static bool test_lock_read_write(struct torture_context *torture,
 
 	ZERO_STRUCT(buf);
 
-	status = torture_smb2_testfile(tree, s->fname, &h1);
+	status = torture_smb2_testfile(cli->tree, s->fname, &h1);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
-	status = smb2_util_write(tree, h1, buf, 0, ARRAY_SIZE(buf));
+	status = smb2_util_write(cli->tree, h1, buf, 0, ARRAY_SIZE(buf));
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	lck.in.lock_count	= 0x0001;
@@ -382,7 +382,7 @@ static bool test_lock_read_write(struct torture_context *torture,
 	el[0].length		= ARRAY_SIZE(buf)/2;
 	el[0].reserved		= 0x00000000;
 	el[0].flags		= s->lock_flags;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_OK);
 	CHECK_VALUE(lck.out.reserved, 0);
 
@@ -393,7 +393,7 @@ static bool test_lock_read_write(struct torture_context *torture,
 	el[0].length		= ARRAY_SIZE(buf)/2;
 	el[0].reserved		= 0x00000000;
 	el[0].flags		= s->lock_flags;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_OK);
 	CHECK_VALUE(lck.out.reserved, 0);
 
@@ -409,7 +409,7 @@ static bool test_lock_read_write(struct torture_context *torture,
 	cr.in.create_options = 0;
 	cr.in.fname = s->fname;
 
-	status = smb2_create(tree, tree, &cr);
+	status = smb2_create(cli->tree, cli->tree, &cr);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	h2 = cr.out.file.handle;
@@ -419,7 +419,7 @@ static bool test_lock_read_write(struct torture_context *torture,
 	wr.in.offset      = ARRAY_SIZE(buf)/2;
 	wr.in.data        = data_blob_const(buf, ARRAY_SIZE(buf)/2);
 
-	status = smb2_write(tree, &wr);
+	status = smb2_write(cli->tree, &wr);
 	CHECK_STATUS(status, s->write_h1_status);
 
 	ZERO_STRUCT(rd);
@@ -427,7 +427,7 @@ static bool test_lock_read_write(struct torture_context *torture,
 	rd.in.offset      = ARRAY_SIZE(buf)/2;
 	rd.in.length      = ARRAY_SIZE(buf)/2;
 
-	status = smb2_read(tree, tree, &rd);
+	status = smb2_read(cli->tree, cli->tree, &rd);
 	CHECK_STATUS(status, s->read_h1_status);
 
 	ZERO_STRUCT(wr);
@@ -435,7 +435,7 @@ static bool test_lock_read_write(struct torture_context *torture,
 	wr.in.offset      = ARRAY_SIZE(buf)/2;
 	wr.in.data        = data_blob_const(buf, ARRAY_SIZE(buf)/2);
 
-	status = smb2_write(tree, &wr);
+	status = smb2_write(cli->tree, &wr);
 	CHECK_STATUS(status, s->write_h2_status);
 
 	ZERO_STRUCT(rd);
@@ -443,7 +443,7 @@ static bool test_lock_read_write(struct torture_context *torture,
 	rd.in.offset      = ARRAY_SIZE(buf)/2;
 	rd.in.length      = ARRAY_SIZE(buf)/2;
 
-	status = smb2_read(tree, tree, &rd);
+	status = smb2_read(cli->tree, cli->tree, &rd);
 	CHECK_STATUS(status, s->read_h2_status);
 
 	lck.in.lock_count	= 0x0001;
@@ -453,7 +453,7 @@ static bool test_lock_read_write(struct torture_context *torture,
 	el[0].length		= ARRAY_SIZE(buf)/2;
 	el[0].reserved		= 0x00000000;
 	el[0].flags		= SMB2_LOCK_FLAG_UNLOCK;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_OK);
 	CHECK_VALUE(lck.out.reserved, 0);
 
@@ -462,7 +462,7 @@ static bool test_lock_read_write(struct torture_context *torture,
 	wr.in.offset      = ARRAY_SIZE(buf)/2;
 	wr.in.data        = data_blob_const(buf, ARRAY_SIZE(buf)/2);
 
-	status = smb2_write(tree, &wr);
+	status = smb2_write(cli->tree, &wr);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	ZERO_STRUCT(rd);
@@ -470,7 +470,7 @@ static bool test_lock_read_write(struct torture_context *torture,
 	rd.in.offset      = ARRAY_SIZE(buf)/2;
 	rd.in.length      = ARRAY_SIZE(buf)/2;
 
-	status = smb2_read(tree, tree, &rd);
+	status = smb2_read(cli->tree, cli->tree, &rd);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 done:
@@ -478,7 +478,7 @@ done:
 }
 
 static bool test_lock_rw_none(struct torture_context *torture,
-			      struct smb2_tree *tree)
+			      struct smb2cli_state *cli)
 {
 	struct test_lock_read_write_state s = {
 		.fname			= "lock_rw_none.dat",
@@ -496,11 +496,11 @@ static bool test_lock_rw_none(struct torture_context *torture,
 			     "target is not W2K8 we skip this test.\n");
 	}
 
-	return test_lock_read_write(torture, tree, &s);
+	return test_lock_read_write(torture, cli->tree, &s);
 }
 
 static bool test_lock_rw_shared(struct torture_context *torture,
-				struct smb2_tree *tree)
+				struct smb2cli_state *cli)
 {
 	struct test_lock_read_write_state s = {
 		.fname			= "lock_rw_shared.dat",
@@ -511,11 +511,11 @@ static bool test_lock_rw_shared(struct torture_context *torture,
 		.read_h2_status		= NT_STATUS_OK,
 	};
 
-	return test_lock_read_write(torture, tree, &s);
+	return test_lock_read_write(torture, cli->tree, &s);
 }
 
 static bool test_lock_rw_exclusive(struct torture_context *torture,
-				   struct smb2_tree *tree)
+				   struct smb2cli_state *cli)
 {
 	struct test_lock_read_write_state s = {
 		.fname			= "lock_rw_exclusive.dat",
@@ -526,11 +526,11 @@ static bool test_lock_rw_exclusive(struct torture_context *torture,
 		.read_h2_status		= NT_STATUS_FILE_LOCK_CONFLICT,
 	};
 
-	return test_lock_read_write(torture, tree, &s);
+	return test_lock_read_write(torture, cli->tree, &s);
 }
 
 static bool test_lock_auto_unlock(struct torture_context *torture,
-				  struct smb2_tree *tree)
+				  struct smb2cli_state *cli)
 {
 	bool ret = true;
 	NTSTATUS status;
@@ -541,10 +541,10 @@ static bool test_lock_auto_unlock(struct torture_context *torture,
 
 	ZERO_STRUCT(buf);
 
-	status = torture_smb2_testfile(tree, "autounlock.txt", &h);
+	status = torture_smb2_testfile(cli->tree, "autounlock.txt", &h);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
-	status = smb2_util_write(tree, h, buf, 0, ARRAY_SIZE(buf));
+	status = smb2_util_write(cli->tree, h, buf, 0, ARRAY_SIZE(buf));
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	ZERO_STRUCT(lck);
@@ -556,13 +556,13 @@ static bool test_lock_auto_unlock(struct torture_context *torture,
 	el[0].length		= 1;
 	el[0].flags		= SMB2_LOCK_FLAG_EXCLUSIVE |
 				  SMB2_LOCK_FLAG_FAIL_IMMEDIATELY;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_LOCK_NOT_GRANTED);
 
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	if (TARGET_IS_W2K8(torture)) {
 		CHECK_STATUS(status, NT_STATUS_OK);
 		torture_warning(torture, "Target has \"pretty please\" bug. "
@@ -572,7 +572,7 @@ static bool test_lock_auto_unlock(struct torture_context *torture,
 		CHECK_STATUS(status, NT_STATUS_LOCK_NOT_GRANTED);
 	}
 
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_LOCK_NOT_GRANTED);
 
 done:
@@ -583,7 +583,7 @@ done:
   test different lock ranges and see if different handles conflict
 */
 static bool test_lock(struct torture_context *torture,
-		      struct smb2_tree *tree)
+		      struct smb2cli_state *cli)
 {
 	NTSTATUS status;
 	bool ret = true;
@@ -595,18 +595,18 @@ static bool test_lock(struct torture_context *torture,
 
 	const char *fname = BASEDIR "\\async.txt";
 
-	status = torture_smb2_testdir(tree, BASEDIR, &h);
+	status = torture_smb2_testdir(cli->tree, BASEDIR, &h);
 	CHECK_STATUS(status, NT_STATUS_OK);
-	smb2_util_close(tree, h);
+	smb2_util_close(cli->tree, h);
 
-	status = torture_smb2_testfile(tree, fname, &h);
+	status = torture_smb2_testfile(cli->tree, fname, &h);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	ZERO_STRUCT(buf);
-	status = smb2_util_write(tree, h, buf, 0, ARRAY_SIZE(buf));
+	status = smb2_util_write(cli->tree, h, buf, 0, ARRAY_SIZE(buf));
 	CHECK_STATUS(status, NT_STATUS_OK);
 
-	status = torture_smb2_testfile(tree, fname, &h2);
+	status = torture_smb2_testfile(cli->tree, fname, &h2);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	lck.in.locks		= el;
@@ -621,14 +621,14 @@ static bool test_lock(struct torture_context *torture,
 	torture_comment(torture, "Trying 0/0 lock\n");
 	el[0].offset		= 0x0000000000000000;
 	el[0].length		= 0x0000000000000000;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_OK);
 	lck.in.file.handle	= h2;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_OK);
 	lck.in.file.handle	= h;
 	el[0].flags		= SMB2_LOCK_FLAG_UNLOCK;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	torture_comment(torture, "Trying 0/1 lock\n");
@@ -636,16 +636,16 @@ static bool test_lock(struct torture_context *torture,
 				  SMB2_LOCK_FLAG_FAIL_IMMEDIATELY;
 	el[0].offset		= 0x0000000000000000;
 	el[0].length		= 0x0000000000000001;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_OK);
 	lck.in.file.handle      = h2;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_LOCK_NOT_GRANTED);
 	lck.in.file.handle      = h;
 	el[0].flags		= SMB2_LOCK_FLAG_UNLOCK;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_OK);
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_RANGE_NOT_LOCKED);
 
 	torture_comment(torture, "Trying 0xEEFFFFF lock\n");
@@ -653,16 +653,16 @@ static bool test_lock(struct torture_context *torture,
 				  SMB2_LOCK_FLAG_FAIL_IMMEDIATELY;
 	el[0].offset		= 0xEEFFFFFF;
 	el[0].length		= 4000;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_OK);
 	lck.in.file.handle      = h2;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_LOCK_NOT_GRANTED);
 	lck.in.file.handle      = h;
 	el[0].flags		= SMB2_LOCK_FLAG_UNLOCK;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_OK);
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_RANGE_NOT_LOCKED);
 
 	torture_comment(torture, "Trying 0xEF00000 lock\n");
@@ -670,16 +670,16 @@ static bool test_lock(struct torture_context *torture,
 				  SMB2_LOCK_FLAG_FAIL_IMMEDIATELY;
 	el[0].offset		= 0xEF000000;
 	el[0].length		= 4000;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_OK);
 	lck.in.file.handle      = h2;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_LOCK_NOT_GRANTED);
 	lck.in.file.handle      = h;
 	el[0].flags		= SMB2_LOCK_FLAG_UNLOCK;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_OK);
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_RANGE_NOT_LOCKED);
 
 	torture_comment(torture, "Trying (2^63 - 1)/1\n");
@@ -689,16 +689,16 @@ static bool test_lock(struct torture_context *torture,
 	el[0].offset	      <<= 63;
 	el[0].offset--;
 	el[0].length		= 1;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_OK);
 	lck.in.file.handle      = h2;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_LOCK_NOT_GRANTED);
 	lck.in.file.handle      = h;
 	el[0].flags		= SMB2_LOCK_FLAG_UNLOCK;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_OK);
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_RANGE_NOT_LOCKED);
 
 	torture_comment(torture, "Trying 2^63/1\n");
@@ -707,16 +707,16 @@ static bool test_lock(struct torture_context *torture,
 	el[0].offset		= 1;
 	el[0].offset	      <<= 63;
 	el[0].length		= 1;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_OK);
 	lck.in.file.handle      = h2;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_LOCK_NOT_GRANTED);
 	lck.in.file.handle      = h;
 	el[0].flags		= SMB2_LOCK_FLAG_UNLOCK;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_OK);
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_RANGE_NOT_LOCKED);
 
 	torture_comment(torture, "Trying max/0 lock\n");
@@ -724,18 +724,18 @@ static bool test_lock(struct torture_context *torture,
 				  SMB2_LOCK_FLAG_FAIL_IMMEDIATELY;
 	el[0].offset		= ~0;
 	el[0].length		= 0;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_OK);
 	lck.in.file.handle      = h2;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_OK);
 	el[0].flags		= SMB2_LOCK_FLAG_UNLOCK;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_OK);
 	lck.in.file.handle      = h;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_OK);
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_RANGE_NOT_LOCKED);
 
 	torture_comment(torture, "Trying max/1 lock\n");
@@ -743,16 +743,16 @@ static bool test_lock(struct torture_context *torture,
 				  SMB2_LOCK_FLAG_FAIL_IMMEDIATELY;
 	el[0].offset		= ~0;
 	el[0].length		= 1;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_OK);
 	lck.in.file.handle      = h2;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_LOCK_NOT_GRANTED);
 	lck.in.file.handle      = h;
 	el[0].flags		= SMB2_LOCK_FLAG_UNLOCK;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_OK);
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_RANGE_NOT_LOCKED);
 
 	torture_comment(torture, "Trying max/2 lock\n");
@@ -760,13 +760,13 @@ static bool test_lock(struct torture_context *torture,
 				  SMB2_LOCK_FLAG_FAIL_IMMEDIATELY;
 	el[0].offset		= ~0;
 	el[0].length		= 2;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	if (TARGET_SUPPORTS_INVALID_LOCK_RANGE(torture)) {
 		CHECK_STATUS(status, NT_STATUS_INVALID_LOCK_RANGE);
 	} else {
 		CHECK_STATUS(status, NT_STATUS_OK);
 		el[0].flags	= SMB2_LOCK_FLAG_UNLOCK;
-		status = smb2_lock(tree, &lck);
+		status = smb2_lock(cli->tree, &lck);
 		CHECK_STATUS(status, NT_STATUS_OK);
 	}
 
@@ -775,20 +775,20 @@ static bool test_lock(struct torture_context *torture,
 				  SMB2_LOCK_FLAG_FAIL_IMMEDIATELY;
 	el[0].offset		= 10001;
 	el[0].length		= 40002;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_OK);
 	lck.in.file.handle	= h2;
 	el[0].flags		= SMB2_LOCK_FLAG_UNLOCK;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_RANGE_NOT_LOCKED);
 	lck.in.file.handle	= h;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 done:
-	smb2_util_close(tree, h2);
-	smb2_util_close(tree, h);
-	smb2_deltree(tree, BASEDIR);
+	smb2_util_close(cli->tree, h2);
+	smb2_util_close(cli->tree, h);
+	smb2_deltree(cli->tree, BASEDIR);
 	return ret;
 }
 
@@ -796,7 +796,7 @@ done:
   test SMB2 LOCK async operation
 */
 static bool test_async(struct torture_context *torture,
-		       struct smb2_tree *tree)
+		       struct smb2cli_state *cli)
 {
 	NTSTATUS status;
 	bool ret = true;
@@ -809,18 +809,18 @@ static bool test_async(struct torture_context *torture,
 
 	const char *fname = BASEDIR "\\async.txt";
 
-	status = torture_smb2_testdir(tree, BASEDIR, &h);
+	status = torture_smb2_testdir(cli->tree, BASEDIR, &h);
 	CHECK_STATUS(status, NT_STATUS_OK);
-	smb2_util_close(tree, h);
+	smb2_util_close(cli->tree, h);
 
-	status = torture_smb2_testfile(tree, fname, &h);
+	status = torture_smb2_testfile(cli->tree, fname, &h);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	ZERO_STRUCT(buf);
-	status = smb2_util_write(tree, h, buf, 0, ARRAY_SIZE(buf));
+	status = smb2_util_write(cli->tree, h, buf, 0, ARRAY_SIZE(buf));
 	CHECK_STATUS(status, NT_STATUS_OK);
 
-	status = torture_smb2_testfile(tree, fname, &h2);
+	status = torture_smb2_testfile(cli->tree, fname, &h2);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	lck.in.locks		= el;
@@ -834,18 +834,18 @@ static bool test_async(struct torture_context *torture,
 	el[0].flags		= SMB2_LOCK_FLAG_EXCLUSIVE;
 
 	torture_comment(torture, "  Acquire first lock\n");
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	torture_comment(torture, "  Second lock should pend on first\n");
 	lck.in.file.handle	= h2;
-	req = smb2_lock_send(tree, &lck);
+	req = smb2_lock_send(cli->tree, &lck);
 	WAIT_FOR_ASYNC_RESPONSE(req);
 
 	torture_comment(torture, "  Unlock first lock\n");
 	lck.in.file.handle	= h;
 	el[0].flags		= SMB2_LOCK_FLAG_UNLOCK;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	torture_comment(torture, "  Second lock should now succeed\n");
@@ -855,9 +855,9 @@ static bool test_async(struct torture_context *torture,
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 done:
-	smb2_util_close(tree, h2);
-	smb2_util_close(tree, h);
-	smb2_deltree(tree, BASEDIR);
+	smb2_util_close(cli->tree, h2);
+	smb2_util_close(cli->tree, h);
+	smb2_deltree(cli->tree, BASEDIR);
 	return ret;
 }
 
@@ -865,7 +865,7 @@ done:
   test SMB2 LOCK Cancel operation
 */
 static bool test_cancel(struct torture_context *torture,
-			struct smb2_tree *tree)
+			struct smb2cli_state *cli)
 {
 	NTSTATUS status;
 	bool ret = true;
@@ -878,18 +878,18 @@ static bool test_cancel(struct torture_context *torture,
 
 	const char *fname = BASEDIR "\\cancel.txt";
 
-	status = torture_smb2_testdir(tree, BASEDIR, &h);
+	status = torture_smb2_testdir(cli->tree, BASEDIR, &h);
 	CHECK_STATUS(status, NT_STATUS_OK);
-	smb2_util_close(tree, h);
+	smb2_util_close(cli->tree, h);
 
-	status = torture_smb2_testfile(tree, fname, &h);
+	status = torture_smb2_testfile(cli->tree, fname, &h);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	ZERO_STRUCT(buf);
-	status = smb2_util_write(tree, h, buf, 0, ARRAY_SIZE(buf));
+	status = smb2_util_write(cli->tree, h, buf, 0, ARRAY_SIZE(buf));
 	CHECK_STATUS(status, NT_STATUS_OK);
 
-	status = torture_smb2_testfile(tree, fname, &h2);
+	status = torture_smb2_testfile(cli->tree, fname, &h2);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	lck.in.locks		= el;
@@ -905,12 +905,12 @@ static bool test_cancel(struct torture_context *torture,
 	torture_comment(torture, "Testing basic cancel\n");
 
 	torture_comment(torture, "  Acquire first lock\n");
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	torture_comment(torture, "  Second lock should pend on first\n");
 	lck.in.file.handle	= h2;
-	req = smb2_lock_send(tree, &lck);
+	req = smb2_lock_send(cli->tree, &lck);
 	WAIT_FOR_ASYNC_RESPONSE(req);
 
 	torture_comment(torture, "  Cancel the second lock\n");
@@ -922,7 +922,7 @@ static bool test_cancel(struct torture_context *torture,
 	torture_comment(torture, "  Unlock first lock\n");
 	lck.in.file.handle	= h;
 	el[0].flags		= SMB2_LOCK_FLAG_UNLOCK;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 
@@ -930,18 +930,18 @@ static bool test_cancel(struct torture_context *torture,
 
 	torture_comment(torture, "  Acquire first lock\n");
 	el[0].flags		= SMB2_LOCK_FLAG_EXCLUSIVE;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	torture_comment(torture, "  Second lock should pend on first\n");
 	lck.in.file.handle	= h2;
-	req = smb2_lock_send(tree, &lck);
+	req = smb2_lock_send(cli->tree, &lck);
 	WAIT_FOR_ASYNC_RESPONSE(req);
 
 	torture_comment(torture, "  Attempt to unlock pending second lock\n");
 	lck.in.file.handle	= h2;
 	el[0].flags		= SMB2_LOCK_FLAG_UNLOCK;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_RANGE_NOT_LOCKED);
 
 	torture_comment(torture, "  Now cancel the second lock\n");
@@ -953,7 +953,7 @@ static bool test_cancel(struct torture_context *torture,
 	torture_comment(torture, "  Unlock first lock\n");
 	lck.in.file.handle	= h;
 	el[0].flags		= SMB2_LOCK_FLAG_UNLOCK;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 
@@ -961,16 +961,16 @@ static bool test_cancel(struct torture_context *torture,
 
 	torture_comment(torture, "  Acquire first lock\n");
 	el[0].flags		= SMB2_LOCK_FLAG_EXCLUSIVE;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	torture_comment(torture, "  Second lock should pend on first\n");
 	lck.in.file.handle	= h2;
-	req = smb2_lock_send(tree, &lck);
+	req = smb2_lock_send(cli->tree, &lck);
 	WAIT_FOR_ASYNC_RESPONSE(req);
 
 	torture_comment(torture, "  Close the second lock handle\n");
-	smb2_util_close(tree, h2);
+	smb2_util_close(cli->tree, h2);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	torture_comment(torture, "  Check pending lock reply\n");
@@ -980,21 +980,21 @@ static bool test_cancel(struct torture_context *torture,
 	torture_comment(torture, "  Unlock first lock\n");
 	lck.in.file.handle	= h;
 	el[0].flags		= SMB2_LOCK_FLAG_UNLOCK;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 done:
-	smb2_util_close(tree, h2);
-	smb2_util_close(tree, h);
-	smb2_deltree(tree, BASEDIR);
+	smb2_util_close(cli->tree, h2);
+	smb2_util_close(cli->tree, h);
+	smb2_deltree(cli->tree, BASEDIR);
 	return ret;
 }
 
 /*
-  test SMB2 LOCK Cancel by tree disconnect
+  test SMB2 LOCK Cancel by cli->tree disconnect
 */
 static bool test_cancel_tdis(struct torture_context *torture,
-			     struct smb2_tree *tree)
+			     struct smb2cli_state *cli)
 {
 	NTSTATUS status;
 	bool ret = true;
@@ -1007,18 +1007,18 @@ static bool test_cancel_tdis(struct torture_context *torture,
 
 	const char *fname = BASEDIR "\\cancel_tdis.txt";
 
-	status = torture_smb2_testdir(tree, BASEDIR, &h);
+	status = torture_smb2_testdir(cli->tree, BASEDIR, &h);
 	CHECK_STATUS(status, NT_STATUS_OK);
-	smb2_util_close(tree, h);
+	smb2_util_close(cli->tree, h);
 
-	status = torture_smb2_testfile(tree, fname, &h);
+	status = torture_smb2_testfile(cli->tree, fname, &h);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	ZERO_STRUCT(buf);
-	status = smb2_util_write(tree, h, buf, 0, ARRAY_SIZE(buf));
+	status = smb2_util_write(cli->tree, h, buf, 0, ARRAY_SIZE(buf));
 	CHECK_STATUS(status, NT_STATUS_OK);
 
-	status = torture_smb2_testfile(tree, fname, &h2);
+	status = torture_smb2_testfile(cli->tree, fname, &h2);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	lck.in.locks		= el;
@@ -1031,26 +1031,26 @@ static bool test_cancel_tdis(struct torture_context *torture,
 	el[0].reserved		= 0x00000000;
 	el[0].flags		= SMB2_LOCK_FLAG_EXCLUSIVE;
 
-	torture_comment(torture, "Testing cancel by tree disconnect\n");
+	torture_comment(torture, "Testing cancel by cli->tree disconnect\n");
 
-	status = torture_smb2_testfile(tree, fname, &h);
+	status = torture_smb2_testfile(cli->tree, fname, &h);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
-	status = torture_smb2_testfile(tree, fname, &h2);
+	status = torture_smb2_testfile(cli->tree, fname, &h2);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	torture_comment(torture, "  Acquire first lock\n");
 	el[0].flags		= SMB2_LOCK_FLAG_EXCLUSIVE;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	torture_comment(torture, "  Second lock should pend on first\n");
 	lck.in.file.handle	= h2;
-	req = smb2_lock_send(tree, &lck);
+	req = smb2_lock_send(cli->tree, &lck);
 	WAIT_FOR_ASYNC_RESPONSE(req);
 
-	torture_comment(torture, "  Disconnect the tree\n");
-	smb2_tdis(tree);
+	torture_comment(torture, "  Disconnect the cli->tree\n");
+	smb2_tdis(cli->tree);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	torture_comment(torture, "  Check pending lock reply\n");
@@ -1067,10 +1067,10 @@ static bool test_cancel_tdis(struct torture_context *torture,
 	torture_comment(torture, "  Attempt to unlock first lock\n");
 	lck.in.file.handle	= h;
 	el[0].flags		= SMB2_LOCK_FLAG_UNLOCK;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	/*
 	 * Most Windows versions have a strange order to
-	 * verify the session id, tree id and file id.
+	 * verify the session id, cli->tree id and file id.
 	 * (They should be checked in that order, but windows
 	 *  seems to check the file id before the others).
 	 */
@@ -1079,9 +1079,9 @@ static bool test_cancel_tdis(struct torture_context *torture,
 	}
 
 done:
-	smb2_util_close(tree, h2);
-	smb2_util_close(tree, h);
-	smb2_deltree(tree, BASEDIR);
+	smb2_util_close(cli->tree, h2);
+	smb2_util_close(cli->tree, h);
+	smb2_deltree(cli->tree, BASEDIR);
 	return ret;
 }
 
@@ -1089,7 +1089,7 @@ done:
   test SMB2 LOCK Cancel by user logoff
 */
 static bool test_cancel_logoff(struct torture_context *torture,
-			       struct smb2_tree *tree)
+			       struct smb2cli_state *cli)
 {
 	NTSTATUS status;
 	bool ret = true;
@@ -1102,18 +1102,18 @@ static bool test_cancel_logoff(struct torture_context *torture,
 
 	const char *fname = BASEDIR "\\cancel_logoff.txt";
 
-	status = torture_smb2_testdir(tree, BASEDIR, &h);
+	status = torture_smb2_testdir(cli->tree, BASEDIR, &h);
 	CHECK_STATUS(status, NT_STATUS_OK);
-	smb2_util_close(tree, h);
+	smb2_util_close(cli->tree, h);
 
-	status = torture_smb2_testfile(tree, fname, &h);
+	status = torture_smb2_testfile(cli->tree, fname, &h);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	ZERO_STRUCT(buf);
-	status = smb2_util_write(tree, h, buf, 0, ARRAY_SIZE(buf));
+	status = smb2_util_write(cli->tree, h, buf, 0, ARRAY_SIZE(buf));
 	CHECK_STATUS(status, NT_STATUS_OK);
 
-	status = torture_smb2_testfile(tree, fname, &h2);
+	status = torture_smb2_testfile(cli->tree, fname, &h2);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	lck.in.locks		= el;
@@ -1130,16 +1130,16 @@ static bool test_cancel_logoff(struct torture_context *torture,
 
 	torture_comment(torture, "  Acquire first lock\n");
 	el[0].flags		= SMB2_LOCK_FLAG_EXCLUSIVE;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	torture_comment(torture, "  Second lock should pend on first\n");
 	lck.in.file.handle	= h2;
-	req = smb2_lock_send(tree, &lck);
+	req = smb2_lock_send(cli->tree, &lck);
 	WAIT_FOR_ASYNC_RESPONSE(req);
 
 	torture_comment(torture, "  Logoff user\n");
-	smb2_logoff(tree->session);
+	smb2_logoff(cli->tree->session);
 
 	torture_comment(torture, "  Check pending lock reply\n");
 	status = smb2_lock_recv(req, &lck);
@@ -1155,10 +1155,10 @@ static bool test_cancel_logoff(struct torture_context *torture,
 	torture_comment(torture, "  Attempt to unlock first lock\n");
 	lck.in.file.handle	= h;
 	el[0].flags		= SMB2_LOCK_FLAG_UNLOCK;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	/*
 	 * Most Windows versions have a strange order to
-	 * verify the session id, tree id and file id.
+	 * verify the session id, cli->tree id and file id.
 	 * (They should be checked in that order, but windows
 	 *  seems to check the file id before the others).
 	 */
@@ -1167,9 +1167,9 @@ static bool test_cancel_logoff(struct torture_context *torture,
 	}
 
 done:
-	smb2_util_close(tree, h2);
-	smb2_util_close(tree, h);
-	smb2_deltree(tree, BASEDIR);
+	smb2_util_close(cli->tree, h2);
+	smb2_util_close(cli->tree, h);
+	smb2_deltree(cli->tree, BASEDIR);
 	return ret;
 }
 
@@ -1186,7 +1186,7 @@ done:
  * being held on that range.
 */
 static bool test_errorcode(struct torture_context *torture,
-			   struct smb2_tree *tree)
+			   struct smb2cli_state *cli)
 {
 	NTSTATUS status;
 	bool ret = true;
@@ -1198,18 +1198,18 @@ static bool test_errorcode(struct torture_context *torture,
 
 	const char *fname = BASEDIR "\\errorcode.txt";
 
-	status = torture_smb2_testdir(tree, BASEDIR, &h);
+	status = torture_smb2_testdir(cli->tree, BASEDIR, &h);
 	CHECK_STATUS(status, NT_STATUS_OK);
-	smb2_util_close(tree, h);
+	smb2_util_close(cli->tree, h);
 
-	status = torture_smb2_testfile(tree, fname, &h);
+	status = torture_smb2_testfile(cli->tree, fname, &h);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	ZERO_STRUCT(buf);
-	status = smb2_util_write(tree, h, buf, 0, ARRAY_SIZE(buf));
+	status = smb2_util_write(cli->tree, h, buf, 0, ARRAY_SIZE(buf));
 	CHECK_STATUS(status, NT_STATUS_OK);
 
-	status = torture_smb2_testfile(tree, fname, &h2);
+	status = torture_smb2_testfile(cli->tree, fname, &h2);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	lck.in.locks		= el;
@@ -1233,44 +1233,44 @@ static bool test_errorcode(struct torture_context *torture,
 		goto done;
 	}
 
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	/* Demonstrate that the first conflicting lock on each handle gives
 	 * LOCK_NOT_GRANTED. */
 	lck.in.file.handle	= h;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_LOCK_NOT_GRANTED);
 
 	lck.in.file.handle	= h2;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_LOCK_NOT_GRANTED);
 
 	/* Demonstrate that each following conflict also gives
 	 * LOCK_NOT_GRANTED */
 	lck.in.file.handle	= h;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_LOCK_NOT_GRANTED);
 
 	lck.in.file.handle	= h2;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_LOCK_NOT_GRANTED);
 
 	lck.in.file.handle	= h;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_LOCK_NOT_GRANTED);
 
 	lck.in.file.handle	= h2;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_LOCK_NOT_GRANTED);
 
 	/* Demonstrate that the smbpid doesn't matter */
 	lck.in.file.handle	= h;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_LOCK_NOT_GRANTED);
 
 	lck.in.file.handle	= h2;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_LOCK_NOT_GRANTED);
 
 	/* Demonstrate that a 0-byte lock inside the locked range still
@@ -1279,11 +1279,11 @@ static bool test_errorcode(struct torture_context *torture,
 	el[0].offset		= 102;
 	el[0].length		= 0;
 	lck.in.file.handle	= h;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_LOCK_NOT_GRANTED);
 
 	lck.in.file.handle	= h2;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_LOCK_NOT_GRANTED);
 
 	/* Demonstrate that a lock inside the locked range still gives the
@@ -1292,17 +1292,17 @@ static bool test_errorcode(struct torture_context *torture,
 	el[0].offset		= 102;
 	el[0].length		= 5;
 	lck.in.file.handle	= h;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_LOCK_NOT_GRANTED);
 
 	lck.in.file.handle	= h2;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_LOCK_NOT_GRANTED);
 
 done:
-	smb2_util_close(tree, h2);
-	smb2_util_close(tree, h);
-	smb2_deltree(tree, BASEDIR);
+	smb2_util_close(cli->tree, h2);
+	smb2_util_close(cli->tree, h);
+	smb2_deltree(cli->tree, BASEDIR);
 	return ret;
 }
 
@@ -1350,7 +1350,7 @@ static struct double_lock_test zero_byte_tests[] = {
 };
 
 static bool test_zerobytelength(struct torture_context *torture,
-			        struct smb2_tree *tree)
+			        struct smb2cli_state *cli)
 {
 	NTSTATUS status;
 	bool ret = true;
@@ -1364,18 +1364,18 @@ static bool test_zerobytelength(struct torture_context *torture,
 
 	torture_comment(torture, "Testing zero length byte range locks:\n");
 
-	status = torture_smb2_testdir(tree, BASEDIR, &h);
+	status = torture_smb2_testdir(cli->tree, BASEDIR, &h);
 	CHECK_STATUS(status, NT_STATUS_OK);
-	smb2_util_close(tree, h);
+	smb2_util_close(cli->tree, h);
 
-	status = torture_smb2_testfile(tree, fname, &h);
+	status = torture_smb2_testfile(cli->tree, fname, &h);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	ZERO_STRUCT(buf);
-	status = smb2_util_write(tree, h, buf, 0, ARRAY_SIZE(buf));
+	status = smb2_util_write(cli->tree, h, buf, 0, ARRAY_SIZE(buf));
 	CHECK_STATUS(status, NT_STATUS_OK);
 
-	status = torture_smb2_testfile(tree, fname, &h2);
+	status = torture_smb2_testfile(cli->tree, fname, &h2);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	/* Setup initial parameters */
@@ -1399,25 +1399,25 @@ static bool test_zerobytelength(struct torture_context *torture,
 		lck.in.locks		= &zero_byte_tests[i].lock1;
 		lck.in.locks[0].flags	= SMB2_LOCK_FLAG_EXCLUSIVE |
 					  SMB2_LOCK_FLAG_FAIL_IMMEDIATELY;
-		status = smb2_lock(tree, &lck);
+		status = smb2_lock(cli->tree, &lck);
 		CHECK_STATUS(status, NT_STATUS_OK);
 
 		lck.in.locks		= &zero_byte_tests[i].lock2;
 		lck.in.locks[0].flags	= SMB2_LOCK_FLAG_EXCLUSIVE |
 					  SMB2_LOCK_FLAG_FAIL_IMMEDIATELY;
-		status = smb2_lock(tree, &lck);
+		status = smb2_lock(cli->tree, &lck);
 		CHECK_STATUS_CONT(status, zero_byte_tests[i].status);
 
 		/* Unlock both locks in reverse order. */
 		lck.in.locks[0].flags	= SMB2_LOCK_FLAG_UNLOCK;
 		if (NT_STATUS_EQUAL(status, NT_STATUS_OK)) {
-			status = smb2_lock(tree, &lck);
+			status = smb2_lock(cli->tree, &lck);
 			CHECK_STATUS(status, NT_STATUS_OK);
 		}
 
 		lck.in.locks		= &zero_byte_tests[i].lock1;
 		lck.in.locks[0].flags	= SMB2_LOCK_FLAG_UNLOCK;
-		status = smb2_lock(tree, &lck);
+		status = smb2_lock(cli->tree, &lck);
 		CHECK_STATUS(status, NT_STATUS_OK);
 	}
 
@@ -1437,40 +1437,40 @@ static bool test_zerobytelength(struct torture_context *torture,
 		lck.in.locks		= &zero_byte_tests[i].lock1;
 		lck.in.locks[0].flags	= SMB2_LOCK_FLAG_EXCLUSIVE |
 					  SMB2_LOCK_FLAG_FAIL_IMMEDIATELY;
-		status = smb2_lock(tree, &lck);
+		status = smb2_lock(cli->tree, &lck);
 		CHECK_STATUS(status, NT_STATUS_OK);
 
 		lck.in.file.handle	= h2;
 		lck.in.locks		= &zero_byte_tests[i].lock2;
 		lck.in.locks[0].flags	= SMB2_LOCK_FLAG_EXCLUSIVE |
 					  SMB2_LOCK_FLAG_FAIL_IMMEDIATELY;
-		status = smb2_lock(tree, &lck);
+		status = smb2_lock(cli->tree, &lck);
 		CHECK_STATUS_CONT(status, zero_byte_tests[i].status);
 
 		/* Unlock both locks in reverse order. */
 		lck.in.file.handle	= h2;
 		lck.in.locks[0].flags	= SMB2_LOCK_FLAG_UNLOCK;
 		if (NT_STATUS_EQUAL(status, NT_STATUS_OK)) {
-			status = smb2_lock(tree, &lck);
+			status = smb2_lock(cli->tree, &lck);
 			CHECK_STATUS(status, NT_STATUS_OK);
 		}
 
 		lck.in.file.handle	= h;
 		lck.in.locks		= &zero_byte_tests[i].lock1;
 		lck.in.locks[0].flags	= SMB2_LOCK_FLAG_UNLOCK;
-		status = smb2_lock(tree, &lck);
+		status = smb2_lock(cli->tree, &lck);
 		CHECK_STATUS(status, NT_STATUS_OK);
 	}
 
 done:
-	smb2_util_close(tree, h2);
-	smb2_util_close(tree, h);
-	smb2_deltree(tree, BASEDIR);
+	smb2_util_close(cli->tree, h2);
+	smb2_util_close(cli->tree, h);
+	smb2_deltree(cli->tree, BASEDIR);
 	return ret;
 }
 
 static bool test_zerobyteread(struct torture_context *torture,
-			      struct smb2_tree *tree)
+			      struct smb2cli_state *cli)
 {
 	NTSTATUS status;
 	bool ret = true;
@@ -1483,18 +1483,18 @@ static bool test_zerobyteread(struct torture_context *torture,
 
 	const char *fname = BASEDIR "\\zerobyteread.txt";
 
-	status = torture_smb2_testdir(tree, BASEDIR, &h);
+	status = torture_smb2_testdir(cli->tree, BASEDIR, &h);
 	CHECK_STATUS(status, NT_STATUS_OK);
-	smb2_util_close(tree, h);
+	smb2_util_close(cli->tree, h);
 
-	status = torture_smb2_testfile(tree, fname, &h);
+	status = torture_smb2_testfile(cli->tree, fname, &h);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	ZERO_STRUCT(buf);
-	status = smb2_util_write(tree, h, buf, 0, ARRAY_SIZE(buf));
+	status = smb2_util_write(cli->tree, h, buf, 0, ARRAY_SIZE(buf));
 	CHECK_STATUS(status, NT_STATUS_OK);
 
-	status = torture_smb2_testfile(tree, fname, &h2);
+	status = torture_smb2_testfile(cli->tree, fname, &h2);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	/* Setup initial parameters */
@@ -1515,7 +1515,7 @@ static bool test_zerobyteread(struct torture_context *torture,
 	el[0].reserved		= 0x00000000;
 	el[0].flags		= SMB2_LOCK_FLAG_EXCLUSIVE |
 				  SMB2_LOCK_FLAG_FAIL_IMMEDIATELY;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_OK);
 	CHECK_VALUE(lck.out.reserved, 0);
 
@@ -1523,14 +1523,14 @@ static bool test_zerobyteread(struct torture_context *torture,
 	torture_comment(torture, "  reading 0 bytes.\n");
 	rd.in.offset      = 5;
 	rd.in.length      = 0;
-	status = smb2_read(tree, tree, &rd);
+	status = smb2_read(cli->tree, cli->tree, &rd);
 	torture_assert_int_equal_goto(torture, rd.out.data.length, 0, ret, done,
 				      "zero byte read did not return 0 bytes");
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	/* Unlock lock */
 	el[0].flags		= SMB2_LOCK_FLAG_UNLOCK;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_OK);
 	CHECK_VALUE(lck.out.reserved, 0);
 
@@ -1544,7 +1544,7 @@ static bool test_zerobyteread(struct torture_context *torture,
 	el[0].reserved		= 0x00000000;
 	el[0].flags		= SMB2_LOCK_FLAG_EXCLUSIVE |
 				  SMB2_LOCK_FLAG_FAIL_IMMEDIATELY;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_OK);
 	CHECK_VALUE(lck.out.reserved, 0);
 
@@ -1552,7 +1552,7 @@ static bool test_zerobyteread(struct torture_context *torture,
 	torture_comment(torture, "  reading 0 bytes before the lock.\n");
 	rd.in.offset      = 4;
 	rd.in.length      = 0;
-	status = smb2_read(tree, tree, &rd);
+	status = smb2_read(cli->tree, cli->tree, &rd);
 	torture_assert_int_equal_goto(torture, rd.out.data.length, 0, ret, done,
 				      "zero byte read did not return 0 bytes");
 	CHECK_STATUS(status, NT_STATUS_OK);
@@ -1561,7 +1561,7 @@ static bool test_zerobyteread(struct torture_context *torture,
 	torture_comment(torture, "  reading 0 bytes on the lock.\n");
 	rd.in.offset      = 5;
 	rd.in.length      = 0;
-	status = smb2_read(tree, tree, &rd);
+	status = smb2_read(cli->tree, cli->tree, &rd);
 	torture_assert_int_equal_goto(torture, rd.out.data.length, 0, ret, done,
 				      "zero byte read did not return 0 bytes");
 	CHECK_STATUS(status, NT_STATUS_OK);
@@ -1570,26 +1570,26 @@ static bool test_zerobyteread(struct torture_context *torture,
 	torture_comment(torture, "  reading 0 bytes after the lock.\n");
 	rd.in.offset      = 6;
 	rd.in.length      = 0;
-	status = smb2_read(tree, tree, &rd);
+	status = smb2_read(cli->tree, cli->tree, &rd);
 	torture_assert_int_equal_goto(torture, rd.out.data.length, 0, ret, done,
 				      "zero byte read did not return 0 bytes");
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	/* Unlock lock */
 	el[0].flags		= SMB2_LOCK_FLAG_UNLOCK;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_OK);
 	CHECK_VALUE(lck.out.reserved, 0);
 
 done:
-	smb2_util_close(tree, h2);
-	smb2_util_close(tree, h);
-	smb2_deltree(tree, BASEDIR);
+	smb2_util_close(cli->tree, h2);
+	smb2_util_close(cli->tree, h);
+	smb2_deltree(cli->tree, BASEDIR);
 	return ret;
 }
 
 static bool test_unlock(struct torture_context *torture,
-		        struct smb2_tree *tree)
+		        struct smb2cli_state *cli)
 {
 	NTSTATUS status;
 	bool ret = true;
@@ -1602,18 +1602,18 @@ static bool test_unlock(struct torture_context *torture,
 
 	const char *fname = BASEDIR "\\unlock.txt";
 
-	status = torture_smb2_testdir(tree, BASEDIR, &h);
+	status = torture_smb2_testdir(cli->tree, BASEDIR, &h);
 	CHECK_STATUS(status, NT_STATUS_OK);
-	smb2_util_close(tree, h);
+	smb2_util_close(cli->tree, h);
 
-	status = torture_smb2_testfile(tree, fname, &h);
+	status = torture_smb2_testfile(cli->tree, fname, &h);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	ZERO_STRUCT(buf);
-	status = smb2_util_write(tree, h, buf, 0, ARRAY_SIZE(buf));
+	status = smb2_util_write(cli->tree, h, buf, 0, ARRAY_SIZE(buf));
 	CHECK_STATUS(status, NT_STATUS_OK);
 
-	status = torture_smb2_testfile(tree, fname, &h2);
+	status = torture_smb2_testfile(cli->tree, fname, &h2);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	/* Setup initial parameters */
@@ -1631,14 +1631,14 @@ static bool test_unlock(struct torture_context *torture,
 	torture_comment(torture, "  taking exclusive lock.\n");
 	lck.in.file.handle	= h;
 	el1[0].flags		= SMB2_LOCK_FLAG_EXCLUSIVE;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	torture_comment(torture, "  try to unlock the exclusive with a shared "
 				 "unlock call.\n");
 	el1[0].flags		= SMB2_LOCK_FLAG_SHARED |
 				  SMB2_LOCK_FLAG_UNLOCK;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_INVALID_PARAMETER);
 
 	torture_comment(torture, "  try shared lock on h2, to test the "
@@ -1646,13 +1646,13 @@ static bool test_unlock(struct torture_context *torture,
 	lck.in.file.handle	= h2;
 	el1[0].flags		= SMB2_LOCK_FLAG_SHARED |
 				  SMB2_LOCK_FLAG_FAIL_IMMEDIATELY;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_LOCK_NOT_GRANTED);
 
 	torture_comment(torture, "  unlock the exclusive lock\n");
 	lck.in.file.handle	= h;
 	el1[0].flags		= SMB2_LOCK_FLAG_UNLOCK;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	/* Unlock a shared lock with an exclusive-unlock call. */
@@ -1662,14 +1662,14 @@ static bool test_unlock(struct torture_context *torture,
 	torture_comment(torture, "  taking shared lock.\n");
 	lck.in.file.handle	= h;
 	el1[0].flags		= SMB2_LOCK_FLAG_SHARED;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	torture_comment(torture, "  try to unlock the shared with an exclusive "
 				 "unlock call.\n");
 	el1[0].flags		= SMB2_LOCK_FLAG_EXCLUSIVE |
 				  SMB2_LOCK_FLAG_UNLOCK;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_INVALID_PARAMETER);
 
 	torture_comment(torture, "  try exclusive lock on h2, to test the "
@@ -1677,13 +1677,13 @@ static bool test_unlock(struct torture_context *torture,
 	lck.in.file.handle	= h2;
 	el1[0].flags		= SMB2_LOCK_FLAG_EXCLUSIVE |
 				  SMB2_LOCK_FLAG_FAIL_IMMEDIATELY;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_LOCK_NOT_GRANTED);
 
 	torture_comment(torture, "  unlock the exclusive lock\n");
 	lck.in.file.handle	= h;
 	el1[0].flags		= SMB2_LOCK_FLAG_UNLOCK;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	/* Test unlocking of stacked 0-byte locks. SMB2 0-byte lock behavior
@@ -1704,13 +1704,13 @@ static bool test_unlock(struct torture_context *torture,
 	/* lock 0-byte exclusive */
 	el1[0].flags		= SMB2_LOCK_FLAG_EXCLUSIVE |
 				  SMB2_LOCK_FLAG_FAIL_IMMEDIATELY;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	/* lock 0-byte shared */
 	el1[0].flags		= SMB2_LOCK_FLAG_SHARED |
 				  SMB2_LOCK_FLAG_FAIL_IMMEDIATELY;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	/* test contention */
@@ -1718,21 +1718,21 @@ static bool test_unlock(struct torture_context *torture,
 	lck.in.file.handle	= h2;
 	el2[0].flags		= SMB2_LOCK_FLAG_EXCLUSIVE |
 				  SMB2_LOCK_FLAG_FAIL_IMMEDIATELY;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_LOCK_NOT_GRANTED);
 
 	lck.in.locks		= el2;
 	lck.in.file.handle	= h2;
 	el2[0].flags		= SMB2_LOCK_FLAG_SHARED |
 				  SMB2_LOCK_FLAG_FAIL_IMMEDIATELY;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_LOCK_NOT_GRANTED);
 
 	/* unlock */
 	lck.in.locks		= el1;
 	lck.in.file.handle	= h;
 	el1[0].flags		= SMB2_LOCK_FLAG_UNLOCK;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	/* test - can we take a shared lock? */
@@ -1740,18 +1740,18 @@ static bool test_unlock(struct torture_context *torture,
 	lck.in.file.handle	= h2;
 	el2[0].flags		= SMB2_LOCK_FLAG_SHARED |
 				  SMB2_LOCK_FLAG_FAIL_IMMEDIATELY;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	el2[0].flags		= SMB2_LOCK_FLAG_UNLOCK;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	/* cleanup */
 	lck.in.locks		= el1;
 	lck.in.file.handle	= h;
 	el1[0].flags		= SMB2_LOCK_FLAG_UNLOCK;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	/* Test unlocking of stacked exclusive, shared locks. Exclusive
@@ -1772,13 +1772,13 @@ static bool test_unlock(struct torture_context *torture,
 	/* lock exclusive */
 	el1[0].flags		= SMB2_LOCK_FLAG_EXCLUSIVE |
 				  SMB2_LOCK_FLAG_FAIL_IMMEDIATELY;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	/* lock shared */
 	el1[0].flags		= SMB2_LOCK_FLAG_SHARED |
 				  SMB2_LOCK_FLAG_FAIL_IMMEDIATELY;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	/* test contention */
@@ -1786,21 +1786,21 @@ static bool test_unlock(struct torture_context *torture,
 	lck.in.file.handle	= h2;
 	el2[0].flags		= SMB2_LOCK_FLAG_EXCLUSIVE |
 				  SMB2_LOCK_FLAG_FAIL_IMMEDIATELY;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_LOCK_NOT_GRANTED);
 
 	lck.in.locks		= el2;
 	lck.in.file.handle	= h2;
 	el2[0].flags		= SMB2_LOCK_FLAG_SHARED |
 				  SMB2_LOCK_FLAG_FAIL_IMMEDIATELY;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_LOCK_NOT_GRANTED);
 
 	/* unlock */
 	lck.in.locks		= el1;
 	lck.in.file.handle	= h;
 	el1[0].flags		= SMB2_LOCK_FLAG_UNLOCK;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	/* test - can we take a shared lock? */
@@ -1808,29 +1808,29 @@ static bool test_unlock(struct torture_context *torture,
 	lck.in.file.handle	= h2;
 	el2[0].flags		= SMB2_LOCK_FLAG_SHARED |
 				  SMB2_LOCK_FLAG_FAIL_IMMEDIATELY;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	el2[0].flags		= SMB2_LOCK_FLAG_UNLOCK;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	/* cleanup */
 	lck.in.locks		= el1;
 	lck.in.file.handle	= h;
 	el1[0].flags		= SMB2_LOCK_FLAG_UNLOCK;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 done:
-	smb2_util_close(tree, h2);
-	smb2_util_close(tree, h);
-	smb2_deltree(tree, BASEDIR);
+	smb2_util_close(cli->tree, h2);
+	smb2_util_close(cli->tree, h);
+	smb2_deltree(cli->tree, BASEDIR);
 	return ret;
 }
 
 static bool test_multiple_unlock(struct torture_context *torture,
-				 struct smb2_tree *tree)
+				 struct smb2cli_state *cli)
 {
 	NTSTATUS status;
 	bool ret = true;
@@ -1841,15 +1841,15 @@ static bool test_multiple_unlock(struct torture_context *torture,
 
 	const char *fname = BASEDIR "\\unlock_multiple.txt";
 
-	status = torture_smb2_testdir(tree, BASEDIR, &h);
+	status = torture_smb2_testdir(cli->tree, BASEDIR, &h);
 	CHECK_STATUS(status, NT_STATUS_OK);
-	smb2_util_close(tree, h);
+	smb2_util_close(cli->tree, h);
 
-	status = torture_smb2_testfile(tree, fname, &h);
+	status = torture_smb2_testfile(cli->tree, fname, &h);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	ZERO_STRUCT(buf);
-	status = smb2_util_write(tree, h, buf, 0, ARRAY_SIZE(buf));
+	status = smb2_util_write(cli->tree, h, buf, 0, ARRAY_SIZE(buf));
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	torture_comment(torture, "Testing multiple unlocks:\n");
@@ -1873,7 +1873,7 @@ static bool test_multiple_unlock(struct torture_context *torture,
 	el[1].flags		= SMB2_LOCK_FLAG_EXCLUSIVE |
 				  SMB2_LOCK_FLAG_FAIL_IMMEDIATELY;
 	lck.in.locks		= &el[1];
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	/* Try to unlock both locks */
@@ -1881,7 +1881,7 @@ static bool test_multiple_unlock(struct torture_context *torture,
 	el[0].flags		= SMB2_LOCK_FLAG_UNLOCK;
 	el[1].flags		= SMB2_LOCK_FLAG_UNLOCK;
 	lck.in.locks		= el;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_RANGE_NOT_LOCKED);
 
 	/* Second lock should not be unlocked. */
@@ -1889,7 +1889,7 @@ static bool test_multiple_unlock(struct torture_context *torture,
 	el[1].flags		= SMB2_LOCK_FLAG_EXCLUSIVE |
 				  SMB2_LOCK_FLAG_FAIL_IMMEDIATELY;
 	lck.in.locks		= &el[1];
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	if (TARGET_IS_W2K8(torture)) {
 		CHECK_STATUS(status, NT_STATUS_OK);
 		torture_warning(torture, "Target has \"pretty please\" bug. "
@@ -1903,7 +1903,7 @@ static bool test_multiple_unlock(struct torture_context *torture,
 	lck.in.lock_count	= 0x0001;
 	el[1].flags		= SMB2_LOCK_FLAG_UNLOCK;
 	lck.in.locks		= &el[1];
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	/* Test2: Acquire first lock, but not second. */
@@ -1914,7 +1914,7 @@ static bool test_multiple_unlock(struct torture_context *torture,
 	el[0].flags		= SMB2_LOCK_FLAG_EXCLUSIVE |
 				  SMB2_LOCK_FLAG_FAIL_IMMEDIATELY;
 	lck.in.locks		= &el[0];
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	/* Try to unlock both locks */
@@ -1922,7 +1922,7 @@ static bool test_multiple_unlock(struct torture_context *torture,
 	el[0].flags		= SMB2_LOCK_FLAG_UNLOCK;
 	el[1].flags		= SMB2_LOCK_FLAG_UNLOCK;
 	lck.in.locks		= el;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_RANGE_NOT_LOCKED);
 
 	/* First lock should be unlocked. */
@@ -1930,14 +1930,14 @@ static bool test_multiple_unlock(struct torture_context *torture,
 	el[0].flags		= SMB2_LOCK_FLAG_EXCLUSIVE |
 				  SMB2_LOCK_FLAG_FAIL_IMMEDIATELY;
 	lck.in.locks		= &el[0];
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	/* cleanup */
 	lck.in.lock_count	= 0x0001;
 	el[0].flags		= SMB2_LOCK_FLAG_UNLOCK;
 	lck.in.locks		= &el[0];
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	/* Test3: Request 2 locks, second will contend.  What happens to the
@@ -1950,7 +1950,7 @@ static bool test_multiple_unlock(struct torture_context *torture,
 	el[1].flags		= SMB2_LOCK_FLAG_EXCLUSIVE |
 				  SMB2_LOCK_FLAG_FAIL_IMMEDIATELY;
 	lck.in.locks		= &el[1];
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	/* Request both locks */
@@ -1958,13 +1958,13 @@ static bool test_multiple_unlock(struct torture_context *torture,
 	el[0].flags		= SMB2_LOCK_FLAG_EXCLUSIVE |
 				  SMB2_LOCK_FLAG_FAIL_IMMEDIATELY;
 	lck.in.locks		= el;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_LOCK_NOT_GRANTED);
 
 	/* First lock should be unlocked. */
 	lck.in.lock_count	= 0x0001;
 	lck.in.locks		= &el[0];
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	/* cleanup */
@@ -1972,7 +1972,7 @@ static bool test_multiple_unlock(struct torture_context *torture,
 		lck.in.lock_count	= 0x0001;
 		el[0].flags		= SMB2_LOCK_FLAG_UNLOCK;
 		lck.in.locks		= &el[0];
-		status = smb2_lock(tree, &lck);
+		status = smb2_lock(cli->tree, &lck);
 		CHECK_STATUS(status, NT_STATUS_OK);
 		torture_warning(torture, "Target has \"pretty please\" bug. "
 				"A contending lock request on the same handle "
@@ -1982,7 +1982,7 @@ static bool test_multiple_unlock(struct torture_context *torture,
 		el[0].flags		= SMB2_LOCK_FLAG_UNLOCK;
 		el[1].flags		= SMB2_LOCK_FLAG_UNLOCK;
 		lck.in.locks		= el;
-		status = smb2_lock(tree, &lck);
+		status = smb2_lock(cli->tree, &lck);
 		CHECK_STATUS(status, NT_STATUS_OK);
 	}
 
@@ -2001,7 +2001,7 @@ static bool test_multiple_unlock(struct torture_context *torture,
 	el[1].flags		= SMB2_LOCK_FLAG_EXCLUSIVE |
 				  SMB2_LOCK_FLAG_FAIL_IMMEDIATELY;
 	lck.in.locks		= el;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	/* Attempt to unlock the first range and lock the second. The lock
@@ -2011,7 +2011,7 @@ static bool test_multiple_unlock(struct torture_context *torture,
 	el[1].flags		= SMB2_LOCK_FLAG_EXCLUSIVE |
 				  SMB2_LOCK_FLAG_FAIL_IMMEDIATELY;
 	lck.in.locks		= el;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_INVALID_PARAMETER);
 
 	/* The first lock should've been unlocked */
@@ -2019,7 +2019,7 @@ static bool test_multiple_unlock(struct torture_context *torture,
 	el[0].flags		= SMB2_LOCK_FLAG_EXCLUSIVE |
 				  SMB2_LOCK_FLAG_FAIL_IMMEDIATELY;
 	lck.in.locks		= &el[0];
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	/* cleanup */
@@ -2027,7 +2027,7 @@ static bool test_multiple_unlock(struct torture_context *torture,
 	el[0].flags		= SMB2_LOCK_FLAG_UNLOCK;
 	el[1].flags		= SMB2_LOCK_FLAG_UNLOCK;
 	lck.in.locks		= el;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	/* Test10: SMB2 only test. Request unlock and lock in same packet.
@@ -2042,7 +2042,7 @@ static bool test_multiple_unlock(struct torture_context *torture,
 	el[0].flags		= SMB2_LOCK_FLAG_EXCLUSIVE |
 				  SMB2_LOCK_FLAG_FAIL_IMMEDIATELY;
 	lck.in.locks		= &el[0];
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	/* Attempt to unlock the first range and lock the second */
@@ -2051,7 +2051,7 @@ static bool test_multiple_unlock(struct torture_context *torture,
 	el[1].flags		= SMB2_LOCK_FLAG_EXCLUSIVE |
 				  SMB2_LOCK_FLAG_FAIL_IMMEDIATELY;
 	lck.in.locks		= el;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_INVALID_PARAMETER);
 
 	/* Neither lock should still be locked */
@@ -2061,7 +2061,7 @@ static bool test_multiple_unlock(struct torture_context *torture,
 	el[1].flags		= SMB2_LOCK_FLAG_EXCLUSIVE |
 				  SMB2_LOCK_FLAG_FAIL_IMMEDIATELY;
 	lck.in.locks		= el;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	/* cleanup */
@@ -2069,7 +2069,7 @@ static bool test_multiple_unlock(struct torture_context *torture,
 	el[0].flags		= SMB2_LOCK_FLAG_UNLOCK;
 	el[1].flags		= SMB2_LOCK_FLAG_UNLOCK;
 	lck.in.locks		= el;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	/* Test11: SMB2 only test. Request lock and unlock in same packet.
@@ -2084,7 +2084,7 @@ static bool test_multiple_unlock(struct torture_context *torture,
 	el[1].flags		= SMB2_LOCK_FLAG_EXCLUSIVE |
 				  SMB2_LOCK_FLAG_FAIL_IMMEDIATELY;
 	lck.in.locks		= &el[1];
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	/* Attempt to lock the first range and unlock the second */
@@ -2093,7 +2093,7 @@ static bool test_multiple_unlock(struct torture_context *torture,
 				  SMB2_LOCK_FLAG_FAIL_IMMEDIATELY;
 	el[1].flags		= SMB2_LOCK_FLAG_UNLOCK;
 	lck.in.locks		= el;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_INVALID_PARAMETER);
 
 	/* First range should be unlocked, second locked. */
@@ -2101,14 +2101,14 @@ static bool test_multiple_unlock(struct torture_context *torture,
 	el[0].flags		= SMB2_LOCK_FLAG_EXCLUSIVE |
 				  SMB2_LOCK_FLAG_FAIL_IMMEDIATELY;
 	lck.in.locks		= &el[0];
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	lck.in.lock_count	= 0x0001;
 	el[1].flags		= SMB2_LOCK_FLAG_EXCLUSIVE |
 				  SMB2_LOCK_FLAG_FAIL_IMMEDIATELY;
 	lck.in.locks		= &el[1];
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_LOCK_NOT_GRANTED);
 
 	/* cleanup */
@@ -2116,7 +2116,7 @@ static bool test_multiple_unlock(struct torture_context *torture,
 		lck.in.lock_count	= 0x0001;
 		el[0].flags		= SMB2_LOCK_FLAG_UNLOCK;
 		lck.in.locks		= &el[0];
-		status = smb2_lock(tree, &lck);
+		status = smb2_lock(cli->tree, &lck);
 		CHECK_STATUS(status, NT_STATUS_OK);
 		torture_warning(torture, "Target has \"pretty please\" bug. "
 				"A contending lock request on the same handle "
@@ -2126,13 +2126,13 @@ static bool test_multiple_unlock(struct torture_context *torture,
 		el[0].flags		= SMB2_LOCK_FLAG_UNLOCK;
 		el[1].flags		= SMB2_LOCK_FLAG_UNLOCK;
 		lck.in.locks		= el;
-		status = smb2_lock(tree, &lck);
+		status = smb2_lock(cli->tree, &lck);
 		CHECK_STATUS(status, NT_STATUS_OK);
 	}
 
 done:
-	smb2_util_close(tree, h);
-	smb2_deltree(tree, BASEDIR);
+	smb2_util_close(cli->tree, h);
+	smb2_deltree(cli->tree, BASEDIR);
 	return ret;
 }
 
@@ -2141,7 +2141,7 @@ done:
  *  - some tests ported from BASE-LOCK-LOCK5
  */
 static bool test_stacking(struct torture_context *torture,
-			  struct smb2_tree *tree)
+			  struct smb2cli_state *cli)
 {
 	NTSTATUS status;
 	bool ret = true;
@@ -2153,18 +2153,18 @@ static bool test_stacking(struct torture_context *torture,
 
 	const char *fname = BASEDIR "\\stacking.txt";
 
-	status = torture_smb2_testdir(tree, BASEDIR, &h);
+	status = torture_smb2_testdir(cli->tree, BASEDIR, &h);
 	CHECK_STATUS(status, NT_STATUS_OK);
-	smb2_util_close(tree, h);
+	smb2_util_close(cli->tree, h);
 
-	status = torture_smb2_testfile(tree, fname, &h);
+	status = torture_smb2_testfile(cli->tree, fname, &h);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	ZERO_STRUCT(buf);
-	status = smb2_util_write(tree, h, buf, 0, ARRAY_SIZE(buf));
+	status = smb2_util_write(cli->tree, h, buf, 0, ARRAY_SIZE(buf));
 	CHECK_STATUS(status, NT_STATUS_OK);
 
-	status = torture_smb2_testfile(tree, fname, &h2);
+	status = torture_smb2_testfile(cli->tree, fname, &h2);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	torture_comment(torture, "Testing lock stacking:\n");
@@ -2184,21 +2184,21 @@ static bool test_stacking(struct torture_context *torture,
 
 	el[0].flags		= SMB2_LOCK_FLAG_SHARED |
 				  SMB2_LOCK_FLAG_FAIL_IMMEDIATELY;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	el[0].flags		= SMB2_LOCK_FLAG_SHARED |
 				  SMB2_LOCK_FLAG_FAIL_IMMEDIATELY;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	/* cleanup */
 	el[0].flags		= SMB2_LOCK_FLAG_UNLOCK;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	el[0].flags		= SMB2_LOCK_FLAG_UNLOCK;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 
@@ -2208,54 +2208,54 @@ static bool test_stacking(struct torture_context *torture,
 
 	el[0].flags		= SMB2_LOCK_FLAG_EXCLUSIVE |
 				  SMB2_LOCK_FLAG_FAIL_IMMEDIATELY;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	el[0].flags		= SMB2_LOCK_FLAG_SHARED |
 				  SMB2_LOCK_FLAG_FAIL_IMMEDIATELY;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	el[0].flags		= SMB2_LOCK_FLAG_SHARED |
 				  SMB2_LOCK_FLAG_FAIL_IMMEDIATELY;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	/* stacking a shared from a different handle should fail */
 	lck.in.file.handle	= h2;
 	el[0].flags		= SMB2_LOCK_FLAG_SHARED |
 				  SMB2_LOCK_FLAG_FAIL_IMMEDIATELY;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_LOCK_NOT_GRANTED);
 
 	/* cleanup */
 	lck.in.file.handle	= h;
 	el[0].flags		= SMB2_LOCK_FLAG_UNLOCK;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	el[0].flags		= SMB2_LOCK_FLAG_UNLOCK;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	el[0].flags		= SMB2_LOCK_FLAG_UNLOCK;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	/* ensure the 4th unlock fails */
 	el[0].flags		= SMB2_LOCK_FLAG_UNLOCK;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_RANGE_NOT_LOCKED);
 
 	/* ensure a second handle can now take an exclusive lock */
 	lck.in.file.handle	= h2;
 	el[0].flags		= SMB2_LOCK_FLAG_SHARED |
 				  SMB2_LOCK_FLAG_FAIL_IMMEDIATELY;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	el[0].flags		= SMB2_LOCK_FLAG_UNLOCK;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	/* Try to take an exclusive lock, then a shared lock on a
@@ -2266,19 +2266,19 @@ static bool test_stacking(struct torture_context *torture,
 	lck.in.file.handle	= h;
 	el[0].flags		= SMB2_LOCK_FLAG_EXCLUSIVE |
 				  SMB2_LOCK_FLAG_FAIL_IMMEDIATELY;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	lck.in.file.handle	= h2;
 	el[0].flags		= SMB2_LOCK_FLAG_SHARED |
 				  SMB2_LOCK_FLAG_FAIL_IMMEDIATELY;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_LOCK_NOT_GRANTED);
 
 	/* cleanup */
 	lck.in.file.handle	= h;
 	el[0].flags		= SMB2_LOCK_FLAG_UNLOCK;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	/* Try to take a shared lock, then stack an exclusive with same
@@ -2288,17 +2288,17 @@ static bool test_stacking(struct torture_context *torture,
 
 	el[0].flags		= SMB2_LOCK_FLAG_SHARED |
 				  SMB2_LOCK_FLAG_FAIL_IMMEDIATELY;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	el[0].flags		= SMB2_LOCK_FLAG_EXCLUSIVE |
 				  SMB2_LOCK_FLAG_FAIL_IMMEDIATELY;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_LOCK_NOT_GRANTED);
 
 	/* cleanup */
 	el[0].flags		= SMB2_LOCK_FLAG_UNLOCK;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	if (TARGET_IS_W2K8(torture)) {
 		CHECK_STATUS(status, NT_STATUS_RANGE_NOT_LOCKED);
 		torture_warning(torture, "Target has \"pretty please\" bug. "
@@ -2313,17 +2313,17 @@ static bool test_stacking(struct torture_context *torture,
 
 	el[0].flags		= SMB2_LOCK_FLAG_EXCLUSIVE |
 				  SMB2_LOCK_FLAG_FAIL_IMMEDIATELY;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	el[0].flags		= SMB2_LOCK_FLAG_EXCLUSIVE |
 				  SMB2_LOCK_FLAG_FAIL_IMMEDIATELY;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_LOCK_NOT_GRANTED);
 
 	/* cleanup */
 	el[0].flags		= SMB2_LOCK_FLAG_UNLOCK;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	if (TARGET_IS_W2K8(torture)) {
 		CHECK_STATUS(status, NT_STATUS_RANGE_NOT_LOCKED);
 		torture_warning(torture, "Target has \"pretty please\" bug. "
@@ -2334,9 +2334,9 @@ static bool test_stacking(struct torture_context *torture,
 	}
 
 done:
-	smb2_util_close(tree, h2);
-	smb2_util_close(tree, h);
-	smb2_deltree(tree, BASEDIR);
+	smb2_util_close(cli->tree, h2);
+	smb2_util_close(cli->tree, h);
+	smb2_deltree(cli->tree, BASEDIR);
 	return ret;
 }
 
@@ -2345,7 +2345,7 @@ done:
  * - shared lock should contend with exclusive lock on different handle
  */
 static bool test_contend(struct torture_context *torture,
-			 struct smb2_tree *tree)
+			 struct smb2cli_state *cli)
 {
 	NTSTATUS status;
 	bool ret = true;
@@ -2357,18 +2357,18 @@ static bool test_contend(struct torture_context *torture,
 
 	const char *fname = BASEDIR "\\contend.txt";
 
-	status = torture_smb2_testdir(tree, BASEDIR, &h);
+	status = torture_smb2_testdir(cli->tree, BASEDIR, &h);
 	CHECK_STATUS(status, NT_STATUS_OK);
-	smb2_util_close(tree, h);
+	smb2_util_close(cli->tree, h);
 
-	status = torture_smb2_testfile(tree, fname, &h);
+	status = torture_smb2_testfile(cli->tree, fname, &h);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	ZERO_STRUCT(buf);
-	status = smb2_util_write(tree, h, buf, 0, ARRAY_SIZE(buf));
+	status = smb2_util_write(cli->tree, h, buf, 0, ARRAY_SIZE(buf));
 	CHECK_STATUS(status, NT_STATUS_OK);
 
-	status = torture_smb2_testfile(tree, fname, &h2);
+	status = torture_smb2_testfile(cli->tree, fname, &h2);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	torture_comment(torture, "Testing lock contention:\n");
@@ -2388,25 +2388,25 @@ static bool test_contend(struct torture_context *torture,
 
 	el[0].flags		= SMB2_LOCK_FLAG_EXCLUSIVE |
 				  SMB2_LOCK_FLAG_FAIL_IMMEDIATELY;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	lck.in.file.handle	= h2;
 	el[0].flags		= SMB2_LOCK_FLAG_SHARED |
 				  SMB2_LOCK_FLAG_FAIL_IMMEDIATELY;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_LOCK_NOT_GRANTED);
 
 	/* cleanup */
 	lck.in.file.handle	= h;
 	el[0].flags		= SMB2_LOCK_FLAG_UNLOCK;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 done:
-	smb2_util_close(tree, h2);
-	smb2_util_close(tree, h);
-	smb2_deltree(tree, BASEDIR);
+	smb2_util_close(cli->tree, h2);
+	smb2_util_close(cli->tree, h);
+	smb2_deltree(cli->tree, BASEDIR);
 	return ret;
 }
 
@@ -2415,7 +2415,7 @@ done:
  * - test that pid does not affect the locker context
  */
 static bool test_context(struct torture_context *torture,
-			 struct smb2_tree *tree)
+			 struct smb2cli_state *cli)
 {
 	NTSTATUS status;
 	bool ret = true;
@@ -2427,18 +2427,18 @@ static bool test_context(struct torture_context *torture,
 
 	const char *fname = BASEDIR "\\context.txt";
 
-	status = torture_smb2_testdir(tree, BASEDIR, &h);
+	status = torture_smb2_testdir(cli->tree, BASEDIR, &h);
 	CHECK_STATUS(status, NT_STATUS_OK);
-	smb2_util_close(tree, h);
+	smb2_util_close(cli->tree, h);
 
-	status = torture_smb2_testfile(tree, fname, &h);
+	status = torture_smb2_testfile(cli->tree, fname, &h);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	ZERO_STRUCT(buf);
-	status = smb2_util_write(tree, h, buf, 0, ARRAY_SIZE(buf));
+	status = smb2_util_write(cli->tree, h, buf, 0, ARRAY_SIZE(buf));
 	CHECK_STATUS(status, NT_STATUS_OK);
 
-	status = torture_smb2_testfile(tree, fname, &h2);
+	status = torture_smb2_testfile(cli->tree, fname, &h2);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	torture_comment(torture, "Testing locker context:\n");
@@ -2459,21 +2459,21 @@ static bool test_context(struct torture_context *torture,
 
 	el[0].flags		= SMB2_LOCK_FLAG_EXCLUSIVE |
 				  SMB2_LOCK_FLAG_FAIL_IMMEDIATELY;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	el[0].flags		= SMB2_LOCK_FLAG_UNLOCK;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	el[0].flags		= SMB2_LOCK_FLAG_UNLOCK;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_RANGE_NOT_LOCKED);
 
 done:
-	smb2_util_close(tree, h2);
-	smb2_util_close(tree, h);
-	smb2_deltree(tree, BASEDIR);
+	smb2_util_close(cli->tree, h2);
+	smb2_util_close(cli->tree, h);
+	smb2_deltree(cli->tree, BASEDIR);
 	return ret;
 }
 
@@ -2482,7 +2482,7 @@ done:
  *  - test ported from BASE-LOCK-LOCK3
  */
 static bool test_range(struct torture_context *torture,
-		       struct smb2_tree *tree)
+		       struct smb2cli_state *cli)
 {
 	NTSTATUS status;
 	bool ret = true;
@@ -2498,18 +2498,18 @@ static bool test_range(struct torture_context *torture,
 
 #define NEXT_OFFSET offset += (~(uint64_t)0) / torture_numops
 
-	status = torture_smb2_testdir(tree, BASEDIR, &h);
+	status = torture_smb2_testdir(cli->tree, BASEDIR, &h);
 	CHECK_STATUS(status, NT_STATUS_OK);
-	smb2_util_close(tree, h);
+	smb2_util_close(cli->tree, h);
 
-	status = torture_smb2_testfile(tree, fname, &h);
+	status = torture_smb2_testfile(cli->tree, fname, &h);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	ZERO_STRUCT(buf);
-	status = smb2_util_write(tree, h, buf, 0, ARRAY_SIZE(buf));
+	status = smb2_util_write(cli->tree, h, buf, 0, ARRAY_SIZE(buf));
 	CHECK_STATUS(status, NT_STATUS_OK);
 
-	status = torture_smb2_testfile(tree, fname, &h2);
+	status = torture_smb2_testfile(cli->tree, fname, &h2);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	torture_comment(torture, "Testing locks spread across the 64-bit "
@@ -2540,7 +2540,7 @@ static bool test_range(struct torture_context *torture,
 
 		lck.in.file.handle	= h;
 		el[0].offset		= offset - 1;
-		status = smb2_lock(tree, &lck);
+		status = smb2_lock(cli->tree, &lck);
 		CHECK_STATUS_CMT(status, NT_STATUS_OK,
 				 talloc_asprintf(torture,
 				     "lock h failed at offset %#llx ",
@@ -2548,7 +2548,7 @@ static bool test_range(struct torture_context *torture,
 
 		lck.in.file.handle	= h2;
 		el[0].offset		= offset - 2;
-		status = smb2_lock(tree, &lck);
+		status = smb2_lock(cli->tree, &lck);
 		CHECK_STATUS_CMT(status, NT_STATUS_OK,
 				 talloc_asprintf(torture,
 				     "lock h2 failed at offset %#llx ",
@@ -2562,7 +2562,7 @@ static bool test_range(struct torture_context *torture,
 
 		lck.in.file.handle	= h;
 		el[0].offset		= offset - 1;
-		status = smb2_lock(tree, &lck);
+		status = smb2_lock(cli->tree, &lck);
 		CHECK_STATUS_CMT(status, NT_STATUS_LOCK_NOT_GRANTED,
 				 talloc_asprintf(torture,
 				     "lock h at offset %#llx should not have "
@@ -2571,7 +2571,7 @@ static bool test_range(struct torture_context *torture,
 
 		lck.in.file.handle	= h;
 		el[0].offset		= offset - 2;
-		status = smb2_lock(tree, &lck);
+		status = smb2_lock(cli->tree, &lck);
 		CHECK_STATUS_CMT(status, NT_STATUS_LOCK_NOT_GRANTED,
 				 talloc_asprintf(torture,
 				     "lock h2 at offset %#llx should not have "
@@ -2580,7 +2580,7 @@ static bool test_range(struct torture_context *torture,
 
 		lck.in.file.handle	= h2;
 		el[0].offset		= offset - 1;
-		status = smb2_lock(tree, &lck);
+		status = smb2_lock(cli->tree, &lck);
 		CHECK_STATUS_CMT(status, NT_STATUS_LOCK_NOT_GRANTED,
 				 talloc_asprintf(torture,
 				     "lock h at offset %#llx should not have "
@@ -2589,7 +2589,7 @@ static bool test_range(struct torture_context *torture,
 
 		lck.in.file.handle	= h2;
 		el[0].offset		= offset - 2;
-		status = smb2_lock(tree, &lck);
+		status = smb2_lock(cli->tree, &lck);
 		CHECK_STATUS_CMT(status, NT_STATUS_LOCK_NOT_GRANTED,
 				 talloc_asprintf(torture,
 				     "lock h2 at offset %#llx should not have "
@@ -2606,7 +2606,7 @@ static bool test_range(struct torture_context *torture,
 
 		lck.in.file.handle	= h;
 		el[0].offset		= offset - 1;
-		status = smb2_lock(tree, &lck);
+		status = smb2_lock(cli->tree, &lck);
 		CHECK_STATUS_CMT(status, NT_STATUS_OK,
 				 talloc_asprintf(torture,
 				     "unlock from h failed at offset %#llx ",
@@ -2614,7 +2614,7 @@ static bool test_range(struct torture_context *torture,
 
 		lck.in.file.handle	= h2;
 		el[0].offset		= offset - 2;
-		status = smb2_lock(tree, &lck);
+		status = smb2_lock(cli->tree, &lck);
 		CHECK_STATUS_CMT(status, NT_STATUS_OK,
 				 talloc_asprintf(torture,
 				     "unlock from h2 failed at offset %#llx ",
@@ -2622,13 +2622,13 @@ static bool test_range(struct torture_context *torture,
 	}
 
 done:
-	smb2_util_close(tree, h2);
-	smb2_util_close(tree, h);
-	smb2_deltree(tree, BASEDIR);
+	smb2_util_close(cli->tree, h2);
+	smb2_util_close(cli->tree, h);
+	smb2_deltree(cli->tree, BASEDIR);
 	return ret;
 }
 
-static NTSTATUS test_smb2_lock(struct smb2_tree *tree, struct smb2_handle h,
+static NTSTATUS test_smb2_lock(struct smb2cli_state *cli, struct smb2_handle h,
 			       uint64_t offset, uint64_t length, bool exclusive)
 {
 	struct smb2_lock lck;
@@ -2647,12 +2647,12 @@ static NTSTATUS test_smb2_lock(struct smb2_tree *tree, struct smb2_handle h,
 				  SMB2_LOCK_FLAG_SHARED) |
 				  SMB2_LOCK_FLAG_FAIL_IMMEDIATELY;
 
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 
 	return status;
 }
 
-static NTSTATUS test_smb2_unlock(struct smb2_tree *tree, struct smb2_handle h,
+static NTSTATUS test_smb2_unlock(struct smb2cli_state *cli, struct smb2_handle h,
 				 uint64_t offset, uint64_t length)
 {
 	struct smb2_lock lck;
@@ -2668,7 +2668,7 @@ static NTSTATUS test_smb2_unlock(struct smb2_tree *tree, struct smb2_handle h,
 	el[0].reserved		= 0x00000000;
 	el[0].flags		= SMB2_LOCK_FLAG_UNLOCK;
 
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 
 	return status;
 }
@@ -2683,8 +2683,8 @@ static NTSTATUS test_smb2_unlock(struct smb2_tree *tree, struct smb2_handle h,
  *  - some tests ported from BASE-LOCK-LOCK4
  */
 static bool test_overlap(struct torture_context *torture,
-			 struct smb2_tree *tree,
-			 struct smb2_tree *tree2)
+			 struct smb2cli_state *cli,
+			 struct smb2cli_state *cli2)
 {
 	NTSTATUS status;
 	bool ret = true;
@@ -2696,88 +2696,88 @@ static bool test_overlap(struct torture_context *torture,
 
 	const char *fname = BASEDIR "\\overlap.txt";
 
-	status = torture_smb2_testdir(tree, BASEDIR, &h);
+	status = torture_smb2_testdir(cli->tree, BASEDIR, &h);
 	CHECK_STATUS(status, NT_STATUS_OK);
-	smb2_util_close(tree, h);
+	smb2_util_close(cli->tree, h);
 
-	status = torture_smb2_testfile(tree, fname, &h);
+	status = torture_smb2_testfile(cli->tree, fname, &h);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	ZERO_STRUCT(buf);
-	status = smb2_util_write(tree, h, buf, 0, ARRAY_SIZE(buf));
+	status = smb2_util_write(cli->tree, h, buf, 0, ARRAY_SIZE(buf));
 	CHECK_STATUS(status, NT_STATUS_OK);
 
-	status = torture_smb2_testfile(tree, fname, &h2);
+	status = torture_smb2_testfile(cli->tree, fname, &h2);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
-	status = torture_smb2_testfile(tree2, fname, &h3);
+	status = torture_smb2_testfile(cli->tree2, fname, &h3);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	torture_comment(torture, "Testing overlapping locks:\n");
 
-	ret = NT_STATUS_IS_OK(test_smb2_lock(tree, h, 0, 4, true)) &&
-	      NT_STATUS_IS_OK(test_smb2_lock(tree, h, 2, 4, true));
+	ret = NT_STATUS_IS_OK(test_smb2_lock(cli->tree, h, 0, 4, true)) &&
+	      NT_STATUS_IS_OK(test_smb2_lock(cli->tree, h, 2, 4, true));
 	EXPECTED(ret, false);
 	torture_comment(torture, "the same session/handle %s set overlapping "
 				 "exclusive locks\n", ret?"can":"cannot");
 
-	ret = NT_STATUS_IS_OK(test_smb2_lock(tree, h, 10, 4, false)) &&
-	      NT_STATUS_IS_OK(test_smb2_lock(tree, h, 12, 4, false));
+	ret = NT_STATUS_IS_OK(test_smb2_lock(cli->tree, h, 10, 4, false)) &&
+	      NT_STATUS_IS_OK(test_smb2_lock(cli->tree, h, 12, 4, false));
 	EXPECTED(ret, true);
 	torture_comment(torture, "the same session/handle %s set overlapping "
 				 "shared locks\n", ret?"can":"cannot");
 
-	ret = NT_STATUS_IS_OK(test_smb2_lock(tree, h, 20, 4, true)) &&
-	      NT_STATUS_IS_OK(test_smb2_lock(tree2, h3, 22, 4, true));
+	ret = NT_STATUS_IS_OK(test_smb2_lock(cli->tree, h, 20, 4, true)) &&
+	      NT_STATUS_IS_OK(test_smb2_lock(cli->tree2, h3, 22, 4, true));
 	EXPECTED(ret, false);
 	torture_comment(torture, "a different session %s set overlapping "
 				 "exclusive locks\n", ret?"can":"cannot");
 
-	ret = NT_STATUS_IS_OK(test_smb2_lock(tree, h, 30, 4, false)) &&
-	      NT_STATUS_IS_OK(test_smb2_lock(tree2, h3, 32, 4, false));
+	ret = NT_STATUS_IS_OK(test_smb2_lock(cli->tree, h, 30, 4, false)) &&
+	      NT_STATUS_IS_OK(test_smb2_lock(cli->tree2, h3, 32, 4, false));
 	EXPECTED(ret, true);
 	torture_comment(torture, "a different session %s set overlapping "
 				 "shared locks\n", ret?"can":"cannot");
 
-	ret = NT_STATUS_IS_OK(test_smb2_lock(tree, h, 40, 4, true)) &&
-	      NT_STATUS_IS_OK(test_smb2_lock(tree, h2, 42, 4, true));
+	ret = NT_STATUS_IS_OK(test_smb2_lock(cli->tree, h, 40, 4, true)) &&
+	      NT_STATUS_IS_OK(test_smb2_lock(cli->tree, h2, 42, 4, true));
 	EXPECTED(ret, false);
 	torture_comment(torture, "a different handle %s set overlapping "
 				 "exclusive locks\n", ret?"can":"cannot");
 
-	ret = NT_STATUS_IS_OK(test_smb2_lock(tree, h, 50, 4, false)) &&
-	      NT_STATUS_IS_OK(test_smb2_lock(tree, h2, 52, 4, false));
+	ret = NT_STATUS_IS_OK(test_smb2_lock(cli->tree, h, 50, 4, false)) &&
+	      NT_STATUS_IS_OK(test_smb2_lock(cli->tree, h2, 52, 4, false));
 	EXPECTED(ret, true);
 	torture_comment(torture, "a different handle %s set overlapping "
 				 "shared locks\n", ret?"can":"cannot");
 
-	ret = NT_STATUS_IS_OK(test_smb2_lock(tree, h, 110, 4, false)) &&
-	      NT_STATUS_IS_OK(test_smb2_lock(tree, h, 112, 4, false)) &&
-	      NT_STATUS_IS_OK(test_smb2_unlock(tree, h, 110, 6));
+	ret = NT_STATUS_IS_OK(test_smb2_lock(cli->tree, h, 110, 4, false)) &&
+	      NT_STATUS_IS_OK(test_smb2_lock(cli->tree, h, 112, 4, false)) &&
+	      NT_STATUS_IS_OK(test_smb2_unlock(cli->tree, h, 110, 6));
 	EXPECTED(ret, false);
 	torture_comment(torture, "the same handle %s coalesce read locks\n",
 				 ret?"can":"cannot");
 
-	smb2_util_close(tree, h2);
-	smb2_util_close(tree, h);
-	status = torture_smb2_testfile(tree, fname, &h);
+	smb2_util_close(cli->tree, h2);
+	smb2_util_close(cli->tree, h);
+	status = torture_smb2_testfile(cli->tree, fname, &h);
 	CHECK_STATUS(status, NT_STATUS_OK);
-	status = torture_smb2_testfile(tree, fname, &h2);
+	status = torture_smb2_testfile(cli->tree, fname, &h2);
 	CHECK_STATUS(status, NT_STATUS_OK);
-	ret = NT_STATUS_IS_OK(test_smb2_lock(tree, h, 0, 8, false)) &&
-	      NT_STATUS_IS_OK(test_smb2_lock(tree, h2, 0, 1, false)) &&
-	      NT_STATUS_IS_OK(smb2_util_close(tree, h)) &&
-	      NT_STATUS_IS_OK(torture_smb2_testfile(tree, fname, &h)) &&
-	      NT_STATUS_IS_OK(test_smb2_lock(tree, h, 7, 1, true));
+	ret = NT_STATUS_IS_OK(test_smb2_lock(cli->tree, h, 0, 8, false)) &&
+	      NT_STATUS_IS_OK(test_smb2_lock(cli->tree, h2, 0, 1, false)) &&
+	      NT_STATUS_IS_OK(smb2_util_close(cli->tree, h)) &&
+	      NT_STATUS_IS_OK(torture_smb2_testfile(cli->tree, fname, &h)) &&
+	      NT_STATUS_IS_OK(test_smb2_lock(cli->tree, h, 7, 1, true));
 	EXPECTED(ret, true);
 	torture_comment(torture, "the server %s have the NT byte range lock "
 				 "bug\n", !ret?"does":"doesn't");
 
 done:
-	smb2_util_close(tree2, h3);
-	smb2_util_close(tree, h2);
-	smb2_util_close(tree, h);
-	smb2_deltree(tree, BASEDIR);
+	smb2_util_close(cli->tree2, h3);
+	smb2_util_close(cli->tree, h2);
+	smb2_util_close(cli->tree, h);
+	smb2_deltree(cli->tree, BASEDIR);
 	return correct;
 }
 
@@ -2786,7 +2786,7 @@ done:
  *  - some tests ported from BASE-LOCK-LOCK7
  */
 static bool test_truncate(struct torture_context *torture,
-			  struct smb2_tree *tree)
+			  struct smb2cli_state *cli)
 {
 	NTSTATUS status;
 	bool ret = true;
@@ -2799,15 +2799,15 @@ static bool test_truncate(struct torture_context *torture,
 
 	const char *fname = BASEDIR "\\truncate.txt";
 
-	status = torture_smb2_testdir(tree, BASEDIR, &h);
+	status = torture_smb2_testdir(cli->tree, BASEDIR, &h);
 	CHECK_STATUS(status, NT_STATUS_OK);
-	smb2_util_close(tree, h);
+	smb2_util_close(cli->tree, h);
 
-	status = torture_smb2_testfile(tree, fname, &h);
+	status = torture_smb2_testfile(cli->tree, fname, &h);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	ZERO_STRUCT(buf);
-	status = smb2_util_write(tree, h, buf, 0, ARRAY_SIZE(buf));
+	status = smb2_util_write(cli->tree, h, buf, 0, ARRAY_SIZE(buf));
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	torture_comment(torture, "Testing truncation of locked file:\n");
@@ -2835,7 +2835,7 @@ static bool test_truncate(struct torture_context *torture,
 	/* Take an exclusive lock */
 	el[0].flags		= SMB2_LOCK_FLAG_EXCLUSIVE |
 				  SMB2_LOCK_FLAG_FAIL_IMMEDIATELY;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	/* On second handle open the file with OVERWRITE disposition */
@@ -2843,31 +2843,31 @@ static bool test_truncate(struct torture_context *torture,
 				 "locked file.\n");
 
 	io.in.create_disposition = NTCREATEX_DISP_OVERWRITE;
-	status = smb2_create(tree, tree, &io);
+	status = smb2_create(cli->tree, cli->tree, &io);
 	CHECK_STATUS(status, NT_STATUS_OK);
 	h2 = io.out.file.handle;
-	smb2_util_close(tree, h2);
+	smb2_util_close(cli->tree, h2);
 
 	/* On second handle open the file with SUPERSEDE disposition */
 	torture_comment(torture, "  supersede disposition is allowed on a "
 				 "locked file.\n");
 
 	io.in.create_disposition = NTCREATEX_DISP_SUPERSEDE;
-	status = smb2_create(tree, tree, &io);
+	status = smb2_create(cli->tree, cli->tree, &io);
 	CHECK_STATUS(status, NT_STATUS_OK);
 	h2 = io.out.file.handle;
-	smb2_util_close(tree, h2);
+	smb2_util_close(cli->tree, h2);
 
 	/* cleanup */
 	lck.in.file.handle	= h;
 	el[0].flags		= SMB2_LOCK_FLAG_UNLOCK;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 done:
-	smb2_util_close(tree, h2);
-	smb2_util_close(tree, h);
-	smb2_deltree(tree, BASEDIR);
+	smb2_util_close(cli->tree, h2);
+	smb2_util_close(cli->tree, h);
+	smb2_deltree(cli->tree, BASEDIR);
 	return ret;
 }
 
@@ -2875,7 +2875,7 @@ done:
  * Test lock replay detection
  */
 static bool test_replay(struct torture_context *torture,
-			  struct smb2_tree *tree)
+			  struct smb2cli_state *cli)
 {
 	NTSTATUS status;
 	bool ret = true;
@@ -2885,19 +2885,19 @@ static bool test_replay(struct torture_context *torture,
 	struct smb2_lock_element el;
 	uint8_t res_req[8];
 	const char *fname = BASEDIR "\\replay.txt";
-	struct smb2_transport *transport = tree->session->transport;
+	struct smb2_transport *transport = cli->tree->session->transport;
 
 	if (smbXcli_conn_protocol(transport->conn) < PROTOCOL_SMB2_10) {
 		torture_skip(torture, "SMB 2.100 Dialect family or above \
 				required for Lock Replay tests\n");
 	}
 
-	status = torture_smb2_testdir(tree, BASEDIR, &h);
+	status = torture_smb2_testdir(cli->tree, BASEDIR, &h);
 	CHECK_STATUS(status, NT_STATUS_OK);
-	smb2_util_close(tree, h);
+	smb2_util_close(cli->tree, h);
 
 	torture_comment(torture, "Testing Open File:\n");
-	status = torture_smb2_testfile(tree, fname, &h);
+	status = torture_smb2_testfile(cli->tree, fname, &h);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	/*
@@ -2916,15 +2916,15 @@ static bool test_replay(struct torture_context *torture,
 	torture_comment(torture, "Testing Lock (ignored) Replay detection:\n");
 	lck.in.lock_sequence = 0x010 + 0x1;
 	el.flags = SMB2_LOCK_FLAG_EXCLUSIVE | SMB2_LOCK_FLAG_FAIL_IMMEDIATELY;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_OK);
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_LOCK_NOT_GRANTED);
 
 	el.flags = SMB2_LOCK_FLAG_UNLOCK;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_OK);
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_RANGE_NOT_LOCKED);
 
 	torture_comment(torture, "Testing Set Resiliency:\n");
@@ -2939,22 +2939,22 @@ static bool test_replay(struct torture_context *torture,
 		.in.out.data = res_req,
 		.in.out.length = sizeof(res_req)
 	};
-	status = smb2_ioctl(tree, torture, &ioctl);
+	status = smb2_ioctl(cli->tree, torture, &ioctl);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	torture_comment(torture, "Testing Lock (ignored) Replay detection "
 				 "(Bucket No: 0):\n");
 	lck.in.lock_sequence = 0x000 + 0x1;
 	el.flags = SMB2_LOCK_FLAG_EXCLUSIVE | SMB2_LOCK_FLAG_FAIL_IMMEDIATELY;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_OK);
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_LOCK_NOT_GRANTED);
 
 	el.flags = SMB2_LOCK_FLAG_UNLOCK;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_OK);
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_RANGE_NOT_LOCKED);
 
 	torture_comment(torture, "Testing Lock Replay detection "
@@ -2966,25 +2966,25 @@ static bool test_replay(struct torture_context *torture,
 	 */
 	lck.in.lock_sequence = 0x010 + 0x1;
 	el.flags = SMB2_LOCK_FLAG_EXCLUSIVE | SMB2_LOCK_FLAG_FAIL_IMMEDIATELY;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	/*
 	 * Server detects Replay of Byte Range locks using the Lock Sequence
 	 * Numbers. And ignores the requests completely.
 	 */
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_OK);
 	el.flags = SMB2_LOCK_FLAG_UNLOCK;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_OK);
 	el.flags = SMB2_LOCK_FLAG_EXCLUSIVE | SMB2_LOCK_FLAG_FAIL_IMMEDIATELY;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_OK);
 	el.flags = SMB2_LOCK_FLAG_UNLOCK;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_OK);
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	/*
@@ -2992,9 +2992,9 @@ static bool test_replay(struct torture_context *torture,
 	 */
 	lck.in.lock_sequence = 0x010 + 0x2;
 	el.flags = SMB2_LOCK_FLAG_EXCLUSIVE | SMB2_LOCK_FLAG_FAIL_IMMEDIATELY;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_LOCK_NOT_GRANTED);
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_LOCK_NOT_GRANTED);
 
 	torture_comment(torture, "Testing Lock Replay detection "
@@ -3005,9 +3005,9 @@ static bool test_replay(struct torture_context *torture,
 	 */
 	lck.in.lock_sequence = 0x410 + 0x1;
 	el.flags = SMB2_LOCK_FLAG_EXCLUSIVE | SMB2_LOCK_FLAG_FAIL_IMMEDIATELY;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_LOCK_NOT_GRANTED);
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_LOCK_NOT_GRANTED);
 
 	/*
@@ -3015,37 +3015,37 @@ static bool test_replay(struct torture_context *torture,
 	 */
 	lck.in.lock_sequence = 0x410 + 0x2;
 	el.flags = SMB2_LOCK_FLAG_UNLOCK;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_OK);
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_OK);
 	el.flags = SMB2_LOCK_FLAG_EXCLUSIVE | SMB2_LOCK_FLAG_FAIL_IMMEDIATELY;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	lck.in.lock_sequence = 0x410 + 0x3;
 	el.flags = SMB2_LOCK_FLAG_UNLOCK;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_RANGE_NOT_LOCKED);
 
 	torture_comment(torture, "Testing Lock (ignored) Replay detection "
 				 "(Bucket No: 65):\n");
 	lck.in.lock_sequence = 0x420 + 0x1;
 	el.flags = SMB2_LOCK_FLAG_EXCLUSIVE | SMB2_LOCK_FLAG_FAIL_IMMEDIATELY;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_OK);
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_LOCK_NOT_GRANTED);
 
 	el.flags = SMB2_LOCK_FLAG_UNLOCK;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_OK);
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_RANGE_NOT_LOCKED);
 
 done:
-	smb2_util_close(tree, h);
-	smb2_deltree(tree, BASEDIR);
+	smb2_util_close(cli->tree, h);
+	smb2_deltree(cli->tree, BASEDIR);
 	return ret;
 }
 
@@ -3059,7 +3059,7 @@ done:
  * https://bugzilla.samba.org/show_bug.cgi?id=10008
  */
 static bool test_deadlock(struct torture_context *torture,
-			  struct smb2_tree *tree)
+			  struct smb2cli_state *cli)
 {
 	NTSTATUS status;
 	bool ret = true;
@@ -3073,42 +3073,42 @@ static bool test_deadlock(struct torture_context *torture,
 		return true;
 	}
 
-	status = torture_smb2_testdir(tree, BASEDIR, &_h);
+	status = torture_smb2_testdir(cli->tree, BASEDIR, &_h);
 	torture_assert_ntstatus_ok(torture, status,
 				   "torture_smb2_testdir failed");
-	smb2_util_close(tree, _h);
+	smb2_util_close(cli->tree, _h);
 
-	status = torture_smb2_testfile(tree, fname, &_h);
+	status = torture_smb2_testfile(cli->tree, fname, &_h);
 	torture_assert_ntstatus_ok_goto(torture, status, ret, done,
 					"torture_smb2_testfile failed");
 	h = &_h;
 
 	ZERO_STRUCT(buf);
-	status = smb2_util_write(tree, *h, buf, 0, ARRAY_SIZE(buf));
+	status = smb2_util_write(cli->tree, *h, buf, 0, ARRAY_SIZE(buf));
 	torture_assert_ntstatus_ok_goto(torture, status, ret, done,
 					"smb2_util_write failed");
 
-	status = test_smb2_lock(tree, *h, 0, 1, true);
+	status = test_smb2_lock(cli->tree, *h, 0, 1, true);
 	torture_assert_ntstatus_ok_goto(torture, status, ret, done,
 					"test_smb2_lock failed");
 
-	status = test_smb2_unlock(tree, *h, 0, 1);
+	status = test_smb2_unlock(cli->tree, *h, 0, 1);
 	torture_assert_ntstatus_ok_goto(torture, status, ret, done,
 					"test_smb2_unlock failed");
 
-	status = test_smb2_lock(tree, *h, 0, 1, true);
+	status = test_smb2_lock(cli->tree, *h, 0, 1, true);
 	torture_assert_ntstatus_ok_goto(torture, status, ret, done,
 					"test_smb2_lock failed");
 
-	status = test_smb2_unlock(tree, *h, 0, 1);
+	status = test_smb2_unlock(cli->tree, *h, 0, 1);
 	torture_assert_ntstatus_ok_goto(torture, status, ret, done,
 					"test_smb2_unlock failed");
 
 done:
 	if (h != NULL) {
-		smb2_util_close(tree, *h);
+		smb2_util_close(cli->tree, *h);
 	}
-	smb2_deltree(tree, BASEDIR);
+	smb2_deltree(cli->tree, BASEDIR);
 	return ret;
 }
 

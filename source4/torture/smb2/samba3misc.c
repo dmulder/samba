@@ -52,11 +52,11 @@ static void torture_smb2_tree_disconnect_timer(struct tevent_context *ev,
 					       struct timeval now,
 					       void *private_data)
 {
-	struct smb2_tree *tree =
+	struct smb2cli_state *cli =
 		talloc_get_type_abort(private_data,
 		struct smb2_tree);
 
-	smbXcli_conn_disconnect(tree->session->transport->conn,
+	smbXcli_conn_disconnect(cli->tree->session->transport->conn,
 				NT_STATUS_CTX_CLIENT_QUERY_TIMEOUT);
 }
 
@@ -68,7 +68,7 @@ static void torture_smb2_tree_disconnect_timer(struct tevent_context *ev,
  * Note: To run this test, use "--option=torture:localdir=<LOCALDIR>"
  */
 static bool torture_samba3_localposixlock1(struct torture_context *tctx,
-					   struct smb2_tree *tree)
+					   struct smb2cli_state *cli)
 {
 	NTSTATUS status;
 	bool ret = true;
@@ -85,17 +85,17 @@ static bool torture_samba3_localposixlock1(struct torture_context *tctx,
 	struct flock posix_lock;
 	struct tevent_timer *te;
 
-	status = torture_smb2_testdir(tree, BASEDIR, &h);
+	status = torture_smb2_testdir(cli->tree, BASEDIR, &h);
 	CHECK_STATUS(status, NT_STATUS_OK);
-	smb2_util_close(tree, h);
+	smb2_util_close(cli->tree, h);
 
-	status = torture_smb2_testfile(tree, fname, &h);
+	status = torture_smb2_testfile(cli->tree, fname, &h);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	fpath = talloc_asprintf(tctx, "%s\\%s", BASEDIR, fname);
 	torture_assert(tctx, fpath != NULL, "fpath\n");
 
-	status = torture_smb2_testfile(tree, fpath, &h);
+	status = torture_smb2_testfile(cli->tree, fpath, &h);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	localdir = torture_setting_string(tctx, "localdir", NULL);
@@ -142,18 +142,18 @@ static bool torture_samba3_localposixlock1(struct torture_context *tctx,
 	lck.in.file.handle	= h;
 
 	torture_comment(tctx, "  remote non-blocking lock\n");
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_LOCK_NOT_GRANTED);
 
 	torture_comment(tctx, "  remote async blocking lock\n");
 	el[0].flags		= SMB2_LOCK_FLAG_EXCLUSIVE;
-	req = smb2_lock_send(tree, &lck);
+	req = smb2_lock_send(cli->tree, &lck);
 	torture_assert_goto(tctx, req != NULL, ret, done, "smb2_lock_send()\n");
 
 	te = tevent_add_timer(tctx->ev,
 			      tctx, timeval_current_ofs(5, 0),
 			      torture_smb2_tree_disconnect_timer,
-			      tree);
+			      cli->tree);
 	torture_assert_goto(tctx, te != NULL, ret, done, "tevent_add_timer\n");
 
 	torture_comment(tctx, "  remote wait for STATUS_PENDING\n");
@@ -171,8 +171,8 @@ done:
 	if (fd != -1) {
 		close(fd);
 	}
-	smb2_util_close(tree, h);
-	smb2_deltree(tree, BASEDIR);
+	smb2_util_close(cli->tree, h);
+	smb2_deltree(cli->tree, BASEDIR);
 	return ret;
 }
 

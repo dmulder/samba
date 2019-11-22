@@ -47,7 +47,7 @@
  */
 
 static bool torture_smb2_rename_simple(struct torture_context *torture,
-		struct smb2_tree *tree1)
+		struct smb2cli_state *cli1)
 {
 	bool ret = true;
 	NTSTATUS status;
@@ -59,12 +59,12 @@ static bool torture_smb2_rename_simple(struct torture_context *torture,
 
 	ZERO_STRUCT(h1);
 
-	smb2_deltree(tree1, BASEDIR);
-	smb2_util_rmdir(tree1, BASEDIR);
+	smb2_deltree(cli1->tree, BASEDIR);
+	smb2_util_rmdir(cli1->tree, BASEDIR);
 
 	torture_comment(torture, "Creating base directory\n");
 
-	smb2_util_mkdir(tree1, BASEDIR);
+	smb2_util_mkdir(cli1->tree, BASEDIR);
 
 
 	torture_comment(torture, "Creating test file\n");
@@ -83,7 +83,7 @@ static bool torture_smb2_rename_simple(struct torture_context *torture,
 	io.smb2.in.security_flags = 0;
 	io.smb2.in.fname = BASEDIR "\\file.txt";
 
-	status = smb2_create(tree1, torture, &(io.smb2));
+	status = smb2_create(cli1->tree, torture, &(io.smb2));
 	CHECK_STATUS(status, NT_STATUS_OK);
 	h1 = io.smb2.out.file.handle;
 
@@ -96,7 +96,7 @@ static bool torture_smb2_rename_simple(struct torture_context *torture,
 	sinfo.rename_information.in.root_fid = 0;
 	sinfo.rename_information.in.new_name =
 		BASEDIR "\\newname.txt";
-	status = smb2_setinfo_file(tree1, &sinfo);
+	status = smb2_setinfo_file(cli1->tree, &sinfo);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	torture_comment(torture, "Checking for new filename\n");
@@ -104,7 +104,7 @@ static bool torture_smb2_rename_simple(struct torture_context *torture,
 	ZERO_STRUCT(fi);
 	fi.generic.level = RAW_FILEINFO_SMB2_ALL_INFORMATION;
 	fi.generic.in.file.handle = h1;
-	status = smb2_getinfo_file(tree1, torture, &fi);
+	status = smb2_getinfo_file(cli1->tree, torture, &fi);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 
@@ -113,7 +113,7 @@ static bool torture_smb2_rename_simple(struct torture_context *torture,
 	ZERO_STRUCT(cl.smb2);
 	cl.smb2.level = RAW_CLOSE_SMB2;
 	cl.smb2.in.file.handle = h1;
-	status = smb2_close(tree1, &(cl.smb2));
+	status = smb2_close(cli1->tree, &(cl.smb2));
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	ZERO_STRUCT(h1);
@@ -126,9 +126,9 @@ done:
 		ZERO_STRUCT(cl.smb2);
 		cl.smb2.level = RAW_CLOSE_SMB2;
 		cl.smb2.in.file.handle = h1;
-		status = smb2_close(tree1, &(cl.smb2));
+		status = smb2_close(cli1->tree, &(cl.smb2));
 	}
-	smb2_deltree(tree1, BASEDIR);
+	smb2_deltree(cli1->tree, BASEDIR);
 	return ret;
 }
 
@@ -138,7 +138,7 @@ done:
  */
 
 static bool torture_smb2_rename_simple2(struct torture_context *torture,
-		struct smb2_tree *tree1)
+		struct smb2cli_state *cli1)
 {
 	bool ret = true;
 	NTSTATUS status;
@@ -149,12 +149,12 @@ static bool torture_smb2_rename_simple2(struct torture_context *torture,
 
 	ZERO_STRUCT(h1);
 
-	smb2_deltree(tree1, BASEDIR);
-	smb2_util_rmdir(tree1, BASEDIR);
+	smb2_deltree(cli1->tree, BASEDIR);
+	smb2_util_rmdir(cli1->tree, BASEDIR);
 
 	torture_comment(torture, "Creating base directory\n");
 
-	smb2_util_mkdir(tree1, BASEDIR);
+	smb2_util_mkdir(cli1->tree, BASEDIR);
 
 
 	torture_comment(torture, "Creating test file\n");
@@ -173,7 +173,7 @@ static bool torture_smb2_rename_simple2(struct torture_context *torture,
 	io.smb2.in.security_flags = 0;
 	io.smb2.in.fname = BASEDIR "\\file.txt";
 
-	status = smb2_create(tree1, torture, &(io.smb2));
+	status = smb2_create(cli1->tree, torture, &(io.smb2));
 	CHECK_STATUS(status, NT_STATUS_OK);
 	h1 = io.smb2.out.file.handle;
 
@@ -186,7 +186,7 @@ static bool torture_smb2_rename_simple2(struct torture_context *torture,
 	sinfo.rename_information.in.root_fid = 0;
 	sinfo.rename_information.in.new_name =
 		BASEDIR "\\newname.txt";
-	status = smb2_setinfo_file(tree1, &sinfo);
+	status = smb2_setinfo_file(cli1->tree, &sinfo);
 	CHECK_STATUS(status, NT_STATUS_ACCESS_DENIED);
 
 	torture_comment(torture, "Closing test file\n");
@@ -194,7 +194,7 @@ static bool torture_smb2_rename_simple2(struct torture_context *torture,
 	ZERO_STRUCT(cl.smb2);
 	cl.smb2.level = RAW_CLOSE_SMB2;
 	cl.smb2.in.file.handle = h1;
-	status = smb2_close(tree1, &(cl.smb2));
+	status = smb2_close(cli1->tree, &(cl.smb2));
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	ZERO_STRUCT(h1);
@@ -207,9 +207,9 @@ done:
 		ZERO_STRUCT(cl.smb2);
 		cl.smb2.level = RAW_CLOSE_SMB2;
 		cl.smb2.in.file.handle = h1;
-		status = smb2_close(tree1, &(cl.smb2));
+		status = smb2_close(cli1->tree, &(cl.smb2));
 	}
-	smb2_deltree(tree1, BASEDIR);
+	smb2_deltree(cli1->tree, BASEDIR);
 	return ret;
 }
 
@@ -220,7 +220,7 @@ done:
  */
 
 static bool torture_smb2_rename_no_sharemode(struct torture_context *torture,
-		struct smb2_tree *tree1)
+		struct smb2cli_state *cli1)
 {
 	bool ret = true;
 	NTSTATUS status;
@@ -232,12 +232,12 @@ static bool torture_smb2_rename_no_sharemode(struct torture_context *torture,
 
 	ZERO_STRUCT(h1);
 
-	smb2_deltree(tree1, BASEDIR);
-	smb2_util_rmdir(tree1, BASEDIR);
+	smb2_deltree(cli1->tree, BASEDIR);
+	smb2_util_rmdir(cli1->tree, BASEDIR);
 
 	torture_comment(torture, "Creating base directory\n");
 
-	smb2_util_mkdir(tree1, BASEDIR);
+	smb2_util_mkdir(cli1->tree, BASEDIR);
 
 
 	torture_comment(torture, "Creating test file\n");
@@ -255,7 +255,7 @@ static bool torture_smb2_rename_no_sharemode(struct torture_context *torture,
 	io.smb2.in.security_flags = 0;
 	io.smb2.in.fname = BASEDIR "\\file.txt";
 
-	status = smb2_create(tree1, torture, &(io.smb2));
+	status = smb2_create(cli1->tree, torture, &(io.smb2));
 	CHECK_STATUS(status, NT_STATUS_OK);
 	h1 = io.smb2.out.file.handle;
 
@@ -268,7 +268,7 @@ static bool torture_smb2_rename_no_sharemode(struct torture_context *torture,
 	sinfo.rename_information.in.root_fid = 0;
 	sinfo.rename_information.in.new_name =
 		BASEDIR "\\newname.txt";
-	status = smb2_setinfo_file(tree1, &sinfo);
+	status = smb2_setinfo_file(cli1->tree, &sinfo);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	torture_comment(torture, "Checking for new filename\n");
@@ -276,7 +276,7 @@ static bool torture_smb2_rename_no_sharemode(struct torture_context *torture,
 	ZERO_STRUCT(fi);
 	fi.generic.level = RAW_FILEINFO_SMB2_ALL_INFORMATION;
 	fi.generic.in.file.handle = h1;
-	status = smb2_getinfo_file(tree1, torture, &fi);
+	status = smb2_getinfo_file(cli1->tree, torture, &fi);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 
@@ -285,7 +285,7 @@ static bool torture_smb2_rename_no_sharemode(struct torture_context *torture,
 	ZERO_STRUCT(cl.smb2);
 	cl.smb2.level = RAW_CLOSE_SMB2;
 	cl.smb2.in.file.handle = h1;
-	status = smb2_close(tree1, &(cl.smb2));
+	status = smb2_close(cli1->tree, &(cl.smb2));
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	ZERO_STRUCT(h1);
@@ -298,9 +298,9 @@ done:
 		ZERO_STRUCT(cl.smb2);
 		cl.smb2.level = RAW_CLOSE_SMB2;
 		cl.smb2.in.file.handle = h1;
-		status = smb2_close(tree1, &(cl.smb2));
+		status = smb2_close(cli1->tree, &(cl.smb2));
 	}
-	smb2_deltree(tree1, BASEDIR);
+	smb2_deltree(cli1->tree, BASEDIR);
 	return ret;
 }
 
@@ -311,7 +311,7 @@ done:
  */
 
 static bool torture_smb2_rename_with_delete_access(struct torture_context *torture,
-		struct smb2_tree *tree1)
+		struct smb2cli_state *cli1)
 {
 	bool ret = true;
 	NTSTATUS status;
@@ -323,12 +323,12 @@ static bool torture_smb2_rename_with_delete_access(struct torture_context *tortu
 	ZERO_STRUCT(fh);
 	ZERO_STRUCT(dh);
 
-	smb2_deltree(tree1, BASEDIR);
-	smb2_util_rmdir(tree1, BASEDIR);
+	smb2_deltree(cli1->tree, BASEDIR);
+	smb2_util_rmdir(cli1->tree, BASEDIR);
 
 	torture_comment(torture, "Creating base directory\n");
 
-	smb2_util_mkdir(tree1, BASEDIR);
+	smb2_util_mkdir(cli1->tree, BASEDIR);
 
 	torture_comment(torture, "Opening parent directory\n");
 
@@ -350,7 +350,7 @@ static bool torture_smb2_rename_with_delete_access(struct torture_context *tortu
 	io.smb2.in.security_flags = 0;
 	io.smb2.in.fname = BASEDIR;
 
-	status = smb2_create(tree1, torture, &(io.smb2));
+	status = smb2_create(cli1->tree, torture, &(io.smb2));
 	CHECK_STATUS(status, NT_STATUS_OK);
 	dh = io.smb2.out.file.handle;
 
@@ -373,7 +373,7 @@ static bool torture_smb2_rename_with_delete_access(struct torture_context *tortu
 	io.smb2.in.security_flags = 0;
 	io.smb2.in.fname = BASEDIR "\\file.txt";
 
-	status = smb2_create(tree1, torture, &(io.smb2));
+	status = smb2_create(cli1->tree, torture, &(io.smb2));
 	CHECK_STATUS(status, NT_STATUS_OK);
 	fh = io.smb2.out.file.handle;
 
@@ -386,7 +386,7 @@ static bool torture_smb2_rename_with_delete_access(struct torture_context *tortu
 	sinfo.rename_information.in.root_fid = 0;
 	sinfo.rename_information.in.new_name =
 		BASEDIR "\\newname.txt";
-	status = smb2_setinfo_file(tree1, &sinfo);
+	status = smb2_setinfo_file(cli1->tree, &sinfo);
 	CHECK_STATUS(status, NT_STATUS_SHARING_VIOLATION);
 
 	torture_comment(torture, "Closing test file\n");
@@ -394,7 +394,7 @@ static bool torture_smb2_rename_with_delete_access(struct torture_context *tortu
 	ZERO_STRUCT(cl.smb2);
 	cl.smb2.level = RAW_CLOSE_SMB2;
 	cl.smb2.in.file.handle = fh;
-	status = smb2_close(tree1, &(cl.smb2));
+	status = smb2_close(cli1->tree, &(cl.smb2));
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	ZERO_STRUCT(fh);
@@ -404,7 +404,7 @@ static bool torture_smb2_rename_with_delete_access(struct torture_context *tortu
 	ZERO_STRUCT(cl.smb2);
 	cl.smb2.level = RAW_CLOSE_SMB2;
 	cl.smb2.in.file.handle = dh;
-	status = smb2_close(tree1, &(cl.smb2));
+	status = smb2_close(cli1->tree, &(cl.smb2));
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	ZERO_STRUCT(dh);
@@ -418,16 +418,16 @@ done:
 		ZERO_STRUCT(cl.smb2);
 		cl.smb2.level = RAW_CLOSE_SMB2;
 		cl.smb2.in.file.handle = fh;
-		status = smb2_close(tree1, &(cl.smb2));
+		status = smb2_close(cli1->tree, &(cl.smb2));
 	}
 	if (dh.data[0] || dh.data[1]) {
 		ZERO_STRUCT(cl.smb2);
 		cl.smb2.level = RAW_CLOSE_SMB2;
 		cl.smb2.in.file.handle = dh;
-		status = smb2_close(tree1, &(cl.smb2));
+		status = smb2_close(cli1->tree, &(cl.smb2));
 	}
 
-	smb2_deltree(tree1, BASEDIR);
+	smb2_deltree(cli1->tree, BASEDIR);
 	return ret;
 }
 
@@ -439,7 +439,7 @@ done:
  */
 
 static bool torture_smb2_rename_with_delete_access2(struct torture_context *torture,
-		struct smb2_tree *tree1)
+		struct smb2cli_state *cli1)
 {
 	bool ret = true;
 	NTSTATUS status;
@@ -451,12 +451,12 @@ static bool torture_smb2_rename_with_delete_access2(struct torture_context *tort
 	ZERO_STRUCT(fh);
 	ZERO_STRUCT(dh);
 
-	smb2_deltree(tree1, BASEDIR);
-	smb2_util_rmdir(tree1, BASEDIR);
+	smb2_deltree(cli1->tree, BASEDIR);
+	smb2_util_rmdir(cli1->tree, BASEDIR);
 
 	torture_comment(torture, "Creating base directory\n");
 
-	smb2_util_mkdir(tree1, BASEDIR);
+	smb2_util_mkdir(cli1->tree, BASEDIR);
 
 	torture_comment(torture, "Opening parent directory\n");
 
@@ -477,7 +477,7 @@ static bool torture_smb2_rename_with_delete_access2(struct torture_context *tort
 	io.smb2.in.security_flags = 0;
 	io.smb2.in.fname = BASEDIR;
 
-	status = smb2_create(tree1, torture, &(io.smb2));
+	status = smb2_create(cli1->tree, torture, &(io.smb2));
 	CHECK_STATUS(status, NT_STATUS_OK);
 	dh = io.smb2.out.file.handle;
 
@@ -500,7 +500,7 @@ static bool torture_smb2_rename_with_delete_access2(struct torture_context *tort
 	io.smb2.in.security_flags = 0;
 	io.smb2.in.fname = BASEDIR "\\file.txt";
 
-	status = smb2_create(tree1, torture, &(io.smb2));
+	status = smb2_create(cli1->tree, torture, &(io.smb2));
 	CHECK_STATUS(status, NT_STATUS_OK);
 	fh = io.smb2.out.file.handle;
 
@@ -513,7 +513,7 @@ static bool torture_smb2_rename_with_delete_access2(struct torture_context *tort
 	sinfo.rename_information.in.root_fid = 0;
 	sinfo.rename_information.in.new_name =
 		BASEDIR "\\newname.txt";
-	status = smb2_setinfo_file(tree1, &sinfo);
+	status = smb2_setinfo_file(cli1->tree, &sinfo);
 	CHECK_STATUS(status, NT_STATUS_SHARING_VIOLATION);
 
 	torture_comment(torture, "Closing test file\n");
@@ -521,7 +521,7 @@ static bool torture_smb2_rename_with_delete_access2(struct torture_context *tort
 	ZERO_STRUCT(cl.smb2);
 	cl.smb2.level = RAW_CLOSE_SMB2;
 	cl.smb2.in.file.handle = fh;
-	status = smb2_close(tree1, &(cl.smb2));
+	status = smb2_close(cli1->tree, &(cl.smb2));
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	ZERO_STRUCT(fh);
@@ -531,7 +531,7 @@ static bool torture_smb2_rename_with_delete_access2(struct torture_context *tort
 	ZERO_STRUCT(cl.smb2);
 	cl.smb2.level = RAW_CLOSE_SMB2;
 	cl.smb2.in.file.handle = dh;
-	status = smb2_close(tree1, &(cl.smb2));
+	status = smb2_close(cli1->tree, &(cl.smb2));
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	ZERO_STRUCT(dh);
@@ -545,16 +545,16 @@ done:
 		ZERO_STRUCT(cl.smb2);
 		cl.smb2.level = RAW_CLOSE_SMB2;
 		cl.smb2.in.file.handle = fh;
-		status = smb2_close(tree1, &(cl.smb2));
+		status = smb2_close(cli1->tree, &(cl.smb2));
 	}
 	if (dh.data[0] || dh.data[1]) {
 		ZERO_STRUCT(cl.smb2);
 		cl.smb2.level = RAW_CLOSE_SMB2;
 		cl.smb2.in.file.handle = dh;
-		status = smb2_close(tree1, &(cl.smb2));
+		status = smb2_close(cli1->tree, &(cl.smb2));
 	}
 
-	smb2_deltree(tree1, BASEDIR);
+	smb2_deltree(cli1->tree, BASEDIR);
 	return ret;
 }
 
@@ -565,7 +565,7 @@ done:
  */
 
 static bool torture_smb2_rename_no_delete_access(struct torture_context *torture,
-		struct smb2_tree *tree1)
+		struct smb2cli_state *cli1)
 {
 	bool ret = true;
 	NTSTATUS status;
@@ -578,12 +578,12 @@ static bool torture_smb2_rename_no_delete_access(struct torture_context *torture
 	ZERO_STRUCT(fh);
 	ZERO_STRUCT(dh);
 
-	smb2_deltree(tree1, BASEDIR);
-	smb2_util_rmdir(tree1, BASEDIR);
+	smb2_deltree(cli1->tree, BASEDIR);
+	smb2_util_rmdir(cli1->tree, BASEDIR);
 
 	torture_comment(torture, "Creating base directory\n");
 
-	smb2_util_mkdir(tree1, BASEDIR);
+	smb2_util_mkdir(cli1->tree, BASEDIR);
 
 	torture_comment(torture, "Opening parent directory\n");
 
@@ -605,7 +605,7 @@ static bool torture_smb2_rename_no_delete_access(struct torture_context *torture
 	io.smb2.in.security_flags = 0;
 	io.smb2.in.fname = BASEDIR;
 
-	status = smb2_create(tree1, torture, &(io.smb2));
+	status = smb2_create(cli1->tree, torture, &(io.smb2));
 	CHECK_STATUS(status, NT_STATUS_OK);
 	dh = io.smb2.out.file.handle;
 
@@ -628,7 +628,7 @@ static bool torture_smb2_rename_no_delete_access(struct torture_context *torture
 	io.smb2.in.security_flags = 0;
 	io.smb2.in.fname = BASEDIR "\\file.txt";
 
-	status = smb2_create(tree1, torture, &(io.smb2));
+	status = smb2_create(cli1->tree, torture, &(io.smb2));
 	CHECK_STATUS(status, NT_STATUS_OK);
 	fh = io.smb2.out.file.handle;
 
@@ -641,7 +641,7 @@ static bool torture_smb2_rename_no_delete_access(struct torture_context *torture
 	sinfo.rename_information.in.root_fid = 0;
 	sinfo.rename_information.in.new_name =
 		BASEDIR "\\newname.txt";
-	status = smb2_setinfo_file(tree1, &sinfo);
+	status = smb2_setinfo_file(cli1->tree, &sinfo);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	torture_comment(torture, "Checking for new filename\n");
@@ -649,7 +649,7 @@ static bool torture_smb2_rename_no_delete_access(struct torture_context *torture
 	ZERO_STRUCT(fi);
 	fi.generic.level = RAW_FILEINFO_SMB2_ALL_INFORMATION;
 	fi.generic.in.file.handle = fh;
-	status = smb2_getinfo_file(tree1, torture, &fi);
+	status = smb2_getinfo_file(cli1->tree, torture, &fi);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 
@@ -658,7 +658,7 @@ static bool torture_smb2_rename_no_delete_access(struct torture_context *torture
 	ZERO_STRUCT(cl.smb2);
 	cl.smb2.level = RAW_CLOSE_SMB2;
 	cl.smb2.in.file.handle = fh;
-	status = smb2_close(tree1, &(cl.smb2));
+	status = smb2_close(cli1->tree, &(cl.smb2));
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	ZERO_STRUCT(fh);
@@ -668,7 +668,7 @@ static bool torture_smb2_rename_no_delete_access(struct torture_context *torture
 	ZERO_STRUCT(cl.smb2);
 	cl.smb2.level = RAW_CLOSE_SMB2;
 	cl.smb2.in.file.handle = dh;
-	status = smb2_close(tree1, &(cl.smb2));
+	status = smb2_close(cli1->tree, &(cl.smb2));
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	ZERO_STRUCT(dh);
@@ -682,16 +682,16 @@ done:
 		ZERO_STRUCT(cl.smb2);
 		cl.smb2.level = RAW_CLOSE_SMB2;
 		cl.smb2.in.file.handle = fh;
-		status = smb2_close(tree1, &(cl.smb2));
+		status = smb2_close(cli1->tree, &(cl.smb2));
 	}
 	if (dh.data[0] || dh.data[1]) {
 		ZERO_STRUCT(cl.smb2);
 		cl.smb2.level = RAW_CLOSE_SMB2;
 		cl.smb2.in.file.handle = dh;
-		status = smb2_close(tree1, &(cl.smb2));
+		status = smb2_close(cli1->tree, &(cl.smb2));
 	}
 
-	smb2_deltree(tree1, BASEDIR);
+	smb2_deltree(cli1->tree, BASEDIR);
 	return ret;
 }
 
@@ -703,7 +703,7 @@ done:
  */
 
 static bool torture_smb2_rename_no_delete_access2(struct torture_context *torture,
-		struct smb2_tree *tree1)
+		struct smb2cli_state *cli1)
 {
 	bool ret = true;
 	NTSTATUS status;
@@ -715,12 +715,12 @@ static bool torture_smb2_rename_no_delete_access2(struct torture_context *tortur
 	ZERO_STRUCT(fh);
 	ZERO_STRUCT(dh);
 
-	smb2_deltree(tree1, BASEDIR);
-	smb2_util_rmdir(tree1, BASEDIR);
+	smb2_deltree(cli1->tree, BASEDIR);
+	smb2_util_rmdir(cli1->tree, BASEDIR);
 
 	torture_comment(torture, "Creating base directory\n");
 
-	smb2_util_mkdir(tree1, BASEDIR);
+	smb2_util_mkdir(cli1->tree, BASEDIR);
 
 	torture_comment(torture, "Opening parent directory\n");
 
@@ -741,7 +741,7 @@ static bool torture_smb2_rename_no_delete_access2(struct torture_context *tortur
 	io.smb2.in.security_flags = 0;
 	io.smb2.in.fname = BASEDIR;
 
-	status = smb2_create(tree1, torture, &(io.smb2));
+	status = smb2_create(cli1->tree, torture, &(io.smb2));
 	CHECK_STATUS(status, NT_STATUS_OK);
 	dh = io.smb2.out.file.handle;
 
@@ -764,7 +764,7 @@ static bool torture_smb2_rename_no_delete_access2(struct torture_context *tortur
 	io.smb2.in.security_flags = 0;
 	io.smb2.in.fname = BASEDIR "\\file.txt";
 
-	status = smb2_create(tree1, torture, &(io.smb2));
+	status = smb2_create(cli1->tree, torture, &(io.smb2));
 	CHECK_STATUS(status, NT_STATUS_OK);
 	fh = io.smb2.out.file.handle;
 
@@ -777,7 +777,7 @@ static bool torture_smb2_rename_no_delete_access2(struct torture_context *tortur
 	sinfo.rename_information.in.root_fid = 0;
 	sinfo.rename_information.in.new_name =
 		BASEDIR "\\newname.txt";
-	status = smb2_setinfo_file(tree1, &sinfo);
+	status = smb2_setinfo_file(cli1->tree, &sinfo);
 	CHECK_STATUS(status, NT_STATUS_SHARING_VIOLATION);
 
 	torture_comment(torture, "Closing test file\n");
@@ -785,7 +785,7 @@ static bool torture_smb2_rename_no_delete_access2(struct torture_context *tortur
 	ZERO_STRUCT(cl.smb2);
 	cl.smb2.level = RAW_CLOSE_SMB2;
 	cl.smb2.in.file.handle = fh;
-	status = smb2_close(tree1, &(cl.smb2));
+	status = smb2_close(cli1->tree, &(cl.smb2));
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	ZERO_STRUCT(fh);
@@ -795,7 +795,7 @@ static bool torture_smb2_rename_no_delete_access2(struct torture_context *tortur
 	ZERO_STRUCT(cl.smb2);
 	cl.smb2.level = RAW_CLOSE_SMB2;
 	cl.smb2.in.file.handle = dh;
-	status = smb2_close(tree1, &(cl.smb2));
+	status = smb2_close(cli1->tree, &(cl.smb2));
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	ZERO_STRUCT(dh);
@@ -809,16 +809,16 @@ done:
 		ZERO_STRUCT(cl.smb2);
 		cl.smb2.level = RAW_CLOSE_SMB2;
 		cl.smb2.in.file.handle = fh;
-		status = smb2_close(tree1, &(cl.smb2));
+		status = smb2_close(cli1->tree, &(cl.smb2));
 	}
 	if (dh.data[0] || dh.data[1]) {
 		ZERO_STRUCT(cl.smb2);
 		cl.smb2.level = RAW_CLOSE_SMB2;
 		cl.smb2.in.file.handle = dh;
-		status = smb2_close(tree1, &(cl.smb2));
+		status = smb2_close(cli1->tree, &(cl.smb2));
 	}
 
-	smb2_deltree(tree1, BASEDIR);
+	smb2_deltree(cli1->tree, BASEDIR);
 	return ret;
 }
 
@@ -828,7 +828,7 @@ done:
  */
 
 static bool torture_smb2_rename_msword(struct torture_context *torture,
-		struct smb2_tree *tree1)
+		struct smb2cli_state *cli1)
 {
 	bool ret = true;
 	NTSTATUS status;
@@ -841,12 +841,12 @@ static bool torture_smb2_rename_msword(struct torture_context *torture,
 	ZERO_STRUCT(fh);
 	ZERO_STRUCT(dh);
 
-	smb2_deltree(tree1, BASEDIR);
-	smb2_util_rmdir(tree1, BASEDIR);
+	smb2_deltree(cli1->tree, BASEDIR);
+	smb2_util_rmdir(cli1->tree, BASEDIR);
 
 	torture_comment(torture, "Creating base directory\n");
 
-	smb2_util_mkdir(tree1, BASEDIR);
+	smb2_util_mkdir(cli1->tree, BASEDIR);
 
 	torture_comment(torture, "Creating test file\n");
 
@@ -863,7 +863,7 @@ static bool torture_smb2_rename_msword(struct torture_context *torture,
 	io.smb2.in.security_flags = 0;
 	io.smb2.in.fname = BASEDIR "\\file.txt";
 
-	status = smb2_create(tree1, torture, &(io.smb2));
+	status = smb2_create(cli1->tree, torture, &(io.smb2));
 	CHECK_STATUS(status, NT_STATUS_OK);
 	fh = io.smb2.out.file.handle;
 
@@ -882,7 +882,7 @@ static bool torture_smb2_rename_msword(struct torture_context *torture,
 	io.smb2.in.security_flags = 0;
 	io.smb2.in.fname = BASEDIR;
 
-	status = smb2_create(tree1, torture, &(io.smb2));
+	status = smb2_create(cli1->tree, torture, &(io.smb2));
 	CHECK_STATUS(status, NT_STATUS_OK);
 	dh = io.smb2.out.file.handle;
 
@@ -895,7 +895,7 @@ static bool torture_smb2_rename_msword(struct torture_context *torture,
 	sinfo.rename_information.in.root_fid = 0;
 	sinfo.rename_information.in.new_name =
 		BASEDIR "\\newname.txt";
-	status = smb2_setinfo_file(tree1, &sinfo);
+	status = smb2_setinfo_file(cli1->tree, &sinfo);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	torture_comment(torture, "Checking for new filename\n");
@@ -903,7 +903,7 @@ static bool torture_smb2_rename_msword(struct torture_context *torture,
 	ZERO_STRUCT(fi);
 	fi.generic.level = RAW_FILEINFO_SMB2_ALL_INFORMATION;
 	fi.generic.in.file.handle = fh;
-	status = smb2_getinfo_file(tree1, torture, &fi);
+	status = smb2_getinfo_file(cli1->tree, torture, &fi);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 
@@ -912,7 +912,7 @@ static bool torture_smb2_rename_msword(struct torture_context *torture,
 	ZERO_STRUCT(cl.smb2);
 	cl.smb2.level = RAW_CLOSE_SMB2;
 	cl.smb2.in.file.handle = fh;
-	status = smb2_close(tree1, &(cl.smb2));
+	status = smb2_close(cli1->tree, &(cl.smb2));
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	ZERO_STRUCT(fh);
@@ -922,7 +922,7 @@ static bool torture_smb2_rename_msword(struct torture_context *torture,
 	ZERO_STRUCT(cl.smb2);
 	cl.smb2.level = RAW_CLOSE_SMB2;
 	cl.smb2.in.file.handle = dh;
-	status = smb2_close(tree1, &(cl.smb2));
+	status = smb2_close(cli1->tree, &(cl.smb2));
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	ZERO_STRUCT(dh);
@@ -936,21 +936,21 @@ done:
 		ZERO_STRUCT(cl.smb2);
 		cl.smb2.level = RAW_CLOSE_SMB2;
 		cl.smb2.in.file.handle = fh;
-		status = smb2_close(tree1, &(cl.smb2));
+		status = smb2_close(cli1->tree, &(cl.smb2));
 	}
 	if (dh.data[0] || dh.data[1]) {
 		ZERO_STRUCT(cl.smb2);
 		cl.smb2.level = RAW_CLOSE_SMB2;
 		cl.smb2.in.file.handle = dh;
-		status = smb2_close(tree1, &(cl.smb2));
+		status = smb2_close(cli1->tree, &(cl.smb2));
 	}
 
-	smb2_deltree(tree1, BASEDIR);
+	smb2_deltree(cli1->tree, BASEDIR);
 	return ret;
 }
 
 static bool torture_smb2_rename_dir_openfile(struct torture_context *torture,
-					     struct smb2_tree *tree1)
+					     struct smb2cli_state *cli1)
 {
 	bool ret = true;
 	NTSTATUS status;
@@ -962,8 +962,8 @@ static bool torture_smb2_rename_dir_openfile(struct torture_context *torture,
 	ZERO_STRUCT(d1);
 	ZERO_STRUCT(h1);
 
-	smb2_deltree(tree1, BASEDIR);
-	smb2_util_rmdir(tree1, BASEDIR);
+	smb2_deltree(cli1->tree, BASEDIR);
+	smb2_util_rmdir(cli1->tree, BASEDIR);
 
 	torture_comment(torture, "Creating base directory\n");
 
@@ -980,7 +980,7 @@ static bool torture_smb2_rename_dir_openfile(struct torture_context *torture,
 	io.smb2.in.security_flags = 0;
 	io.smb2.in.fname = BASEDIR;
 
-	status = smb2_create(tree1, torture, &(io.smb2));
+	status = smb2_create(cli1->tree, torture, &(io.smb2));
 	CHECK_STATUS(status, NT_STATUS_OK);
 	d1 = io.smb2.out.file.handle;
 
@@ -999,7 +999,7 @@ static bool torture_smb2_rename_dir_openfile(struct torture_context *torture,
 	io.smb2.in.security_flags = 0;
 	io.smb2.in.fname = BASEDIR "\\file.txt";
 
-	status = smb2_create(tree1, torture, &(io.smb2));
+	status = smb2_create(cli1->tree, torture, &(io.smb2));
 	CHECK_STATUS(status, NT_STATUS_OK);
 	h1 = io.smb2.out.file.handle;
 
@@ -1012,7 +1012,7 @@ static bool torture_smb2_rename_dir_openfile(struct torture_context *torture,
 	sinfo.rename_information.in.root_fid = 0;
 	sinfo.rename_information.in.new_name =
 		BASEDIR "-new";
-	status = smb2_setinfo_file(tree1, &sinfo);
+	status = smb2_setinfo_file(cli1->tree, &sinfo);
 	CHECK_STATUS(status, NT_STATUS_ACCESS_DENIED);
 
 	torture_comment(torture, "Closing directory\n");
@@ -1020,14 +1020,14 @@ static bool torture_smb2_rename_dir_openfile(struct torture_context *torture,
 	ZERO_STRUCT(cl.smb2);
 	cl.smb2.level = RAW_CLOSE_SMB2;
 	cl.smb2.in.file.handle = d1;
-	status = smb2_close(tree1, &(cl.smb2));
+	status = smb2_close(cli1->tree, &(cl.smb2));
 	CHECK_STATUS(status, NT_STATUS_OK);
 	ZERO_STRUCT(d1);
 
 	torture_comment(torture, "Closing test file\n");
 
 	cl.smb2.in.file.handle = h1;
-	status = smb2_close(tree1, &(cl.smb2));
+	status = smb2_close(cli1->tree, &(cl.smb2));
 	CHECK_STATUS(status, NT_STATUS_OK);
 	ZERO_STRUCT(h1);
 
@@ -1039,15 +1039,15 @@ done:
 		ZERO_STRUCT(cl.smb2);
 		cl.smb2.level = RAW_CLOSE_SMB2;
 		cl.smb2.in.file.handle = h1;
-		status = smb2_close(tree1, &(cl.smb2));
+		status = smb2_close(cli1->tree, &(cl.smb2));
 	}
-	smb2_deltree(tree1, BASEDIR);
+	smb2_deltree(cli1->tree, BASEDIR);
 	return ret;
 }
 
 struct rename_one_dir_cycle_state {
 	struct tevent_context *ev;
-	struct smb2_tree *tree;
+	struct smb2cli_state *cli;
 	struct smb2_handle file;
 	const char *base_name;
 	char *new_name;
@@ -1062,7 +1062,7 @@ static void rename_one_dir_cycle_done(struct smb2_request *subreq);
 
 static struct tevent_req *rename_one_dir_cycle_send(TALLOC_CTX *mem_ctx,
 						    struct tevent_context *ev,
-						    struct smb2_tree *tree,
+						    struct smb2cli_state *cli,
 						    struct smb2_handle file,
 						    unsigned max_renames,
 						    const char *base_name,
@@ -1078,7 +1078,7 @@ static struct tevent_req *rename_one_dir_cycle_send(TALLOC_CTX *mem_ctx,
 		return NULL;
 	}
 	state->ev = ev;
-	state->tree = tree;
+	state->cli->tree = cli->tree;
 	state->file = file;
 	state->base_name = base_name;
 	state->rename_counter = rename_counter;
@@ -1099,7 +1099,7 @@ static struct tevent_req *rename_one_dir_cycle_send(TALLOC_CTX *mem_ctx,
 	}
 	state->sinfo.rename_information.in.new_name = state->new_name;
 
-	subreq = smb2_setinfo_file_send(state->tree, &state->sinfo);
+	subreq = smb2_setinfo_file_send(state->cli->tree, &state->sinfo);
 	if (tevent_req_nomem(subreq, req)) {
 		return tevent_req_post(req, ev);
 	}
@@ -1144,7 +1144,7 @@ static void rename_one_dir_cycle_done(struct smb2_request *subreq)
 	}
 	state->sinfo.rename_information.in.new_name = state->new_name;
 
-	subreq = smb2_setinfo_file_send(state->tree, &state->sinfo);
+	subreq = smb2_setinfo_file_send(state->cli->tree, &state->sinfo);
 	if (tevent_req_nomem(subreq, req)) {
 		return;
 	}
@@ -1159,7 +1159,7 @@ static NTSTATUS rename_one_dir_cycle_recv(struct tevent_req *req)
 
 struct rename_dir_bench_state {
 	struct tevent_context *ev;
-	struct smb2_tree *tree;
+	struct smb2cli_state *cli;
 	const char *base_name;
 	unsigned max_renames;
 	unsigned *rename_counter;
@@ -1178,7 +1178,7 @@ static void rename_dir_bench_closed(struct smb2_request *subreq);
 
 static struct tevent_req *rename_dir_bench_send(TALLOC_CTX *mem_ctx,
 						struct tevent_context *ev,
-						struct smb2_tree *tree,
+						struct smb2cli_state *cli,
 						const char *base_name,
 						unsigned max_renames,
 						unsigned *rename_counter)
@@ -1193,7 +1193,7 @@ static struct tevent_req *rename_dir_bench_send(TALLOC_CTX *mem_ctx,
 		return NULL;
 	}
 	state->ev = ev;
-	state->tree = tree;
+	state->cli->tree = cli->tree;
 	state->base_name = base_name;
 	state->max_renames = max_renames;
 	state->rename_counter = rename_counter;
@@ -1208,7 +1208,7 @@ static struct tevent_req *rename_dir_bench_send(TALLOC_CTX *mem_ctx,
 	state->io.in.create_disposition = NTCREATEX_DISP_OPEN_IF;
 	state->io.in.fname = state->base_name;
 
-	subreq = smb2_create_send(state->tree, &state->io);
+	subreq = smb2_create_send(state->cli->tree, &state->io);
 	if (tevent_req_nomem(subreq, req)) {
 		return tevent_req_post(req, ev);
 	}
@@ -1270,7 +1270,7 @@ static void rename_dir_bench_renamed(struct tevent_req *subreq)
 	state->sinfo.disposition_info.in.file.handle = state->file;
 	state->sinfo.disposition_info.in.delete_on_close = true;
 
-	subreq2 = smb2_setinfo_file_send(state->tree, &state->sinfo);
+	subreq2 = smb2_setinfo_file_send(state->cli->tree, &state->sinfo);
 	if (tevent_req_nomem(subreq2, req)) {
 		return;
 	}
@@ -1294,7 +1294,7 @@ static void rename_dir_bench_set_doc(struct smb2_request *subreq)
 	ZERO_STRUCT(state->cl);
 	state->cl.in.file.handle = state->file;
 
-	subreq = smb2_close_send(state->tree, &state->cl);
+	subreq = smb2_close_send(state->cli->tree, &state->cl);
 	if (tevent_req_nomem(subreq, req)) {
 		return;
 	}
@@ -1330,7 +1330,7 @@ static void rename_dirs_bench_done(struct tevent_req *subreq);
 
 static struct tevent_req *rename_dirs_bench_send(TALLOC_CTX *mem_ctx,
 						 struct tevent_context *ev,
-						 struct smb2_tree *tree,
+						 struct smb2cli_state *cli,
 						 const char *base_name,
 						 unsigned num_parallel,
 						 unsigned max_renames,
@@ -1357,7 +1357,7 @@ static struct tevent_req *rename_dirs_bench_send(TALLOC_CTX *mem_ctx,
 			return tevent_req_post(req, ev);
 		}
 
-		subreq = rename_dir_bench_send(state, ev, tree, sub_base,
+		subreq = rename_dir_bench_send(state, ev, cli, sub_base,
 					       max_renames, rename_counter);
 		if (tevent_req_nomem(subreq, req)) {
 			return tevent_req_post(req, ev);
@@ -1393,14 +1393,14 @@ static NTSTATUS rename_dirs_bench_recv(struct tevent_req *req)
 }
 
 static bool torture_smb2_rename_dir_bench(struct torture_context *tctx,
-					  struct smb2_tree *tree)
+					  struct smb2cli_state *cli)
 {
 	struct tevent_req *req;
 	NTSTATUS status;
 	unsigned counter = 0;
 	bool ret;
 
-	req = rename_dirs_bench_send(tctx, tctx->ev, tree, "dir", 3, 10,
+	req = rename_dirs_bench_send(tctx, tctx->ev, cli, "dir", 3, 10,
 				     &counter);
 	torture_assert(tctx, req != NULL, "rename_dirs_bench_send failed");
 

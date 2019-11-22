@@ -98,7 +98,7 @@
  * Test what happens when SMB2_FLAGS_REPLAY_OPERATION is enabled for various
  * commands. We want to verify if the server returns an error code or not.
  */
-static bool test_replay_commands(struct torture_context *tctx, struct smb2_tree *tree)
+static bool test_replay_commands(struct torture_context *tctx, struct smb2cli_state *cli)
 {
 	bool ret = true;
 	NTSTATUS status;
@@ -111,9 +111,9 @@ static bool test_replay_commands(struct torture_context *tctx, struct smb2_tree 
 	struct smb2_lock lck;
 	struct smb2_lock_element el[2];
 	struct smb2_flush f;
-	TALLOC_CTX *tmp_ctx = talloc_new(tree);
+	TALLOC_CTX *tmp_ctx = talloc_new(cli->tree);
 	const char *fname = BASEDIR "\\replay_commands.dat";
-	struct smb2_transport *transport = tree->session->transport;
+	struct smb2_transport *transport = cli->tree->session->transport;
 
 	if (smbXcli_conn_protocol(transport->conn) < PROTOCOL_SMB3_00) {
 		torture_skip(tctx, "SMB 3.X Dialect family required for "
@@ -122,19 +122,19 @@ static bool test_replay_commands(struct torture_context *tctx, struct smb2_tree 
 
 	ZERO_STRUCT(break_info);
 	break_info.tctx = tctx;
-	tree->session->transport->oplock.handler = torture_oplock_ack_handler;
-	tree->session->transport->oplock.private_data = tree;
+	cli->tree->session->transport->oplock.handler = torture_oplock_ack_handler;
+	cli->tree->session->transport->oplock.private_data = cli->tree;
 
-	status = torture_smb2_testdir(tree, BASEDIR, &h);
+	status = torture_smb2_testdir(cli->tree, BASEDIR, &h);
 	CHECK_STATUS(status, NT_STATUS_OK);
-	smb2_util_close(tree, h);
+	smb2_util_close(cli->tree, h);
 
-	smb2cli_session_start_replay(tree->session->smbXcli);
+	smb2cli_session_start_replay(cli->tree->session->smbXcli);
 
 	torture_comment(tctx, "Try Commands with Replay Flags Enabled\n");
 
 	torture_comment(tctx, "Trying create\n");
-	status = torture_smb2_testfile(tree, fname, &h);
+	status = torture_smb2_testfile(cli->tree, fname, &h);
 	CHECK_STATUS(status, NT_STATUS_OK);
 	CHECK_VAL(break_info.count, 0);
 	/*
@@ -143,14 +143,14 @@ static bool test_replay_commands(struct torture_context *tctx, struct smb2_tree 
 	 */
 
 	torture_comment(tctx, "Trying write\n");
-	status = smb2_util_write(tree, h, buf, 0, ARRAY_SIZE(buf));
+	status = smb2_util_write(cli->tree, h, buf, 0, ARRAY_SIZE(buf));
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	f = (struct smb2_flush) {
 		.in.file.handle = h
 	};
 	torture_comment(tctx, "Trying flush\n");
-	status = smb2_flush(tree, &f);
+	status = smb2_flush(cli->tree, &f);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	rd = (struct smb2_read) {
@@ -160,7 +160,7 @@ static bool test_replay_commands(struct torture_context *tctx, struct smb2_tree 
 		.in.min_count = 1
 	};
 	torture_comment(tctx, "Trying read\n");
-	status = smb2_read(tree, tmp_ctx, &rd);
+	status = smb2_read(cli->tree, tmp_ctx, &rd);
 	CHECK_STATUS(status, NT_STATUS_OK);
 	CHECK_VAL(rd.out.data.length, 10);
 
@@ -168,7 +168,7 @@ static bool test_replay_commands(struct torture_context *tctx, struct smb2_tree 
 	sfinfo.position_information.in.file.handle = h;
 	sfinfo.position_information.in.position = 0x1000;
 	torture_comment(tctx, "Trying setinfo\n");
-	status = smb2_setinfo_file(tree, &sfinfo);
+	status = smb2_setinfo_file(cli->tree, &sfinfo);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	qfinfo = (union smb_fileinfo) {
@@ -176,7 +176,7 @@ static bool test_replay_commands(struct torture_context *tctx, struct smb2_tree 
 		.generic.in.file.handle = h
 	};
 	torture_comment(tctx, "Trying getinfo\n");
-	status = smb2_getinfo_file(tree, tmp_ctx, &qfinfo);
+	status = smb2_getinfo_file(cli->tree, tmp_ctx, &qfinfo);
 	CHECK_STATUS(status, NT_STATUS_OK);
 	CHECK_VAL(qfinfo.position_information.out.position, 0x1000);
 
@@ -188,7 +188,7 @@ static bool test_replay_commands(struct torture_context *tctx, struct smb2_tree 
 		.smb2.in.flags = SMB2_IOCTL_FLAG_IS_FSCTL
 	};
 	torture_comment(tctx, "Trying ioctl\n");
-	status = smb2_ioctl(tree, tmp_ctx, &ioctl.smb2);
+	status = smb2_ioctl(cli->tree, tmp_ctx, &ioctl.smb2);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	lck = (struct smb2_lock) {
@@ -204,19 +204,19 @@ static bool test_replay_commands(struct torture_context *tctx, struct smb2_tree 
 	torture_comment(tctx, "Trying lock\n");
 	el[0].offset		= 0x0000000000000000;
 	el[0].length		= 0x0000000000000100;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	lck.in.file.handle	= h;
 	el[0].flags		= SMB2_LOCK_FLAG_UNLOCK;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	CHECK_VAL(break_info.count, 0);
 done:
-	smb2cli_session_stop_replay(tree->session->smbXcli);
-	smb2_util_close(tree, h);
-	smb2_deltree(tree, BASEDIR);
+	smb2cli_session_stop_replay(cli->tree->session->smbXcli);
+	smb2_util_close(cli->tree, h);
+	smb2_deltree(cli->tree, BASEDIR);
 
 	talloc_free(tmp_ctx);
 
@@ -229,7 +229,7 @@ done:
  * The return code is unaffected of the REPLAY_OPERATION flag.
  */
 static bool test_replay_regular(struct torture_context *tctx,
-				struct smb2_tree *tree)
+				struct smb2cli_state *cli)
 {
 	NTSTATUS status;
 	TALLOC_CTX *mem_ctx = talloc_new(tctx);
@@ -239,7 +239,7 @@ static bool test_replay_regular(struct torture_context *tctx,
 	uint32_t perms = 0;
 	bool ret = true;
 	const char *fname = BASEDIR "\\replay_regular.dat";
-	struct smb2_transport *transport = tree->session->transport;
+	struct smb2_transport *transport = cli->tree->session->transport;
 
 	if (smbXcli_conn_protocol(transport->conn) < PROTOCOL_SMB3_00) {
 		torture_skip(tctx, "SMB 3.X Dialect family required for "
@@ -248,13 +248,13 @@ static bool test_replay_regular(struct torture_context *tctx,
 
 	ZERO_STRUCT(break_info);
 	break_info.tctx = tctx;
-	tree->session->transport->oplock.handler = torture_oplock_ack_handler;
-	tree->session->transport->oplock.private_data = tree;
+	cli->tree->session->transport->oplock.handler = torture_oplock_ack_handler;
+	cli->tree->session->transport->oplock.private_data = cli->tree;
 
-	smb2_util_unlink(tree, fname);
-	status = torture_smb2_testdir(tree, BASEDIR, &_h);
+	smb2_util_unlink(cli->tree, fname);
+	status = torture_smb2_testdir(cli->tree, BASEDIR, &_h);
 	CHECK_STATUS(status, NT_STATUS_OK);
-	smb2_util_close(tree, _h);
+	smb2_util_close(cli->tree, _h);
 	CHECK_VAL(break_info.count, 0);
 
 	torture_comment(tctx, "No replay detection for regular create\n");
@@ -273,68 +273,68 @@ static bool test_replay_regular(struct torture_context *tctx,
 		.in.fname   = fname
 	};
 
-	status = smb2_create(tree, tctx, &io);
+	status = smb2_create(cli->tree, tctx, &io);
 	CHECK_STATUS(status, NT_STATUS_OK);
 	CHECK_VAL(break_info.count, 0);
 	_h = io.out.file.handle;
 	h = &_h;
 	CHECK_CREATED(&io, CREATED, FILE_ATTRIBUTE_ARCHIVE);
 
-	smb2cli_session_start_replay(tree->session->smbXcli);
-	status = smb2_create(tree, tctx, &io);
-	smb2cli_session_stop_replay(tree->session->smbXcli);
+	smb2cli_session_start_replay(cli->tree->session->smbXcli);
+	status = smb2_create(cli->tree, tctx, &io);
+	smb2cli_session_stop_replay(cli->tree->session->smbXcli);
 	CHECK_STATUS(status, NT_STATUS_OBJECT_NAME_COLLISION);
 	CHECK_VAL(break_info.count, 0);
 
-	smb2_util_close(tree, *h);
+	smb2_util_close(cli->tree, *h);
 	h = NULL;
-	smb2_util_unlink(tree, fname);
+	smb2_util_unlink(cli->tree, fname);
 
 	/*
 	 * Same experiment with different create disposition.
 	 */
 	io.in.create_disposition = NTCREATEX_DISP_OPEN_IF;
-	status = smb2_create(tree, tctx, &io);
+	status = smb2_create(cli->tree, tctx, &io);
 	CHECK_STATUS(status, NT_STATUS_OK);
 	CHECK_VAL(break_info.count, 0);
 	_h = io.out.file.handle;
 	h = &_h;
 	CHECK_CREATED(&io, CREATED, FILE_ATTRIBUTE_ARCHIVE);
 
-	smb2cli_session_start_replay(tree->session->smbXcli);
-	status = smb2_create(tree, tctx, &io);
-	smb2cli_session_stop_replay(tree->session->smbXcli);
+	smb2cli_session_start_replay(cli->tree->session->smbXcli);
+	status = smb2_create(cli->tree, tctx, &io);
+	smb2cli_session_stop_replay(cli->tree->session->smbXcli);
 	CHECK_STATUS(status, NT_STATUS_SHARING_VIOLATION);
 	CHECK_VAL(break_info.count, 0);
 
-	smb2_util_close(tree, *h);
+	smb2_util_close(cli->tree, *h);
 	h = NULL;
-	smb2_util_unlink(tree, fname);
+	smb2_util_unlink(cli->tree, fname);
 
 	/*
 	 * Now with more generous share mode.
 	 */
 	io.in.share_access = smb2_util_share_access("RWD");
-	status = smb2_create(tree, tctx, &io);
+	status = smb2_create(cli->tree, tctx, &io);
 	CHECK_STATUS(status, NT_STATUS_OK);
 	CHECK_VAL(break_info.count, 0);
 	_h = io.out.file.handle;
 	h = &_h;
 	CHECK_CREATED(&io, CREATED, FILE_ATTRIBUTE_ARCHIVE);
 
-	smb2cli_session_start_replay(tree->session->smbXcli);
-	status = smb2_create(tree, tctx, &io);
-	smb2cli_session_stop_replay(tree->session->smbXcli);
+	smb2cli_session_start_replay(cli->tree->session->smbXcli);
+	status = smb2_create(cli->tree, tctx, &io);
+	smb2cli_session_stop_replay(cli->tree->session->smbXcli);
 	CHECK_STATUS(status, NT_STATUS_OK);
 	CHECK_VAL(break_info.count, 0);
 
 done:
 	if (h != NULL) {
-		smb2_util_close(tree, *h);
+		smb2_util_close(cli->tree, *h);
 	}
-	smb2_deltree(tree, BASEDIR);
+	smb2_deltree(cli->tree, BASEDIR);
 
-	talloc_free(tree);
+	talloc_free(cli->tree);
 	talloc_free(mem_ctx);
 
 	return ret;
@@ -344,7 +344,7 @@ done:
  * Test Durability V2 Create Replay Detection on Single Channel.
  */
 static bool test_replay_dhv2_oplock1(struct torture_context *tctx,
-				     struct smb2_tree *tree)
+				     struct smb2cli_state *cli)
 {
 	NTSTATUS status;
 	TALLOC_CTX *mem_ctx = talloc_new(tctx);
@@ -354,7 +354,7 @@ static bool test_replay_dhv2_oplock1(struct torture_context *tctx,
 	struct GUID create_guid = GUID_random();
 	bool ret = true;
 	const char *fname = BASEDIR "\\replay_dhv2_oplock1.dat";
-	struct smb2_transport *transport = tree->session->transport;
+	struct smb2_transport *transport = cli->tree->session->transport;
 	uint32_t share_capabilities;
 	bool share_is_so;
 
@@ -363,20 +363,20 @@ static bool test_replay_dhv2_oplock1(struct torture_context *tctx,
 				   "replay tests\n");
 	}
 
-	share_capabilities = smb2cli_tcon_capabilities(tree->smbXcli);
+	share_capabilities = smb2cli_tcon_capabilities(cli->tree->smbXcli);
 	share_is_so = share_capabilities & SMB2_SHARE_CAP_SCALEOUT;
 
 	ZERO_STRUCT(break_info);
 	break_info.tctx = tctx;
-	tree->session->transport->oplock.handler = torture_oplock_ack_handler;
-	tree->session->transport->oplock.private_data = tree;
+	cli->tree->session->transport->oplock.handler = torture_oplock_ack_handler;
+	cli->tree->session->transport->oplock.private_data = cli->tree;
 
 	torture_comment(tctx, "Replay of DurableHandleReqV2 on Single "
 			      "Channel\n");
-	smb2_util_unlink(tree, fname);
-	status = torture_smb2_testdir(tree, BASEDIR, &_h);
+	smb2_util_unlink(cli->tree, fname);
+	status = torture_smb2_testdir(cli->tree, BASEDIR, &_h);
 	CHECK_STATUS(status, NT_STATUS_OK);
-	smb2_util_close(tree, _h);
+	smb2_util_close(cli->tree, _h);
 	CHECK_VAL(break_info.count, 0);
 
 	smb2_oplock_create_share(&io, fname,
@@ -388,7 +388,7 @@ static bool test_replay_dhv2_oplock1(struct torture_context *tctx,
 	io.in.create_guid = create_guid;
 	io.in.timeout = UINT32_MAX;
 
-	status = smb2_create(tree, mem_ctx, &io);
+	status = smb2_create(cli->tree, mem_ctx, &io);
 	CHECK_STATUS(status, NT_STATUS_OK);
 	ref1 = io;
 	_h = io.out.file.handle;
@@ -408,20 +408,20 @@ static bool test_replay_dhv2_oplock1(struct torture_context *tctx,
 	/*
 	 * Replay Durable V2 Create on single channel
 	 */
-	smb2cli_session_start_replay(tree->session->smbXcli);
-	status = smb2_create(tree, mem_ctx, &io);
-	smb2cli_session_stop_replay(tree->session->smbXcli);
+	smb2cli_session_start_replay(cli->tree->session->smbXcli);
+	status = smb2_create(cli->tree, mem_ctx, &io);
+	smb2cli_session_stop_replay(cli->tree->session->smbXcli);
 	CHECK_STATUS(status, NT_STATUS_OK);
 	CHECK_CREATE_OUT(&io, &ref1);
 	CHECK_VAL(break_info.count, 0);
 
 done:
 	if (h != NULL) {
-		smb2_util_close(tree, *h);
+		smb2_util_close(cli->tree, *h);
 	}
-	smb2_deltree(tree, BASEDIR);
+	smb2_deltree(cli->tree, BASEDIR);
 
-	talloc_free(tree);
+	talloc_free(cli->tree);
 	talloc_free(mem_ctx);
 
 	return ret;
@@ -435,7 +435,7 @@ done:
  * oplock level or durable status of the opened file.
  */
 static bool test_replay_dhv2_oplock2(struct torture_context *tctx,
-				      struct smb2_tree *tree)
+				      struct smb2cli_state *cli)
 {
 	NTSTATUS status;
 	TALLOC_CTX *mem_ctx = talloc_new(tctx);
@@ -445,7 +445,7 @@ static bool test_replay_dhv2_oplock2(struct torture_context *tctx,
 	struct GUID create_guid = GUID_random();
 	bool ret = true;
 	const char *fname = BASEDIR "\\replay_dhv2_oplock2.dat";
-	struct smb2_transport *transport = tree->session->transport;
+	struct smb2_transport *transport = cli->tree->session->transport;
 	uint32_t share_capabilities;
 	bool share_is_so;
 
@@ -454,20 +454,20 @@ static bool test_replay_dhv2_oplock2(struct torture_context *tctx,
 				   "replay tests\n");
 	}
 
-	share_capabilities = smb2cli_tcon_capabilities(tree->smbXcli);
+	share_capabilities = smb2cli_tcon_capabilities(cli->tree->smbXcli);
 	share_is_so = share_capabilities & SMB2_SHARE_CAP_SCALEOUT;
 
 	ZERO_STRUCT(break_info);
 	break_info.tctx = tctx;
-	tree->session->transport->oplock.handler = torture_oplock_ack_handler;
-	tree->session->transport->oplock.private_data = tree;
+	cli->tree->session->transport->oplock.handler = torture_oplock_ack_handler;
+	cli->tree->session->transport->oplock.private_data = cli->tree;
 
 	torture_comment(tctx, "Replay of DurableHandleReqV2 on Single "
 			      "Channel\n");
-	smb2_util_unlink(tree, fname);
-	status = torture_smb2_testdir(tree, BASEDIR, &_h);
+	smb2_util_unlink(cli->tree, fname);
+	status = torture_smb2_testdir(cli->tree, BASEDIR, &_h);
 	CHECK_STATUS(status, NT_STATUS_OK);
-	smb2_util_close(tree, _h);
+	smb2_util_close(cli->tree, _h);
 	CHECK_VAL(break_info.count, 0);
 
 	smb2_oplock_create_share(&io, fname,
@@ -479,7 +479,7 @@ static bool test_replay_dhv2_oplock2(struct torture_context *tctx,
 	io.in.create_guid = create_guid;
 	io.in.timeout = UINT32_MAX;
 
-	status = smb2_create(tree, mem_ctx, &io);
+	status = smb2_create(cli->tree, mem_ctx, &io);
 	CHECK_STATUS(status, NT_STATUS_OK);
 	ref1 = io;
 	_h = io.out.file.handle;
@@ -523,9 +523,9 @@ static bool test_replay_dhv2_oplock2(struct torture_context *tctx,
 	ref2.out.timeout = 0;
 	ref2.out.blobs.num_blobs = 0;
 
-	smb2cli_session_start_replay(tree->session->smbXcli);
-	status = smb2_create(tree, mem_ctx, &io);
-	smb2cli_session_stop_replay(tree->session->smbXcli);
+	smb2cli_session_start_replay(cli->tree->session->smbXcli);
+	status = smb2_create(cli->tree, mem_ctx, &io);
+	smb2cli_session_stop_replay(cli->tree->session->smbXcli);
 	CHECK_STATUS(status, NT_STATUS_OK);
 	CHECK_CREATE_OUT(&io, &ref2);
 	CHECK_VAL(break_info.count, 0);
@@ -542,7 +542,7 @@ static bool test_replay_dhv2_oplock2(struct torture_context *tctx,
 	io.in.persistent_open = false;
 	io.in.create_guid = GUID_random();
 	io.in.timeout = UINT32_MAX;
-	status = smb2_create(tree, mem_ctx, &io);
+	status = smb2_create(cli->tree, mem_ctx, &io);
 	CHECK_STATUS(status, NT_STATUS_SHARING_VIOLATION);
 
 	if (!share_is_so) {
@@ -554,11 +554,11 @@ static bool test_replay_dhv2_oplock2(struct torture_context *tctx,
 
 done:
 	if (h != NULL) {
-		smb2_util_close(tree, *h);
+		smb2_util_close(cli->tree, *h);
 	}
-	smb2_deltree(tree, BASEDIR);
+	smb2_deltree(cli->tree, BASEDIR);
 
-	talloc_free(tree);
+	talloc_free(cli->tree);
 	talloc_free(mem_ctx);
 
 	return ret;
@@ -570,7 +570,7 @@ done:
  * the opened file is not changed by this.
  */
 static bool test_replay_dhv2_oplock3(struct torture_context *tctx,
-				     struct smb2_tree *tree)
+				     struct smb2cli_state *cli)
 {
 	NTSTATUS status;
 	TALLOC_CTX *mem_ctx = talloc_new(tctx);
@@ -580,7 +580,7 @@ static bool test_replay_dhv2_oplock3(struct torture_context *tctx,
 	struct GUID create_guid = GUID_random();
 	bool ret = true;
 	const char *fname = BASEDIR "\\replay_dhv2_oplock3.dat";
-	struct smb2_transport *transport = tree->session->transport;
+	struct smb2_transport *transport = cli->tree->session->transport;
 	uint32_t share_capabilities;
 	bool share_is_so;
 
@@ -589,20 +589,20 @@ static bool test_replay_dhv2_oplock3(struct torture_context *tctx,
 				   "replay tests\n");
 	}
 
-	share_capabilities = smb2cli_tcon_capabilities(tree->smbXcli);
+	share_capabilities = smb2cli_tcon_capabilities(cli->tree->smbXcli);
 	share_is_so = share_capabilities & SMB2_SHARE_CAP_SCALEOUT;
 
 	ZERO_STRUCT(break_info);
 	break_info.tctx = tctx;
-	tree->session->transport->oplock.handler = torture_oplock_ack_handler;
-	tree->session->transport->oplock.private_data = tree;
+	cli->tree->session->transport->oplock.handler = torture_oplock_ack_handler;
+	cli->tree->session->transport->oplock.private_data = cli->tree;
 
 	torture_comment(tctx, "Replay of DurableHandleReqV2 on Single "
 			      "Channel\n");
-	smb2_util_unlink(tree, fname);
-	status = torture_smb2_testdir(tree, BASEDIR, &_h);
+	smb2_util_unlink(cli->tree, fname);
+	status = torture_smb2_testdir(cli->tree, BASEDIR, &_h);
 	CHECK_STATUS(status, NT_STATUS_OK);
-	smb2_util_close(tree, _h);
+	smb2_util_close(cli->tree, _h);
 	CHECK_VAL(break_info.count, 0);
 
 	smb2_oplock_create_share(&io, fname,
@@ -614,7 +614,7 @@ static bool test_replay_dhv2_oplock3(struct torture_context *tctx,
 	io.in.create_guid = create_guid;
 	io.in.timeout = UINT32_MAX;
 
-	status = smb2_create(tree, mem_ctx, &io);
+	status = smb2_create(cli->tree, mem_ctx, &io);
 	CHECK_STATUS(status, NT_STATUS_OK);
 	ref1 = io;
 	_h = io.out.file.handle;
@@ -648,9 +648,9 @@ static bool test_replay_dhv2_oplock3(struct torture_context *tctx,
 	io.in.create_guid = create_guid;
 	io.in.timeout = UINT32_MAX;
 
-	smb2cli_session_start_replay(tree->session->smbXcli);
-	status = smb2_create(tree, mem_ctx, &io);
-	smb2cli_session_stop_replay(tree->session->smbXcli);
+	smb2cli_session_start_replay(cli->tree->session->smbXcli);
+	status = smb2_create(cli->tree, mem_ctx, &io);
+	smb2cli_session_stop_replay(cli->tree->session->smbXcli);
 	CHECK_STATUS(status, NT_STATUS_OK);
 	CHECK_CREATE_OUT(&io, &ref1);
 	CHECK_VAL(break_info.count, 0);
@@ -668,7 +668,7 @@ static bool test_replay_dhv2_oplock3(struct torture_context *tctx,
 	io.in.persistent_open = false;
 	io.in.create_guid = GUID_random();
 	io.in.timeout = UINT32_MAX;
-	status = smb2_create(tree, mem_ctx, &io);
+	status = smb2_create(cli->tree, mem_ctx, &io);
 	CHECK_STATUS(status, NT_STATUS_SHARING_VIOLATION);
 
 	if (!share_is_so) {
@@ -680,11 +680,11 @@ static bool test_replay_dhv2_oplock3(struct torture_context *tctx,
 
 done:
 	if (h != NULL) {
-		smb2_util_close(tree, *h);
+		smb2_util_close(cli->tree, *h);
 	}
-	smb2_deltree(tree, BASEDIR);
+	smb2_deltree(cli->tree, BASEDIR);
 
-	talloc_free(tree);
+	talloc_free(cli->tree);
 	talloc_free(mem_ctx);
 
 	return ret;
@@ -695,7 +695,7 @@ done:
  * Create with an oplock, and replay with a lease.
  */
 static bool test_replay_dhv2_oplock_lease(struct torture_context *tctx,
-					  struct smb2_tree *tree)
+					  struct smb2cli_state *cli)
 {
 	NTSTATUS status;
 	TALLOC_CTX *mem_ctx = talloc_new(tctx);
@@ -705,7 +705,7 @@ static bool test_replay_dhv2_oplock_lease(struct torture_context *tctx,
 	struct GUID create_guid = GUID_random();
 	bool ret = true;
 	const char *fname = BASEDIR "\\replay_dhv2_oplock1.dat";
-	struct smb2_transport *transport = tree->session->transport;
+	struct smb2_transport *transport = cli->tree->session->transport;
 	uint32_t share_capabilities;
 	bool share_is_so;
 	uint32_t server_capabilities;
@@ -722,20 +722,20 @@ static bool test_replay_dhv2_oplock_lease(struct torture_context *tctx,
 		torture_skip(tctx, "leases are not supported");
 	}
 
-	share_capabilities = smb2cli_tcon_capabilities(tree->smbXcli);
+	share_capabilities = smb2cli_tcon_capabilities(cli->tree->smbXcli);
 	share_is_so = share_capabilities & SMB2_SHARE_CAP_SCALEOUT;
 
 	ZERO_STRUCT(break_info);
 	break_info.tctx = tctx;
-	tree->session->transport->oplock.handler = torture_oplock_ack_handler;
-	tree->session->transport->oplock.private_data = tree;
+	cli->tree->session->transport->oplock.handler = torture_oplock_ack_handler;
+	cli->tree->session->transport->oplock.private_data = cli->tree;
 
 	torture_comment(tctx, "Replay of DurableHandleReqV2 on Single "
 			      "Channel\n");
-	smb2_util_unlink(tree, fname);
-	status = torture_smb2_testdir(tree, BASEDIR, &_h);
+	smb2_util_unlink(cli->tree, fname);
+	status = torture_smb2_testdir(cli->tree, BASEDIR, &_h);
 	CHECK_STATUS(status, NT_STATUS_OK);
-	smb2_util_close(tree, _h);
+	smb2_util_close(cli->tree, _h);
 	CHECK_VAL(break_info.count, 0);
 
 	smb2_oplock_create_share(&io, fname,
@@ -747,7 +747,7 @@ static bool test_replay_dhv2_oplock_lease(struct torture_context *tctx,
 	io.in.create_guid = create_guid;
 	io.in.timeout = UINT32_MAX;
 
-	status = smb2_create(tree, mem_ctx, &io);
+	status = smb2_create(cli->tree, mem_ctx, &io);
 	CHECK_STATUS(status, NT_STATUS_OK);
 	_h = io.out.file.handle;
 	h = &_h;
@@ -776,18 +776,18 @@ static bool test_replay_dhv2_oplock_lease(struct torture_context *tctx,
 	io.in.create_guid = create_guid;
 	io.in.timeout = UINT32_MAX;
 
-	smb2cli_session_start_replay(tree->session->smbXcli);
-	status = smb2_create(tree, mem_ctx, &io);
-	smb2cli_session_stop_replay(tree->session->smbXcli);
+	smb2cli_session_start_replay(cli->tree->session->smbXcli);
+	status = smb2_create(cli->tree, mem_ctx, &io);
+	smb2cli_session_stop_replay(cli->tree->session->smbXcli);
 	CHECK_STATUS(status, NT_STATUS_ACCESS_DENIED);
 
 done:
 	if (h != NULL) {
-		smb2_util_close(tree, *h);
+		smb2_util_close(cli->tree, *h);
 	}
-	smb2_deltree(tree, BASEDIR);
+	smb2_deltree(cli->tree, BASEDIR);
 
-	talloc_free(tree);
+	talloc_free(cli->tree);
 	talloc_free(mem_ctx);
 
 	return ret;
@@ -803,7 +803,7 @@ done:
  *   ==> it gets back the upgraded lease level
  */
 static bool test_replay_dhv2_lease1(struct torture_context *tctx,
-				    struct smb2_tree *tree)
+				    struct smb2cli_state *cli)
 {
 	NTSTATUS status;
 	TALLOC_CTX *mem_ctx = talloc_new(tctx);
@@ -815,7 +815,7 @@ static bool test_replay_dhv2_lease1(struct torture_context *tctx,
 	struct GUID create_guid = GUID_random();
 	bool ret = true;
 	const char *fname = BASEDIR "\\replay2_lease1.dat";
-	struct smb2_transport *transport = tree->session->transport;
+	struct smb2_transport *transport = cli->tree->session->transport;
 	uint32_t share_capabilities;
 	bool share_is_so;
 	uint32_t server_capabilities;
@@ -832,20 +832,20 @@ static bool test_replay_dhv2_lease1(struct torture_context *tctx,
 		torture_skip(tctx, "leases are not supported");
 	}
 
-	share_capabilities = smb2cli_tcon_capabilities(tree->smbXcli);
+	share_capabilities = smb2cli_tcon_capabilities(cli->tree->smbXcli);
 	share_is_so = share_capabilities & SMB2_SHARE_CAP_SCALEOUT;
 
 	ZERO_STRUCT(break_info);
 	break_info.tctx = tctx;
-	tree->session->transport->oplock.handler = torture_oplock_ack_handler;
-	tree->session->transport->oplock.private_data = tree;
+	cli->tree->session->transport->oplock.handler = torture_oplock_ack_handler;
+	cli->tree->session->transport->oplock.private_data = cli->tree;
 
 	torture_comment(tctx, "Replay of DurableHandleReqV2 with Lease "
 			      "on Single Channel\n");
-	smb2_util_unlink(tree, fname);
-	status = torture_smb2_testdir(tree, BASEDIR, &_h1);
+	smb2_util_unlink(cli->tree, fname);
+	status = torture_smb2_testdir(cli->tree, BASEDIR, &_h1);
 	CHECK_STATUS(status, NT_STATUS_OK);
-	smb2_util_close(tree, _h1);
+	smb2_util_close(cli->tree, _h1);
 	CHECK_VAL(break_info.count, 0);
 
 	lease_key = random();
@@ -858,7 +858,7 @@ static bool test_replay_dhv2_lease1(struct torture_context *tctx,
 	io1.in.create_guid = create_guid;
 	io1.in.timeout = UINT32_MAX;
 
-	status = smb2_create(tree, mem_ctx, &io1);
+	status = smb2_create(cli->tree, mem_ctx, &io1);
 	CHECK_STATUS(status, NT_STATUS_OK);
 	ref1 = io1;
 	_h1 = io1.out.file.handle;
@@ -891,7 +891,7 @@ static bool test_replay_dhv2_lease1(struct torture_context *tctx,
 	io2.in.create_guid = GUID_random(); /* new guid... */
 	io2.in.timeout = UINT32_MAX;
 
-	status = smb2_create(tree, mem_ctx, &io2);
+	status = smb2_create(cli->tree, mem_ctx, &io2);
 	CHECK_STATUS(status, NT_STATUS_OK);
 	_h2 = io2.out.file.handle;
 	h2 = &_h2;
@@ -908,25 +908,25 @@ static bool test_replay_dhv2_lease1(struct torture_context *tctx,
 			smb2_util_lease_state("RHW");
 	}
 
-	smb2cli_session_start_replay(tree->session->smbXcli);
-	status = smb2_create(tree, mem_ctx, &io1);
-	smb2cli_session_stop_replay(tree->session->smbXcli);
+	smb2cli_session_start_replay(cli->tree->session->smbXcli);
+	status = smb2_create(cli->tree, mem_ctx, &io1);
+	smb2cli_session_stop_replay(cli->tree->session->smbXcli);
 	CHECK_STATUS(status, NT_STATUS_OK);
 	CHECK_CREATE_OUT(&io1, &ref1);
 	CHECK_VAL(break_info.count, 0);
 
 done:
-	smb2cli_session_stop_replay(tree->session->smbXcli);
+	smb2cli_session_stop_replay(cli->tree->session->smbXcli);
 
 	if (h1 != NULL) {
-		smb2_util_close(tree, *h1);
+		smb2_util_close(cli->tree, *h1);
 	}
 	if (h2 != NULL) {
-		smb2_util_close(tree, *h2);
+		smb2_util_close(cli->tree, *h2);
 	}
-	smb2_deltree(tree, BASEDIR);
+	smb2_deltree(cli->tree, BASEDIR);
 
-	talloc_free(tree);
+	talloc_free(cli->tree);
 	talloc_free(mem_ctx);
 
 	return ret;
@@ -944,7 +944,7 @@ done:
  *   ==> it gets back the upgraded lease level
  */
 static bool test_replay_dhv2_lease2(struct torture_context *tctx,
-				    struct smb2_tree *tree)
+				    struct smb2cli_state *cli)
 {
 	NTSTATUS status;
 	TALLOC_CTX *mem_ctx = talloc_new(tctx);
@@ -956,7 +956,7 @@ static bool test_replay_dhv2_lease2(struct torture_context *tctx,
 	struct GUID create_guid = GUID_random();
 	bool ret = true;
 	const char *fname = BASEDIR "\\replay2_lease2.dat";
-	struct smb2_transport *transport = tree->session->transport;
+	struct smb2_transport *transport = cli->tree->session->transport;
 	uint32_t share_capabilities;
 	bool share_is_so;
 	uint32_t server_capabilities;
@@ -973,20 +973,20 @@ static bool test_replay_dhv2_lease2(struct torture_context *tctx,
 		torture_skip(tctx, "leases are not supported");
 	}
 
-	share_capabilities = smb2cli_tcon_capabilities(tree->smbXcli);
+	share_capabilities = smb2cli_tcon_capabilities(cli->tree->smbXcli);
 	share_is_so = share_capabilities & SMB2_SHARE_CAP_SCALEOUT;
 
 	ZERO_STRUCT(break_info);
 	break_info.tctx = tctx;
-	tree->session->transport->oplock.handler = torture_oplock_ack_handler;
-	tree->session->transport->oplock.private_data = tree;
+	cli->tree->session->transport->oplock.handler = torture_oplock_ack_handler;
+	cli->tree->session->transport->oplock.private_data = cli->tree;
 
 	torture_comment(tctx, "Replay of DurableHandleReqV2 with Lease "
 			      "on Single Channel\n");
-	smb2_util_unlink(tree, fname);
-	status = torture_smb2_testdir(tree, BASEDIR, &_h1);
+	smb2_util_unlink(cli->tree, fname);
+	status = torture_smb2_testdir(cli->tree, BASEDIR, &_h1);
 	CHECK_STATUS(status, NT_STATUS_OK);
-	smb2_util_close(tree, _h1);
+	smb2_util_close(cli->tree, _h1);
 	CHECK_VAL(break_info.count, 0);
 
 	lease_key = random();
@@ -999,7 +999,7 @@ static bool test_replay_dhv2_lease2(struct torture_context *tctx,
 	io1.in.create_guid = create_guid;
 	io1.in.timeout = UINT32_MAX;
 
-	status = smb2_create(tree, mem_ctx, &io1);
+	status = smb2_create(cli->tree, mem_ctx, &io1);
 	CHECK_STATUS(status, NT_STATUS_OK);
 	CHECK_CREATED(&io1, CREATED, FILE_ATTRIBUTE_ARCHIVE);
 	CHECK_VAL(io1.out.durable_open, false);
@@ -1032,7 +1032,7 @@ static bool test_replay_dhv2_lease2(struct torture_context *tctx,
 	io2.in.create_guid = GUID_random(); /* new guid... */
 	io2.in.timeout = UINT32_MAX;
 
-	status = smb2_create(tree, mem_ctx, &io2);
+	status = smb2_create(cli->tree, mem_ctx, &io2);
 	CHECK_STATUS(status, NT_STATUS_OK);
 	_h2 = io2.out.file.handle;
 	h2 = &_h2;
@@ -1059,25 +1059,25 @@ static bool test_replay_dhv2_lease2(struct torture_context *tctx,
 	io1.in.create_guid = create_guid;
 	io1.in.timeout = UINT32_MAX;
 
-	smb2cli_session_start_replay(tree->session->smbXcli);
-	status = smb2_create(tree, mem_ctx, &io1);
-	smb2cli_session_stop_replay(tree->session->smbXcli);
+	smb2cli_session_start_replay(cli->tree->session->smbXcli);
+	status = smb2_create(cli->tree, mem_ctx, &io1);
+	smb2cli_session_stop_replay(cli->tree->session->smbXcli);
 	CHECK_STATUS(status, NT_STATUS_OK);
 	CHECK_CREATE_OUT(&io1, &ref1);
 	CHECK_VAL(break_info.count, 0);
 
 done:
-	smb2cli_session_stop_replay(tree->session->smbXcli);
+	smb2cli_session_stop_replay(cli->tree->session->smbXcli);
 
 	if (h1 != NULL) {
-		smb2_util_close(tree, *h1);
+		smb2_util_close(cli->tree, *h1);
 	}
 	if (h2 != NULL) {
-		smb2_util_close(tree, *h2);
+		smb2_util_close(cli->tree, *h2);
 	}
-	smb2_deltree(tree, BASEDIR);
+	smb2_deltree(cli->tree, BASEDIR);
 
-	talloc_free(tree);
+	talloc_free(cli->tree);
 	talloc_free(mem_ctx);
 
 	return ret;
@@ -1088,7 +1088,7 @@ done:
  * create with a lease, and replay with a different lease key
  */
 static bool test_replay_dhv2_lease3(struct torture_context *tctx,
-				    struct smb2_tree *tree)
+				    struct smb2cli_state *cli)
 {
 	NTSTATUS status;
 	TALLOC_CTX *mem_ctx = talloc_new(tctx);
@@ -1100,7 +1100,7 @@ static bool test_replay_dhv2_lease3(struct torture_context *tctx,
 	struct GUID create_guid = GUID_random();
 	bool ret = true;
 	const char *fname = BASEDIR "\\replay2_lease2.dat";
-	struct smb2_transport *transport = tree->session->transport;
+	struct smb2_transport *transport = cli->tree->session->transport;
 	uint32_t share_capabilities;
 	bool share_is_so;
 	uint32_t server_capabilities;
@@ -1117,20 +1117,20 @@ static bool test_replay_dhv2_lease3(struct torture_context *tctx,
 		torture_skip(tctx, "leases are not supported");
 	}
 
-	share_capabilities = smb2cli_tcon_capabilities(tree->smbXcli);
+	share_capabilities = smb2cli_tcon_capabilities(cli->tree->smbXcli);
 	share_is_so = share_capabilities & SMB2_SHARE_CAP_SCALEOUT;
 
 	ZERO_STRUCT(break_info);
 	break_info.tctx = tctx;
-	tree->session->transport->oplock.handler = torture_oplock_ack_handler;
-	tree->session->transport->oplock.private_data = tree;
+	cli->tree->session->transport->oplock.handler = torture_oplock_ack_handler;
+	cli->tree->session->transport->oplock.private_data = cli->tree;
 
 	torture_comment(tctx, "Replay of DurableHandleReqV2 with Lease "
 			      "on Single Channel\n");
-	smb2_util_unlink(tree, fname);
-	status = torture_smb2_testdir(tree, BASEDIR, &_h1);
+	smb2_util_unlink(cli->tree, fname);
+	status = torture_smb2_testdir(cli->tree, BASEDIR, &_h1);
 	CHECK_STATUS(status, NT_STATUS_OK);
-	smb2_util_close(tree, _h1);
+	smb2_util_close(cli->tree, _h1);
 	CHECK_VAL(break_info.count, 0);
 
 	lease_key = random();
@@ -1143,7 +1143,7 @@ static bool test_replay_dhv2_lease3(struct torture_context *tctx,
 	io1.in.create_guid = create_guid;
 	io1.in.timeout = UINT32_MAX;
 
-	status = smb2_create(tree, mem_ctx, &io1);
+	status = smb2_create(cli->tree, mem_ctx, &io1);
 	CHECK_STATUS(status, NT_STATUS_OK);
 	CHECK_CREATED(&io1, CREATED, FILE_ATTRIBUTE_ARCHIVE);
 	CHECK_VAL(io1.out.durable_open, false);
@@ -1175,7 +1175,7 @@ static bool test_replay_dhv2_lease3(struct torture_context *tctx,
 	io2.in.create_guid = GUID_random(); /* new guid... */
 	io2.in.timeout = UINT32_MAX;
 
-	status = smb2_create(tree, mem_ctx, &io2);
+	status = smb2_create(cli->tree, mem_ctx, &io2);
 	CHECK_STATUS(status, NT_STATUS_OK);
 	_h2 = io2.out.file.handle;
 	h2 = &_h2;
@@ -1194,23 +1194,23 @@ static bool test_replay_dhv2_lease3(struct torture_context *tctx,
 	io1.in.create_guid = create_guid;
 	io1.in.timeout = UINT32_MAX;
 
-	smb2cli_session_start_replay(tree->session->smbXcli);
-	status = smb2_create(tree, mem_ctx, &io1);
-	smb2cli_session_stop_replay(tree->session->smbXcli);
+	smb2cli_session_start_replay(cli->tree->session->smbXcli);
+	status = smb2_create(cli->tree, mem_ctx, &io1);
+	smb2cli_session_stop_replay(cli->tree->session->smbXcli);
 	CHECK_STATUS(status, NT_STATUS_ACCESS_DENIED);
 
 done:
-	smb2cli_session_stop_replay(tree->session->smbXcli);
+	smb2cli_session_stop_replay(cli->tree->session->smbXcli);
 
 	if (h1 != NULL) {
-		smb2_util_close(tree, *h1);
+		smb2_util_close(cli->tree, *h1);
 	}
 	if (h2 != NULL) {
-		smb2_util_close(tree, *h2);
+		smb2_util_close(cli->tree, *h2);
 	}
-	smb2_deltree(tree, BASEDIR);
+	smb2_deltree(cli->tree, BASEDIR);
 
-	talloc_free(tree);
+	talloc_free(cli->tree);
 	talloc_free(mem_ctx);
 
 	return ret;
@@ -1222,7 +1222,7 @@ done:
  * with an oplock.
  */
 static bool test_replay_dhv2_lease_oplock(struct torture_context *tctx,
-					  struct smb2_tree *tree)
+					  struct smb2cli_state *cli)
 {
 	NTSTATUS status;
 	TALLOC_CTX *mem_ctx = talloc_new(tctx);
@@ -1234,7 +1234,7 @@ static bool test_replay_dhv2_lease_oplock(struct torture_context *tctx,
 	struct GUID create_guid = GUID_random();
 	bool ret = true;
 	const char *fname = BASEDIR "\\replay2_lease1.dat";
-	struct smb2_transport *transport = tree->session->transport;
+	struct smb2_transport *transport = cli->tree->session->transport;
 	uint32_t share_capabilities;
 	bool share_is_so;
 	uint32_t server_capabilities;
@@ -1251,20 +1251,20 @@ static bool test_replay_dhv2_lease_oplock(struct torture_context *tctx,
 		torture_skip(tctx, "leases are not supported");
 	}
 
-	share_capabilities = smb2cli_tcon_capabilities(tree->smbXcli);
+	share_capabilities = smb2cli_tcon_capabilities(cli->tree->smbXcli);
 	share_is_so = share_capabilities & SMB2_SHARE_CAP_SCALEOUT;
 
 	ZERO_STRUCT(break_info);
 	break_info.tctx = tctx;
-	tree->session->transport->oplock.handler = torture_oplock_ack_handler;
-	tree->session->transport->oplock.private_data = tree;
+	cli->tree->session->transport->oplock.handler = torture_oplock_ack_handler;
+	cli->tree->session->transport->oplock.private_data = cli->tree;
 
 	torture_comment(tctx, "Replay of DurableHandleReqV2 with Lease "
 			      "on Single Channel\n");
-	smb2_util_unlink(tree, fname);
-	status = torture_smb2_testdir(tree, BASEDIR, &_h1);
+	smb2_util_unlink(cli->tree, fname);
+	status = torture_smb2_testdir(cli->tree, BASEDIR, &_h1);
 	CHECK_STATUS(status, NT_STATUS_OK);
-	smb2_util_close(tree, _h1);
+	smb2_util_close(cli->tree, _h1);
 	CHECK_VAL(break_info.count, 0);
 
 	lease_key = random();
@@ -1277,7 +1277,7 @@ static bool test_replay_dhv2_lease_oplock(struct torture_context *tctx,
 	io1.in.create_guid = create_guid;
 	io1.in.timeout = UINT32_MAX;
 
-	status = smb2_create(tree, mem_ctx, &io1);
+	status = smb2_create(cli->tree, mem_ctx, &io1);
 	CHECK_STATUS(status, NT_STATUS_OK);
 	ref1 = io1;
 	_h1 = io1.out.file.handle;
@@ -1310,7 +1310,7 @@ static bool test_replay_dhv2_lease_oplock(struct torture_context *tctx,
 	io2.in.create_guid = GUID_random(); /* new guid... */
 	io2.in.timeout = UINT32_MAX;
 
-	status = smb2_create(tree, mem_ctx, &io2);
+	status = smb2_create(cli->tree, mem_ctx, &io2);
 	CHECK_STATUS(status, NT_STATUS_OK);
 	_h2 = io2.out.file.handle;
 	h2 = &_h2;
@@ -1336,32 +1336,32 @@ static bool test_replay_dhv2_lease_oplock(struct torture_context *tctx,
 			smb2_util_lease_state("RHW");
 	}
 
-	smb2cli_session_start_replay(tree->session->smbXcli);
-	status = smb2_create(tree, mem_ctx, &io1);
-	smb2cli_session_stop_replay(tree->session->smbXcli);
+	smb2cli_session_start_replay(cli->tree->session->smbXcli);
+	status = smb2_create(cli->tree, mem_ctx, &io1);
+	smb2cli_session_stop_replay(cli->tree->session->smbXcli);
 	CHECK_STATUS(status, NT_STATUS_OK);
 	CHECK_CREATE_OUT(&io1, &ref1);
 	CHECK_VAL(break_info.count, 0);
 
 done:
-	smb2cli_session_stop_replay(tree->session->smbXcli);
+	smb2cli_session_stop_replay(cli->tree->session->smbXcli);
 
 	if (h1 != NULL) {
-		smb2_util_close(tree, *h1);
+		smb2_util_close(cli->tree, *h1);
 	}
 	if (h2 != NULL) {
-		smb2_util_close(tree, *h2);
+		smb2_util_close(cli->tree, *h2);
 	}
-	smb2_deltree(tree, BASEDIR);
+	smb2_deltree(cli->tree, BASEDIR);
 
-	talloc_free(tree);
+	talloc_free(cli->tree);
 	talloc_free(mem_ctx);
 
 	return ret;
 }
 
 static bool test_channel_sequence_table(struct torture_context *tctx,
-					struct smb2_tree *tree,
+					struct smb2cli_state *cli,
 					bool do_replay,
 					uint16_t opcode)
 {
@@ -1435,9 +1435,9 @@ static bool test_channel_sequence_table(struct torture_context *tctx,
 		}
 	};
 
-	smb2cli_session_reset_channel_sequence(tree->session->smbXcli, 0);
+	smb2cli_session_reset_channel_sequence(cli->tree->session->smbXcli, 0);
 
-	csn = smb2cli_session_current_channel_sequence(tree->session->smbXcli);
+	csn = smb2cli_session_current_channel_sequence(cli->tree->session->smbXcli);
 	torture_comment(tctx, "Testing create with channel sequence number: 0x%04x\n", csn);
 
 	smb2_oplock_create_share(&io, fname,
@@ -1449,7 +1449,7 @@ static bool test_channel_sequence_table(struct torture_context *tctx,
 	io.in.timeout = UINT32_MAX;
 
 	torture_assert_ntstatus_ok_goto(tctx,
-		smb2_create(tree, mem_ctx, &io),
+		smb2_create(cli->tree, mem_ctx, &io),
 		ret, done, "failed to call smb2_create");
 
 	handle = io.out.file.handle;
@@ -1482,15 +1482,15 @@ static bool test_channel_sequence_table(struct torture_context *tctx,
 			break;
 		}
 
-		smb2cli_session_reset_channel_sequence(tree->session->smbXcli, csn);
-		csn = smb2cli_session_current_channel_sequence(tree->session->smbXcli);
+		smb2cli_session_reset_channel_sequence(cli->tree->session->smbXcli, csn);
+		csn = smb2cli_session_current_channel_sequence(cli->tree->session->smbXcli);
 
 		torture_comment(tctx, "Testing %s (replay: %s) with CSN 0x%04x, expecting: %s\n",
 			opstr, do_replay ? "true" : "false", csn,
 			nt_errstr(tests[i].expected_status));
 
 		if (do_replay) {
-			smb2cli_session_start_replay(tree->session->smbXcli);
+			smb2cli_session_start_replay(cli->tree->session->smbXcli);
 		}
 
 		switch (opcode) {
@@ -1499,7 +1499,7 @@ static bool test_channel_sequence_table(struct torture_context *tctx,
 
 			generate_random_buffer(blob.data, blob.length);
 
-			status = smb2_util_write(tree, handle, blob.data, 0, blob.length);
+			status = smb2_util_write(cli->tree, handle, blob.data, 0, blob.length);
 			if (NT_STATUS_IS_OK(status)) {
 				struct smb2_read rd;
 
@@ -1510,7 +1510,7 @@ static bool test_channel_sequence_table(struct torture_context *tctx,
 				};
 
 				torture_assert_ntstatus_ok_goto(tctx,
-					smb2_read(tree, tree, &rd),
+					smb2_read(cli->tree, cli->tree, &rd),
 					ret, done, "failed to read after write");
 
 				torture_assert_data_blob_equal(tctx,
@@ -1528,7 +1528,7 @@ static bool test_channel_sequence_table(struct torture_context *tctx,
 				.smb2.in.max_output_response = 64,
 				.smb2.in.flags = SMB2_IOCTL_FLAG_IS_FSCTL
 			};
-			status = smb2_ioctl(tree, mem_ctx, &ioctl.smb2);
+			status = smb2_ioctl(cli->tree, mem_ctx, &ioctl.smb2);
 			break;
 		}
 		case SMB2_OP_SETINFO: {
@@ -1537,7 +1537,7 @@ static bool test_channel_sequence_table(struct torture_context *tctx,
 			sfinfo.generic.level = RAW_SFILEINFO_POSITION_INFORMATION;
 			sfinfo.generic.in.file.handle = handle;
 			sfinfo.position_information.in.position = 0x1000;
-			status = smb2_setinfo_file(tree, &sfinfo);
+			status = smb2_setinfo_file(cli->tree, &sfinfo);
 			break;
 		}
 		default:
@@ -1550,11 +1550,11 @@ static bool test_channel_sequence_table(struct torture_context *tctx,
 		};
 
 		torture_assert_ntstatus_ok_goto(tctx,
-			smb2_getinfo_file(tree, mem_ctx, &qfinfo),
+			smb2_getinfo_file(cli->tree, mem_ctx, &qfinfo),
 			ret, done, "failed to read after write");
 
 		if (do_replay) {
-			smb2cli_session_stop_replay(tree->session->smbXcli);
+			smb2cli_session_stop_replay(cli->tree->session->smbXcli);
 		}
 
 		torture_assert_ntstatus_equal_goto(tctx,
@@ -1564,21 +1564,21 @@ static bool test_channel_sequence_table(struct torture_context *tctx,
 	}
 done:
 	if (phandle != NULL) {
-		smb2_util_close(tree, *phandle);
+		smb2_util_close(cli->tree, *phandle);
 	}
 
-	smb2_util_unlink(tree, fname);
+	smb2_util_unlink(cli->tree, fname);
 
 	return ret;
 }
 
 static bool test_channel_sequence(struct torture_context *tctx,
-				  struct smb2_tree *tree)
+				  struct smb2cli_state *cli)
 {
 	TALLOC_CTX *mem_ctx = talloc_new(tctx);
 	bool ret = true;
 	const char *fname = BASEDIR "\\channel_sequence.dat";
-	struct smb2_transport *transport1 = tree->session->transport;
+	struct smb2_transport *transport1 = cli->tree->session->transport;
 	struct smb2_handle handle;
 	uint32_t server_capabilities;
 	uint16_t opcodes[] = { SMB2_OP_WRITE, SMB2_OP_IOCTL, SMB2_OP_SETINFO };
@@ -1590,7 +1590,7 @@ static bool test_channel_sequence(struct torture_context *tctx,
 	}
 
 	server_capabilities = smb2cli_conn_server_capabilities(
-					tree->session->transport->conn);
+					cli->tree->session->transport->conn);
 	if (!(server_capabilities & SMB2_CAP_MULTI_CHANNEL)) {
 		torture_skip(tctx,
 			     "Server does not support multi-channel.");
@@ -1599,27 +1599,27 @@ static bool test_channel_sequence(struct torture_context *tctx,
 	torture_comment(tctx, "Testing channel sequence numbers\n");
 
 	torture_assert_ntstatus_ok_goto(tctx,
-		torture_smb2_testdir(tree, BASEDIR, &handle),
+		torture_smb2_testdir(cli->tree, BASEDIR, &handle),
 		ret, done, "failed to setup test directory");
 
-	smb2_util_close(tree, handle);
-	smb2_util_unlink(tree, fname);
+	smb2_util_close(cli->tree, handle);
+	smb2_util_unlink(cli->tree, fname);
 
 	for (i=0; i <ARRAY_SIZE(opcodes); i++) {
 		torture_assert(tctx,
-			test_channel_sequence_table(tctx, tree, false, opcodes[i]),
+			test_channel_sequence_table(tctx, cli, false, opcodes[i]),
 			"failed to test CSN without replay flag");
 		torture_assert(tctx,
-			test_channel_sequence_table(tctx, tree, true, opcodes[i]),
+			test_channel_sequence_table(tctx, cli, true, opcodes[i]),
 			"failed to test CSN with replay flag");
 	}
 
 done:
 
-	smb2_util_unlink(tree, fname);
-	smb2_deltree(tree, BASEDIR);
+	smb2_util_unlink(cli->tree, fname);
+	smb2_deltree(cli->tree, BASEDIR);
 
-	talloc_free(tree);
+	talloc_free(cli->tree);
 	talloc_free(mem_ctx);
 
 	return ret;
@@ -1628,7 +1628,7 @@ done:
 /**
  * Test Durability V2 Create Replay Detection on Multi Channel
  */
-static bool test_replay3(struct torture_context *tctx, struct smb2_tree *tree1)
+static bool test_replay3(struct torture_context *tctx, struct smb2cli_state *cli1)
 {
 	const char *host = torture_setting_string(tctx, "host", NULL);
 	const char *share = torture_setting_string(tctx, "share", NULL);
@@ -1640,10 +1640,10 @@ static bool test_replay3(struct torture_context *tctx, struct smb2_tree *tree1)
 	struct GUID create_guid = GUID_random();
 	bool ret = true;
 	const char *fname = BASEDIR "\\replay3.dat";
-	struct smb2_tree *tree2 = NULL;
-	struct smb2_transport *transport1 = tree1->session->transport;
+	struct smb2cli_state *cli2 = NULL;
+	struct smb2_transport *transport1 = cli1->tree->session->transport;
 	struct smb2_transport *transport2 = NULL;
-	struct smb2_session *session1_1 = tree1->session;
+	struct smb2_session *session1_1 = cli1->tree->session;
 	struct smb2_session *session1_2 = NULL;
 	uint32_t share_capabilities;
 	bool share_is_so;
@@ -1655,26 +1655,26 @@ static bool test_replay3(struct torture_context *tctx, struct smb2_tree *tree1)
 	}
 
 	server_capabilities = smb2cli_conn_server_capabilities(
-					tree1->session->transport->conn);
+					cli1->tree->session->transport->conn);
 	if (!(server_capabilities & SMB2_CAP_MULTI_CHANNEL)) {
 		torture_skip(tctx,
 			     "Server does not support multi-channel.");
 	}
 
-	share_capabilities = smb2cli_tcon_capabilities(tree1->smbXcli);
+	share_capabilities = smb2cli_tcon_capabilities(cli1->tree->smbXcli);
 	share_is_so = share_capabilities & SMB2_SHARE_CAP_SCALEOUT;
 
 	ZERO_STRUCT(break_info);
 	break_info.tctx = tctx;
 	transport1->oplock.handler = torture_oplock_ack_handler;
-	transport1->oplock.private_data = tree1;
+	transport1->oplock.private_data = cli1->tree;
 
 	torture_comment(tctx, "Replay of DurableHandleReqV2 on Multi "
 			      "Channel\n");
-	status = torture_smb2_testdir(tree1, BASEDIR, &_h);
+	status = torture_smb2_testdir(cli1->tree, BASEDIR, &_h);
 	CHECK_STATUS(status, NT_STATUS_OK);
-	smb2_util_close(tree1, _h);
-	smb2_util_unlink(tree1, fname);
+	smb2_util_close(cli1->tree, _h);
+	smb2_util_unlink(cli1->tree, fname);
 	CHECK_VAL(break_info.count, 0);
 
 	/*
@@ -1689,8 +1689,8 @@ static bool test_replay3(struct torture_context *tctx, struct smb2_tree *tree1)
 	io.in.create_guid = create_guid;
 	io.in.timeout = UINT32_MAX;
 
-	tree1->session = session1_1;
-	status = smb2_create(tree1, mem_ctx, &io);
+	cli1->tree->session = session1_1;
+	status = smb2_create(cli1->tree, mem_ctx, &io);
 	CHECK_STATUS(status, NT_STATUS_OK);
 	_h = io.out.file.handle;
 	h = &_h;
@@ -1713,7 +1713,7 @@ static bool test_replay3(struct torture_context *tctx, struct smb2_tree *tree1)
 			share,
 			lpcfg_resolve_context(tctx->lp_ctx),
 			popt_get_cmdline_credentials(),
-			&tree2,
+			&cli->tree2,
 			tctx->ev,
 			&transport1->options,
 			lpcfg_socket_options(tctx->lp_ctx),
@@ -1721,17 +1721,17 @@ static bool test_replay3(struct torture_context *tctx, struct smb2_tree *tree1)
 			);
 	torture_assert_ntstatus_ok_goto(tctx, status, ret, done,
 			"smb2_connect failed");
-	transport2 = tree2->session->transport;
+	transport2 = cli->tree2->session->transport;
 
 	transport2->oplock.handler = torture_oplock_ack_handler;
-	transport2->oplock.private_data = tree2;
+	transport2->oplock.private_data = cli->tree2;
 
 	/*
 	 * Now bind the 1st session to 2nd transport channel
 	 */
 	session1_2 = smb2_session_channel(transport2,
 			lpcfg_gensec_settings(tctx, tctx->lp_ctx),
-			tree2, session1_1);
+			cli->tree2, session1_1);
 	torture_assert(tctx, session1_2 != NULL, "smb2_session_channel failed");
 
 	status = smb2_session_setup_spnego(session1_2,
@@ -1742,10 +1742,10 @@ static bool test_replay3(struct torture_context *tctx, struct smb2_tree *tree1)
 	/*
 	 * use the 2nd channel, 1st session
 	 */
-	tree1->session = session1_2;
-	smb2cli_session_start_replay(tree1->session->smbXcli);
-	status = smb2_create(tree1, mem_ctx, &io);
-	smb2cli_session_stop_replay(tree1->session->smbXcli);
+	cli1->tree->session = session1_2;
+	smb2cli_session_start_replay(cli1->tree->session->smbXcli);
+	status = smb2_create(cli1->tree, mem_ctx, &io);
+	smb2cli_session_stop_replay(cli1->tree->session->smbXcli);
 	CHECK_STATUS(status, NT_STATUS_OK);
 	_h = io.out.file.handle;
 	h = &_h;
@@ -1762,22 +1762,22 @@ static bool test_replay3(struct torture_context *tctx, struct smb2_tree *tree1)
 	CHECK_VAL(io.out.durable_open, false);
 	CHECK_VAL(break_info.count, 0);
 
-	tree1->session = session1_1;
-	smb2_util_close(tree1, *h);
+	cli1->tree->session = session1_1;
+	smb2_util_close(cli1->tree, *h);
 	h = NULL;
 
 done:
-	talloc_free(tree2);
-	tree1->session = session1_1;
+	talloc_free(cli->tree2);
+	cli1->tree->session = session1_1;
 
 	if (h != NULL) {
-		smb2_util_close(tree1, *h);
+		smb2_util_close(cli1->tree, *h);
 	}
 
-	smb2_util_unlink(tree1, fname);
-	smb2_deltree(tree1, BASEDIR);
+	smb2_util_unlink(cli1->tree, fname);
+	smb2_deltree(cli1->tree, BASEDIR);
 
-	talloc_free(tree1);
+	talloc_free(cli1->tree);
 	talloc_free(mem_ctx);
 
 	return ret;
@@ -1786,7 +1786,7 @@ done:
 /**
  * Test Multichannel IO Ordering using ChannelSequence/Channel Epoch number
  */
-static bool test_replay4(struct torture_context *tctx, struct smb2_tree *tree1)
+static bool test_replay4(struct torture_context *tctx, struct smb2cli_state *cli1)
 {
 	const char *host = torture_setting_string(tctx, "host", NULL);
 	const char *share = torture_setting_string(tctx, "share", NULL);
@@ -1801,10 +1801,10 @@ static bool test_replay4(struct torture_context *tctx, struct smb2_tree *tree1)
 	union smb_setfileinfo sfinfo;
 	bool ret = true;
 	const char *fname = BASEDIR "\\replay4.dat";
-	struct smb2_tree *tree2 = NULL;
-	struct smb2_transport *transport1 = tree1->session->transport;
+	struct smb2cli_state *cli2 = NULL;
+	struct smb2_transport *transport1 = cli1->tree->session->transport;
 	struct smb2_transport *transport2 = NULL;
-	struct smb2_session *session1_1 = tree1->session;
+	struct smb2_session *session1_1 = cli1->tree->session;
 	struct smb2_session *session1_2 = NULL;
 	uint16_t curr_cs;
 	uint32_t share_capabilities;
@@ -1817,25 +1817,25 @@ static bool test_replay4(struct torture_context *tctx, struct smb2_tree *tree1)
 	}
 
 	server_capabilities = smb2cli_conn_server_capabilities(
-					tree1->session->transport->conn);
+					cli1->tree->session->transport->conn);
 	if (!(server_capabilities & SMB2_CAP_MULTI_CHANNEL)) {
 		torture_skip(tctx,
 			     "Server does not support multi-channel.");
 	}
 
-	share_capabilities = smb2cli_tcon_capabilities(tree1->smbXcli);
+	share_capabilities = smb2cli_tcon_capabilities(cli1->tree->smbXcli);
 	share_is_so = share_capabilities & SMB2_SHARE_CAP_SCALEOUT;
 
 	ZERO_STRUCT(break_info);
 	break_info.tctx = tctx;
 	transport1->oplock.handler = torture_oplock_ack_handler;
-	transport1->oplock.private_data = tree1;
+	transport1->oplock.private_data = cli1->tree;
 
 	torture_comment(tctx, "IO Ordering for Multi Channel\n");
-	status = torture_smb2_testdir(tree1, BASEDIR, &_h1);
+	status = torture_smb2_testdir(cli1->tree, BASEDIR, &_h1);
 	CHECK_STATUS(status, NT_STATUS_OK);
-	smb2_util_close(tree1, _h1);
-	smb2_util_unlink(tree1, fname);
+	smb2_util_close(cli1->tree, _h1);
+	smb2_util_unlink(cli1->tree, fname);
 	CHECK_VAL(break_info.count, 0);
 
 	/*
@@ -1851,8 +1851,8 @@ static bool test_replay4(struct torture_context *tctx, struct smb2_tree *tree1)
 	io.in.create_guid = create_guid;
 	io.in.timeout = UINT32_MAX;
 
-	tree1->session = session1_1;
-	status = smb2_create(tree1, mem_ctx, &io);
+	cli1->tree->session = session1_1;
+	status = smb2_create(cli1->tree, mem_ctx, &io);
 	CHECK_STATUS(status, NT_STATUS_OK);
 	_h1 = io.out.file.handle;
 	h1 = &_h1;
@@ -1869,14 +1869,14 @@ static bool test_replay4(struct torture_context *tctx, struct smb2_tree *tree1)
 	CHECK_VAL(io.out.durable_open, false);
 	CHECK_VAL(break_info.count, 0);
 
-	status = smb2_util_write(tree1, *h1, buf, 0, ARRAY_SIZE(buf));
+	status = smb2_util_write(cli1->tree, *h1, buf, 0, ARRAY_SIZE(buf));
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	/*
 	 * Increment ChannelSequence so that server thinks that there's a
 	 * Channel Failure
 	 */
-	smb2cli_session_increment_channel_sequence(tree1->session->smbXcli);
+	smb2cli_session_increment_channel_sequence(cli1->tree->session->smbXcli);
 
 	/*
 	 * Perform a Read with incremented ChannelSequence
@@ -1886,7 +1886,7 @@ static bool test_replay4(struct torture_context *tctx, struct smb2_tree *tree1)
 		.in.length = sizeof(buf),
 		.in.offset = 0
 	};
-	status = smb2_read(tree1, tree1, &rd);
+	status = smb2_read(cli1->tree, cli1->tree, &rd);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	/*
@@ -1894,18 +1894,18 @@ static bool test_replay4(struct torture_context *tctx, struct smb2_tree *tree1)
 	 * server
 	 */
 	curr_cs = smb2cli_session_reset_channel_sequence(
-						tree1->session->smbXcli, 0);
-	status = smb2_util_write(tree1, *h1, buf, 0, ARRAY_SIZE(buf));
+						cli1->tree->session->smbXcli, 0);
+	status = smb2_util_write(cli1->tree, *h1, buf, 0, ARRAY_SIZE(buf));
 	CHECK_STATUS(status, NT_STATUS_FILE_NOT_AVAILABLE);
 
 	/*
 	 * Performing a Write Replay with Stale ChannelSequence is not allowed
 	 * by server
 	 */
-	smb2cli_session_start_replay(tree1->session->smbXcli);
-	smb2cli_session_reset_channel_sequence(tree1->session->smbXcli, 0);
-	status = smb2_util_write(tree1, *h1, buf, 0, ARRAY_SIZE(buf));
-	smb2cli_session_stop_replay(tree1->session->smbXcli);
+	smb2cli_session_start_replay(cli1->tree->session->smbXcli);
+	smb2cli_session_reset_channel_sequence(cli1->tree->session->smbXcli, 0);
+	status = smb2_util_write(cli1->tree, *h1, buf, 0, ARRAY_SIZE(buf));
+	smb2cli_session_stop_replay(cli1->tree->session->smbXcli);
 	CHECK_STATUS(status, NT_STATUS_FILE_NOT_AVAILABLE);
 
 	/*
@@ -1916,7 +1916,7 @@ static bool test_replay4(struct torture_context *tctx, struct smb2_tree *tree1)
 	sfinfo.generic.level = RAW_SFILEINFO_POSITION_INFORMATION;
 	sfinfo.generic.in.file.handle = *h1;
 	sfinfo.position_information.in.position = 0x1000;
-	status = smb2_setinfo_file(tree1, &sfinfo);
+	status = smb2_setinfo_file(cli1->tree, &sfinfo);
 	CHECK_STATUS(status, NT_STATUS_FILE_NOT_AVAILABLE);
 
 	/*
@@ -1927,7 +1927,7 @@ static bool test_replay4(struct torture_context *tctx, struct smb2_tree *tree1)
 		.in.length = ARRAY_SIZE(buf),
 		.in.offset = 0
 	};
-	status = smb2_read(tree1, tree1, &rd);
+	status = smb2_read(cli1->tree, cli1->tree, &rd);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	status = smb2_connect(tctx,
@@ -1936,7 +1936,7 @@ static bool test_replay4(struct torture_context *tctx, struct smb2_tree *tree1)
 			share,
 			lpcfg_resolve_context(tctx->lp_ctx),
 			popt_get_cmdline_credentials(),
-			&tree2,
+			&cli->tree2,
 			tctx->ev,
 			&transport1->options,
 			lpcfg_socket_options(tctx->lp_ctx),
@@ -1944,17 +1944,17 @@ static bool test_replay4(struct torture_context *tctx, struct smb2_tree *tree1)
 			);
 	torture_assert_ntstatus_ok_goto(tctx, status, ret, done,
 			"smb2_connect failed");
-	transport2 = tree2->session->transport;
+	transport2 = cli->tree2->session->transport;
 
 	transport2->oplock.handler = torture_oplock_ack_handler;
-	transport2->oplock.private_data = tree2;
+	transport2->oplock.private_data = cli->tree2;
 
 	/*
 	 * Now bind the 1st session to 2nd transport channel
 	 */
 	session1_2 = smb2_session_channel(transport2,
 			lpcfg_gensec_settings(tctx, tctx->lp_ctx),
-			tree2, session1_1);
+			cli->tree2, session1_1);
 	torture_assert(tctx, session1_2 != NULL, "smb2_session_channel failed");
 
 	status = smb2_session_setup_spnego(session1_2,
@@ -1965,27 +1965,27 @@ static bool test_replay4(struct torture_context *tctx, struct smb2_tree *tree1)
 	/*
 	 * use the 2nd channel, 1st session
 	 */
-	tree1->session = session1_2;
+	cli1->tree->session = session1_2;
 
 	/*
 	 * Write Replay with Correct ChannelSequence is allowed by the server
 	 */
-	smb2cli_session_start_replay(tree1->session->smbXcli);
-	smb2cli_session_reset_channel_sequence(tree1->session->smbXcli,
+	smb2cli_session_start_replay(cli1->tree->session->smbXcli);
+	smb2cli_session_reset_channel_sequence(cli1->tree->session->smbXcli,
 					       curr_cs);
-	status = smb2_util_write(tree1, *h1, buf, 0, ARRAY_SIZE(buf));
+	status = smb2_util_write(cli1->tree, *h1, buf, 0, ARRAY_SIZE(buf));
 	CHECK_STATUS(status, NT_STATUS_OK);
-	smb2cli_session_stop_replay(tree1->session->smbXcli);
+	smb2cli_session_stop_replay(cli1->tree->session->smbXcli);
 
 	/*
 	 * See what happens if we change the Buffer and perform a Write Replay.
 	 * This is to show that Write Replay does not really care about the data
 	 */
 	memset(buf, 'r', ARRAY_SIZE(buf));
-	smb2cli_session_start_replay(tree1->session->smbXcli);
-	status = smb2_util_write(tree1, *h1, buf, 0, ARRAY_SIZE(buf));
+	smb2cli_session_start_replay(cli1->tree->session->smbXcli);
+	status = smb2_util_write(cli1->tree, *h1, buf, 0, ARRAY_SIZE(buf));
 	CHECK_STATUS(status, NT_STATUS_OK);
-	smb2cli_session_stop_replay(tree1->session->smbXcli);
+	smb2cli_session_stop_replay(cli1->tree->session->smbXcli);
 
 	/*
 	 * Read back from File to verify what was written
@@ -1995,7 +1995,7 @@ static bool test_replay4(struct torture_context *tctx, struct smb2_tree *tree1)
 		.in.length = ARRAY_SIZE(buf),
 		.in.offset = 0
 	};
-	status = smb2_read(tree1, tree1, &rd);
+	status = smb2_read(cli1->tree, cli1->tree, &rd);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	if ((rd.out.data.length != ARRAY_SIZE(buf)) ||
@@ -2003,8 +2003,8 @@ static bool test_replay4(struct torture_context *tctx, struct smb2_tree *tree1)
 		torture_comment(tctx, "Write Replay Data Mismatch\n");
 	}
 
-	tree1->session = session1_1;
-	smb2_util_close(tree1, *h1);
+	cli1->tree->session = session1_1;
+	smb2_util_close(cli1->tree, *h1);
 	h1 = NULL;
 
 	if (share_is_so) {
@@ -2013,17 +2013,17 @@ static bool test_replay4(struct torture_context *tctx, struct smb2_tree *tree1)
 		CHECK_VAL(break_info.count, 0);
 	}
 done:
-	talloc_free(tree2);
-	tree1->session = session1_1;
+	talloc_free(cli->tree2);
+	cli1->tree->session = session1_1;
 
 	if (h1 != NULL) {
-		smb2_util_close(tree1, *h1);
+		smb2_util_close(cli1->tree, *h1);
 	}
 
-	smb2_util_unlink(tree1, fname);
-	smb2_deltree(tree1, BASEDIR);
+	smb2_util_unlink(cli1->tree, fname);
+	smb2_deltree(cli1->tree, BASEDIR);
 
-	talloc_free(tree1);
+	talloc_free(cli1->tree);
 	talloc_free(mem_ctx);
 
 	return ret;
@@ -2032,7 +2032,7 @@ done:
 /**
  * Test Durability V2 Persistent Create Replay on a Single Channel
  */
-static bool test_replay5(struct torture_context *tctx, struct smb2_tree *tree)
+static bool test_replay5(struct torture_context *tctx, struct smb2cli_state *cli)
 {
 	NTSTATUS status;
 	TALLOC_CTX *mem_ctx = talloc_new(tctx);
@@ -2046,8 +2046,8 @@ static bool test_replay5(struct torture_context *tctx, struct smb2_tree *tree)
 	bool share_is_so;
 	uint32_t server_capabilities;
 	const char *fname = BASEDIR "\\replay5.dat";
-	struct smb2_transport *transport = tree->session->transport;
-	struct smbcli_options options = tree->session->transport->options;
+	struct smb2_transport *transport = cli->tree->session->transport;
+	struct smbcli_options options = cli->tree->session->transport->options;
 	uint8_t expect_oplock = smb2_util_oplock_level("b");
 	NTSTATUS expect_status = NT_STATUS_DUPLICATE_OBJECTID;
 
@@ -2057,13 +2057,13 @@ static bool test_replay5(struct torture_context *tctx, struct smb2_tree *tree)
 	}
 
 	server_capabilities = smb2cli_conn_server_capabilities(
-					tree->session->transport->conn);
+					cli->tree->session->transport->conn);
 	if (!(server_capabilities & SMB2_CAP_PERSISTENT_HANDLES)) {
 		torture_skip(tctx,
 			     "Server does not support persistent handles.");
 	}
 
-	share_capabilities = smb2cli_tcon_capabilities(tree->smbXcli);
+	share_capabilities = smb2cli_tcon_capabilities(cli->tree->smbXcli);
 
 	share_is_ca = share_capabilities & SMB2_SHARE_CAP_CONTINUOUS_AVAILABILITY;
 	if (!share_is_ca) {
@@ -2079,14 +2079,14 @@ static bool test_replay5(struct torture_context *tctx, struct smb2_tree *tree)
 	ZERO_STRUCT(break_info);
 	break_info.tctx = tctx;
 	transport->oplock.handler = torture_oplock_ack_handler;
-	transport->oplock.private_data = tree;
+	transport->oplock.private_data = cli->tree;
 
 	torture_comment(tctx, "Replay of Persistent DurableHandleReqV2 on Single "
 			"Channel\n");
-	status = torture_smb2_testdir(tree, BASEDIR, &_h);
+	status = torture_smb2_testdir(cli->tree, BASEDIR, &_h);
 	CHECK_STATUS(status, NT_STATUS_OK);
-	smb2_util_close(tree, _h);
-	smb2_util_unlink(tree, fname);
+	smb2_util_close(cli->tree, _h);
+	smb2_util_unlink(cli->tree, fname);
 	CHECK_VAL(break_info.count, 0);
 
 	smb2_oplock_create_share(&io, fname,
@@ -2098,7 +2098,7 @@ static bool test_replay5(struct torture_context *tctx, struct smb2_tree *tree)
 	io.in.create_guid = create_guid;
 	io.in.timeout = UINT32_MAX;
 
-	status = smb2_create(tree, mem_ctx, &io);
+	status = smb2_create(cli->tree, mem_ctx, &io);
 	CHECK_STATUS(status, NT_STATUS_OK);
 	_h = io.out.file.handle;
 	h = &_h;
@@ -2111,22 +2111,22 @@ static bool test_replay5(struct torture_context *tctx, struct smb2_tree *tree)
 	CHECK_VAL(break_info.count, 0);
 
 	/* disconnect, leaving the durable open */
-	TALLOC_FREE(tree);
+	TALLOC_FREE(cli->tree);
 
-	if (!torture_smb2_connection_ext(tctx, 0, &options, &tree)) {
+	if (!torture_smb2_connection_ext(tctx, 0, &options, &cli->tree)) {
 		torture_warning(tctx, "couldn't reconnect, bailing\n");
 		ret = false;
 		goto done;
 	}
 
 	/* a re-open of a persistent handle causes an error */
-	status = smb2_create(tree, mem_ctx, &io);
+	status = smb2_create(cli->tree, mem_ctx, &io);
 	CHECK_STATUS(status, expect_status);
 
 	/* SMB2_FLAGS_REPLAY_OPERATION must be set to open the Persistent Handle */
-	smb2cli_session_start_replay(tree->session->smbXcli);
-	smb2cli_session_increment_channel_sequence(tree->session->smbXcli);
-	status = smb2_create(tree, mem_ctx, &io);
+	smb2cli_session_start_replay(cli->tree->session->smbXcli);
+	smb2cli_session_increment_channel_sequence(cli->tree->session->smbXcli);
+	status = smb2_create(cli->tree, mem_ctx, &io);
 	CHECK_STATUS(status, NT_STATUS_OK);
 	CHECK_CREATED(&io, CREATED, FILE_ATTRIBUTE_ARCHIVE);
 	CHECK_VAL(io.out.durable_open, false);
@@ -2135,17 +2135,17 @@ static bool test_replay5(struct torture_context *tctx, struct smb2_tree *tree)
 	_h = io.out.file.handle;
 	h = &_h;
 
-	smb2_util_close(tree, *h);
+	smb2_util_close(cli->tree, *h);
 	h = NULL;
 done:
 	if (h != NULL) {
-		smb2_util_close(tree, *h);
+		smb2_util_close(cli->tree, *h);
 	}
 
-	smb2_util_unlink(tree, fname);
-	smb2_deltree(tree, BASEDIR);
+	smb2_util_unlink(cli->tree, fname);
+	smb2_deltree(cli->tree, BASEDIR);
 
-	talloc_free(tree);
+	talloc_free(cli->tree);
 	talloc_free(mem_ctx);
 
 	return ret;
@@ -2156,7 +2156,7 @@ done:
  * Test Error Codes when a DurableHandleReqV2 with matching CreateGuid is
  * re-sent with or without SMB2_FLAGS_REPLAY_OPERATION
  */
-static bool test_replay6(struct torture_context *tctx, struct smb2_tree *tree)
+static bool test_replay6(struct torture_context *tctx, struct smb2cli_state *cli)
 {
 	NTSTATUS status;
 	TALLOC_CTX *mem_ctx = talloc_new(tctx);
@@ -2167,7 +2167,7 @@ static bool test_replay6(struct torture_context *tctx, struct smb2_tree *tree)
 	struct GUID create_guid = GUID_random();
 	bool ret = true;
 	const char *fname = BASEDIR "\\replay6.dat";
-	struct smb2_transport *transport = tree->session->transport;
+	struct smb2_transport *transport = cli->tree->session->transport;
 
 	if (smbXcli_conn_protocol(transport->conn) < PROTOCOL_SMB3_00) {
 		torture_skip(tctx, "SMB 3.X Dialect family required for "
@@ -2175,14 +2175,14 @@ static bool test_replay6(struct torture_context *tctx, struct smb2_tree *tree)
 	}
 
 	torture_reset_break_info(tctx, &break_info);
-	tree->session->transport->oplock.handler = torture_oplock_ack_handler;
-	tree->session->transport->oplock.private_data = tree;
+	cli->tree->session->transport->oplock.handler = torture_oplock_ack_handler;
+	cli->tree->session->transport->oplock.private_data = cli->tree;
 
 	torture_comment(tctx, "Error Codes for DurableHandleReqV2 Replay\n");
-	smb2_util_unlink(tree, fname);
-	status = torture_smb2_testdir(tree, BASEDIR, &_h);
+	smb2_util_unlink(cli->tree, fname);
+	status = torture_smb2_testdir(cli->tree, BASEDIR, &_h);
 	CHECK_STATUS(status, NT_STATUS_OK);
-	smb2_util_close(tree, _h);
+	smb2_util_close(cli->tree, _h);
 	torture_wait_for_oplock_break(tctx);
 	CHECK_VAL(break_info.count, 0);
 	torture_reset_break_info(tctx, &break_info);
@@ -2196,7 +2196,7 @@ static bool test_replay6(struct torture_context *tctx, struct smb2_tree *tree)
 	io.in.create_guid = create_guid;
 	io.in.timeout = UINT32_MAX;
 
-	status = smb2_create(tree, mem_ctx, &io);
+	status = smb2_create(cli->tree, mem_ctx, &io);
 	CHECK_STATUS(status, NT_STATUS_OK);
 	ref1 = io;
 	_h = io.out.file.handle;
@@ -2208,9 +2208,9 @@ static bool test_replay6(struct torture_context *tctx, struct smb2_tree *tree)
 
 	io.in.file_attributes = FILE_ATTRIBUTE_DIRECTORY;
 	io.in.create_disposition = NTCREATEX_DISP_OPEN;
-	smb2cli_session_start_replay(tree->session->smbXcli);
-	status = smb2_create(tree, mem_ctx, &io);
-	smb2cli_session_stop_replay(tree->session->smbXcli);
+	smb2cli_session_start_replay(cli->tree->session->smbXcli);
+	status = smb2_create(cli->tree, mem_ctx, &io);
+	smb2cli_session_stop_replay(cli->tree->session->smbXcli);
 	CHECK_STATUS(status, NT_STATUS_OK);
 	CHECK_CREATE_OUT(&io, &ref1);
 	torture_wait_for_oplock_break(tctx);
@@ -2222,13 +2222,13 @@ static bool test_replay6(struct torture_context *tctx, struct smb2_tree *tree)
 		.generic.in.file.handle = *h
 	};
 	torture_comment(tctx, "Trying getinfo\n");
-	status = smb2_getinfo_file(tree, mem_ctx, &qfinfo);
+	status = smb2_getinfo_file(cli->tree, mem_ctx, &qfinfo);
 	CHECK_STATUS(status, NT_STATUS_OK);
 	CHECK_VAL(qfinfo.position_information.out.position, 0);
 
-	smb2cli_session_start_replay(tree->session->smbXcli);
-	status = smb2_create(tree, mem_ctx, &io);
-	smb2cli_session_stop_replay(tree->session->smbXcli);
+	smb2cli_session_start_replay(cli->tree->session->smbXcli);
+	status = smb2_create(cli->tree, mem_ctx, &io);
+	smb2cli_session_stop_replay(cli->tree->session->smbXcli);
 	CHECK_STATUS(status, NT_STATUS_OK);
 	torture_assert_u64_not_equal_goto(tctx,
 		io.out.file.handle.data[0],
@@ -2248,7 +2248,7 @@ static bool test_replay6(struct torture_context *tctx, struct smb2_tree *tree)
 	 * SMB2_FLAGS_REPLAY_OPERATION. This triggers an oplock break and still
 	 * gets NT_STATUS_DUPLICATE_OBJECTID
 	 */
-	status = smb2_create(tree, mem_ctx, &io);
+	status = smb2_create(cli->tree, mem_ctx, &io);
 	CHECK_STATUS(status, NT_STATUS_DUPLICATE_OBJECTID);
 	torture_wait_for_oplock_break(tctx);
 	CHECK_VAL(break_info.count, 0);
@@ -2264,9 +2264,9 @@ static bool test_replay6(struct torture_context *tctx, struct smb2_tree *tree)
 	 */
 	io.in.file_attributes = FILE_ATTRIBUTE_DIRECTORY;
 	io.in.create_disposition = NTCREATEX_DISP_OPEN;
-	smb2cli_session_start_replay(tree->session->smbXcli);
-	status = smb2_create(tree, mem_ctx, &io);
-	smb2cli_session_stop_replay(tree->session->smbXcli);
+	smb2cli_session_start_replay(cli->tree->session->smbXcli);
+	status = smb2_create(cli->tree, mem_ctx, &io);
+	smb2cli_session_stop_replay(cli->tree->session->smbXcli);
 	CHECK_STATUS(status, NT_STATUS_OK);
 	torture_assert_u64_not_equal_goto(tctx,
 		io.out.file.handle.data[0],
@@ -2281,22 +2281,22 @@ static bool test_replay6(struct torture_context *tctx, struct smb2_tree *tree)
 
 done:
 	if (h != NULL) {
-		smb2_util_close(tree, *h);
+		smb2_util_close(cli->tree, *h);
 	}
 
-	smb2_util_unlink(tree, fname);
-	smb2_deltree(tree, BASEDIR);
+	smb2_util_unlink(cli->tree, fname);
+	smb2_deltree(cli->tree, BASEDIR);
 
-	talloc_free(tree);
+	talloc_free(cli->tree);
 	talloc_free(mem_ctx);
 
 	return ret;
 }
 
-static bool test_replay7(struct torture_context *tctx, struct smb2_tree *tree)
+static bool test_replay7(struct torture_context *tctx, struct smb2cli_state *cli)
 {
 	TALLOC_CTX *mem_ctx = talloc_new(tctx);
-	struct smb2_transport *transport = tree->session->transport;
+	struct smb2_transport *transport = cli->tree->session->transport;
 	NTSTATUS status;
 	struct smb2_handle _dh;
 	struct smb2_handle *dh = NULL;
@@ -2314,7 +2314,7 @@ static bool test_replay7(struct torture_context *tctx, struct smb2_tree *tree)
 
 	smbXcli_conn_set_force_channel_sequence(transport->conn, true);
 
-	status = torture_smb2_testdir(tree, BASEDIR, &_dh);
+	status = torture_smb2_testdir(cli->tree, BASEDIR, &_dh);
 	CHECK_STATUS(status, NT_STATUS_OK);
 	dh = &_dh;
 
@@ -2328,8 +2328,8 @@ static bool test_replay7(struct torture_context *tctx, struct smb2_tree *tree)
 	 * This posts a long-running request with csn==0 to "dh". Now
 	 * op->request_count==1 in smb2_server.c.
 	 */
-	smb2cli_session_reset_channel_sequence(tree->session->smbXcli, 0);
-	req = smb2_notify_send(tree, &notify);
+	smb2cli_session_reset_channel_sequence(cli->tree->session->smbXcli, 0);
+	req = smb2_notify_send(cli->tree, &notify);
 
 	qfinfo = (union smb_fileinfo) {
 		.generic.level = RAW_FILEINFO_POSITION_INFORMATION,
@@ -2342,12 +2342,12 @@ static bool test_replay7(struct torture_context *tctx, struct smb2_tree *tree)
 	 * used avoid int16 overflow.
 	 */
 
-	smb2cli_session_reset_channel_sequence(tree->session->smbXcli, 30000);
-	status = smb2_getinfo_file(tree, mem_ctx, &qfinfo);
+	smb2cli_session_reset_channel_sequence(cli->tree->session->smbXcli, 30000);
+	status = smb2_getinfo_file(cli->tree, mem_ctx, &qfinfo);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
-	smb2cli_session_reset_channel_sequence(tree->session->smbXcli, 60000);
-	status = smb2_getinfo_file(tree, mem_ctx, &qfinfo);
+	smb2cli_session_reset_channel_sequence(cli->tree->session->smbXcli, 60000);
+	status = smb2_getinfo_file(cli->tree, mem_ctx, &qfinfo);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	/*
@@ -2357,8 +2357,8 @@ static bool test_replay7(struct torture_context *tctx, struct smb2_tree *tree)
 	 * op->pre_request_count.
 	 */
 
-	smb2cli_session_reset_channel_sequence(tree->session->smbXcli, 0);
-	status = smb2_getinfo_file(tree, mem_ctx, &qfinfo);
+	smb2cli_session_reset_channel_sequence(cli->tree->session->smbXcli, 0);
+	status = smb2_getinfo_file(cli->tree, mem_ctx, &qfinfo);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	/*
@@ -2380,10 +2380,10 @@ static bool test_replay7(struct torture_context *tctx, struct smb2_tree *tree)
 
 done:
 	if (dh != NULL) {
-		smb2_util_close(tree, _dh);
+		smb2_util_close(cli->tree, _dh);
 	}
-	smb2_deltree(tree, BASEDIR);
-	talloc_free(tree);
+	smb2_deltree(cli->tree, BASEDIR);
+	talloc_free(cli->tree);
 	talloc_free(mem_ctx);
 
 	return ret;

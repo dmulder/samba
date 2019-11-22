@@ -85,7 +85,7 @@ static bool torture_oplock_handler(struct smb2_transport *transport,
  * testing various create blob combinations.
  */
 bool test_durable_v2_open_create_blob(struct torture_context *tctx,
-				      struct smb2_tree *tree)
+				      struct smb2cli_state *cli)
 {
 	NTSTATUS status;
 	TALLOC_CTX *mem_ctx = talloc_new(tctx);
@@ -97,7 +97,7 @@ bool test_durable_v2_open_create_blob(struct torture_context *tctx,
 	bool ret = true;
 	struct smbcli_options options;
 
-	options = tree->session->transport->options;
+	options = cli->tree->session->transport->options;
 
 	/* Choose a random name in case the state is left a little funky. */
 	snprintf(fname, 256, "durable_v2_open_create_blob_%s.dat",
@@ -246,7 +246,7 @@ static struct durable_open_vs_oplock durable_open_vs_oplock_table[NUM_OPLOCK_OPE
 };
 
 static bool test_one_durable_v2_open_oplock(struct torture_context *tctx,
-					    struct smb2_tree *tree,
+					    struct smb2cli_state *cli,
 					    const char *fname,
 					    bool request_persistent,
 					    struct durable_open_vs_oplock test)
@@ -289,7 +289,7 @@ done:
 }
 
 static bool test_durable_v2_open_oplock_table(struct torture_context *tctx,
-					      struct smb2_tree *tree,
+					      struct smb2cli_state *cli,
 					      const char *fname,
 					      bool request_persistent,
 					      struct durable_open_vs_oplock *table,
@@ -318,7 +318,7 @@ done:
 }
 
 bool test_durable_v2_open_oplock(struct torture_context *tctx,
-				 struct smb2_tree *tree)
+				 struct smb2cli_state *cli)
 {
 	bool ret;
 	char fname[256];
@@ -403,7 +403,7 @@ static struct durable_open_vs_lease durable_open_vs_lease_table[NUM_LEASE_OPEN_T
 };
 
 static bool test_one_durable_v2_open_lease(struct torture_context *tctx,
-					   struct smb2_tree *tree,
+					   struct smb2cli_state *cli,
 					   const char *fname,
 					   bool request_persistent,
 					   struct durable_open_vs_lease test)
@@ -454,7 +454,7 @@ done:
 }
 
 static bool test_durable_v2_open_lease_table(struct torture_context *tctx,
-					     struct smb2_tree *tree,
+					     struct smb2cli_state *cli,
 					     const char *fname,
 					     bool request_persistent,
 					     struct durable_open_vs_lease *table,
@@ -483,13 +483,13 @@ done:
 }
 
 bool test_durable_v2_open_lease(struct torture_context *tctx,
-				struct smb2_tree *tree)
+				struct smb2cli_state *cli)
 {
 	char fname[256];
 	bool ret = true;
 	uint32_t caps;
 
-	caps = smb2cli_conn_server_capabilities(tree->session->transport->conn);
+	caps = smb2cli_conn_server_capabilities(cli->tree->session->transport->conn);
 	if (!(caps & SMB2_CAP_LEASING)) {
 		torture_skip(tctx, "leases are not supported");
 	}
@@ -512,7 +512,7 @@ bool test_durable_v2_open_lease(struct torture_context *tctx,
  * while the first open is still active (fails)
  */
 bool test_durable_v2_open_reopen1(struct torture_context *tctx,
-				  struct smb2_tree *tree)
+				  struct smb2cli_state *cli)
 {
 	NTSTATUS status;
 	TALLOC_CTX *mem_ctx = talloc_new(tctx);
@@ -580,7 +580,7 @@ done:
  * durable reconnect on the new session succeeds.
  */
 bool test_durable_v2_open_reopen1a(struct torture_context *tctx,
-				   struct smb2_tree *tree)
+				   struct smb2cli_state *cli)
 {
 	NTSTATUS status;
 	TALLOC_CTX *mem_ctx = talloc_new(tctx);
@@ -596,7 +596,7 @@ bool test_durable_v2_open_reopen1a(struct torture_context *tctx,
 	struct smbcli_options options;
 	struct GUID orig_client_guid;
 
-	options = tree->session->transport->options;
+	options = cli->tree->session->transport->options;
 	orig_client_guid = options.client_guid;
 
 	/* Choose a random name in case the state is left a little funky. */
@@ -629,7 +629,7 @@ bool test_durable_v2_open_reopen1a(struct torture_context *tctx,
 	 * a session reconnect on a second tcp connection
 	 */
 
-	previous_session_id = smb2cli_session_current_id(tree->session->smbXcli);
+	previous_session_id = smb2cli_session_current_id(cli->tree->session->smbXcli);
 
 	/* for oplocks, the client guid can be different: */
 	options.client_guid = GUID_random();
@@ -751,7 +751,7 @@ done:
  * Durable reconnect on a session with the original client guid succeeds.
  */
 bool test_durable_v2_open_reopen1a_lease(struct torture_context *tctx,
-					 struct smb2_tree *tree)
+					 struct smb2cli_state *cli)
 {
 	NTSTATUS status;
 	TALLOC_CTX *mem_ctx = talloc_new(tctx);
@@ -769,7 +769,7 @@ bool test_durable_v2_open_reopen1a_lease(struct torture_context *tctx,
 	struct smbcli_options options;
 	struct GUID orig_client_guid;
 
-	options = tree->session->transport->options;
+	options = cli->tree->session->transport->options;
 	orig_client_guid = options.client_guid;
 
 	/* Choose a random name in case the state is left a little funky. */
@@ -804,7 +804,7 @@ bool test_durable_v2_open_reopen1a_lease(struct torture_context *tctx,
 	CHECK_VAL(io.out.lease_response.lease_flags, 0);
 	CHECK_VAL(io.out.lease_response.lease_duration, 0);
 
-	previous_session_id = smb2cli_session_current_id(tree->session->smbXcli);
+	previous_session_id = smb2cli_session_current_id(cli->tree->session->smbXcli);
 
 	/*
 	 * a session reconnect on a second tcp connection
@@ -925,7 +925,7 @@ done:
  * tcp disconnect, reconnect, do a durable reopen (succeeds)
  */
 bool test_durable_v2_open_reopen2(struct torture_context *tctx,
-				  struct smb2_tree *tree)
+				  struct smb2cli_state *cli)
 {
 	NTSTATUS status;
 	TALLOC_CTX *mem_ctx = talloc_new(tctx);
@@ -1084,7 +1084,7 @@ done:
  * connect with v2, reconnect with v1
  */
 bool test_durable_v2_open_reopen2b(struct torture_context *tctx,
-				   struct smb2_tree *tree)
+				   struct smb2cli_state *cli)
 {
 	NTSTATUS status;
 	TALLOC_CTX *mem_ctx = talloc_new(tctx);
@@ -1096,7 +1096,7 @@ bool test_durable_v2_open_reopen2b(struct torture_context *tctx,
 	bool ret = true;
 	struct smbcli_options options;
 
-	options = tree->session->transport->options;
+	options = cli->tree->session->transport->options;
 
 	/* Choose a random name in case the state is left a little funky. */
 	snprintf(fname, 256, "durable_v2_open_reopen2b_%s.dat",
@@ -1173,7 +1173,7 @@ done:
  * connect with v1, reconnect with v2 : fails (no create_guid...)
  */
 bool test_durable_v2_open_reopen2c(struct torture_context *tctx,
-				   struct smb2_tree *tree)
+				   struct smb2cli_state *cli)
 {
 	NTSTATUS status;
 	TALLOC_CTX *mem_ctx = talloc_new(tctx);
@@ -1185,7 +1185,7 @@ bool test_durable_v2_open_reopen2c(struct torture_context *tctx,
 	bool ret = true;
 	struct smbcli_options options;
 
-	options = tree->session->transport->options;
+	options = cli->tree->session->transport->options;
 
 	/* Choose a random name in case the state is left a little funky. */
 	snprintf(fname, 256, "durable_v2_open_reopen2c_%s.dat",
@@ -1249,7 +1249,7 @@ done:
  * tcp disconnect, reconnect, do a durable reopen (succeeds)
  */
 bool test_durable_v2_open_reopen2_lease(struct torture_context *tctx,
-					struct smb2_tree *tree)
+					struct smb2cli_state *cli)
 {
 	NTSTATUS status;
 	TALLOC_CTX *mem_ctx = talloc_new(tctx);
@@ -1264,12 +1264,12 @@ bool test_durable_v2_open_reopen2_lease(struct torture_context *tctx,
 	struct smbcli_options options;
 	uint32_t caps;
 
-	caps = smb2cli_conn_server_capabilities(tree->session->transport->conn);
+	caps = smb2cli_conn_server_capabilities(cli->tree->session->transport->conn);
 	if (!(caps & SMB2_CAP_LEASING)) {
 		torture_skip(tctx, "leases are not supported");
 	}
 
-	options = tree->session->transport->options;
+	options = cli->tree->session->transport->options;
 
 	/* Choose a random name in case the state is left a little funky. */
 	snprintf(fname, 256, "durable_v2_open_reopen2_%s.dat",
@@ -1495,7 +1495,7 @@ done:
  * tcp disconnect, reconnect, do a durable reopen (succeeds)
  */
 bool test_durable_v2_open_reopen2_lease_v2(struct torture_context *tctx,
-					   struct smb2_tree *tree)
+					   struct smb2cli_state *cli)
 {
 	NTSTATUS status;
 	TALLOC_CTX *mem_ctx = talloc_new(tctx);
@@ -1510,12 +1510,12 @@ bool test_durable_v2_open_reopen2_lease_v2(struct torture_context *tctx,
 	struct smbcli_options options;
 	uint32_t caps;
 
-	caps = smb2cli_conn_server_capabilities(tree->session->transport->conn);
+	caps = smb2cli_conn_server_capabilities(cli->tree->session->transport->conn);
 	if (!(caps & SMB2_CAP_LEASING)) {
 		torture_skip(tctx, "leases are not supported");
 	}
 
-	options = tree->session->transport->options;
+	options = cli->tree->session->transport->options;
 
 	smb2_deltree(tree, __func__);
 	status = torture_smb2_testdir(tree, __func__, &_h);
@@ -1744,8 +1744,8 @@ done:
  * Test durable request / reconnect with AppInstanceId
  */
 bool test_durable_v2_open_app_instance(struct torture_context *tctx,
-				       struct smb2_tree *tree1,
-				       struct smb2_tree *tree2)
+				       struct smb2cli_state *cli1,
+				       struct smb2cli_state *cli2)
 {
 	NTSTATUS status;
 	TALLOC_CTX *mem_ctx = talloc_new(tctx);
@@ -1887,7 +1887,7 @@ struct durable_open_vs_oplock persistent_open_oplock_ca_table[NUM_OPLOCK_OPEN_TE
 };
 
 bool test_persistent_open_oplock(struct torture_context *tctx,
-				 struct smb2_tree *tree)
+				 struct smb2cli_state *cli)
 {
 	char fname[256];
 	bool ret = true;
@@ -1898,7 +1898,7 @@ bool test_persistent_open_oplock(struct torture_context *tctx,
 	/* Choose a random name in case the state is left a little funky. */
 	snprintf(fname, 256, "persistent_open_oplock_%s.dat", generate_random_str(tctx, 8));
 
-	share_capabilities = smb2cli_tcon_capabilities(tree->smbXcli);
+	share_capabilities = smb2cli_tcon_capabilities(cli->tree->smbXcli);
 	share_is_ca = share_capabilities & SMB2_SHARE_CAP_CONTINUOUS_AVAILABILITY;
 
 	if (share_is_ca) {
@@ -1974,7 +1974,7 @@ struct durable_open_vs_lease persistent_open_lease_ca_table[NUM_LEASE_OPEN_TESTS
 };
 
 bool test_persistent_open_lease(struct torture_context *tctx,
-				struct smb2_tree *tree)
+				struct smb2cli_state *cli)
 {
 	char fname[256];
 	bool ret = true;
@@ -1983,7 +1983,7 @@ bool test_persistent_open_lease(struct torture_context *tctx,
 	bool share_is_ca;
 	struct durable_open_vs_lease *table;
 
-	caps = smb2cli_conn_server_capabilities(tree->session->transport->conn);
+	caps = smb2cli_conn_server_capabilities(cli->tree->session->transport->conn);
 	if (!(caps & SMB2_CAP_LEASING)) {
 		torture_skip(tctx, "leases are not supported");
 	}
@@ -1991,7 +1991,7 @@ bool test_persistent_open_lease(struct torture_context *tctx,
 	/* Choose a random name in case the state is left a little funky. */
 	snprintf(fname, 256, "persistent_open_lease_%s.dat", generate_random_str(tctx, 8));
 
-	share_capabilities = smb2cli_tcon_capabilities(tree->smbXcli);
+	share_capabilities = smb2cli_tcon_capabilities(cli->tree->smbXcli);
 	share_is_ca = share_capabilities & SMB2_SHARE_CAP_CONTINUOUS_AVAILABILITY;
 
 	if (share_is_ca) {
@@ -2040,7 +2040,7 @@ struct torture_suite *torture_smb2_durable_v2_open_init(TALLOC_CTX *ctx)
  * tcp disconnect, reconnect, do a durable reopen (succeeds)
  */
 static bool test_durable_v2_reconnect_delay(struct torture_context *tctx,
-					    struct smb2_tree *tree)
+					    struct smb2cli_state *cli)
 {
 	NTSTATUS status;
 	TALLOC_CTX *mem_ctx = talloc_new(tctx);
@@ -2054,8 +2054,8 @@ static bool test_durable_v2_reconnect_delay(struct torture_context *tctx,
 	uint8_t b = 0;
 	bool ret = true;
 
-	options = tree->session->transport->options;
-	previous_session_id = smb2cli_session_current_id(tree->session->smbXcli);
+	options = cli->tree->session->transport->options;
+	previous_session_id = smb2cli_session_current_id(cli->tree->session->smbXcli);
 
 	/* Choose a random name in case the state is left a little funky. */
 	snprintf(fname, 256, "durable_v2_reconnect_delay_%s.dat",

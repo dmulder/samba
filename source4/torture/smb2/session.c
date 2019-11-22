@@ -50,7 +50,7 @@
 /**
  * basic test for doing a session reconnect
  */
-bool test_session_reconnect1(struct torture_context *tctx, struct smb2_tree *tree)
+bool test_session_reconnect1(struct torture_context *tctx, struct smb2cli_state *cli)
 {
 	NTSTATUS status;
 	TALLOC_CTX *mem_ctx = talloc_new(tctx);
@@ -69,13 +69,13 @@ bool test_session_reconnect1(struct torture_context *tctx, struct smb2_tree *tre
 	snprintf(fname, sizeof(fname), "session_reconnect_%s.dat",
 		 generate_random_str(tctx, 8));
 
-	smb2_util_unlink(tree, fname);
+	smb2_util_unlink(cli->tree, fname);
 
 	smb2_oplock_create_share(&io1, fname,
 				 smb2_util_share_access(""),
 				 smb2_util_oplock_level("b"));
 
-	status = smb2_create(tree, mem_ctx, &io1);
+	status = smb2_create(cli->tree, mem_ctx, &io1);
 	torture_assert_ntstatus_ok_goto(tctx, status, ret, done,
 					"smb2_create failed");
 	_h1 = io1.out.file.handle;
@@ -86,10 +86,10 @@ bool test_session_reconnect1(struct torture_context *tctx, struct smb2_tree *tre
 					"oplock_level incorrect");
 
 	/* disconnect, reconnect and then do durable reopen */
-	previous_session_id = smb2cli_session_current_id(tree->session->smbXcli);
+	previous_session_id = smb2cli_session_current_id(cli->cli->tree->session->smbXcli);
 
 	torture_assert_goto(tctx, torture_smb2_connection_ext(tctx, previous_session_id,
-			    &tree->session->transport->options, &tree2),
+			    &cli->cli->tree->session->transport->options, &tree2),
 			    ret, done,
 			    "session reconnect failed\n");
 
@@ -98,7 +98,7 @@ bool test_session_reconnect1(struct torture_context *tctx, struct smb2_tree *tre
 	ZERO_STRUCT(qfinfo);
 	qfinfo.generic.level = RAW_FILEINFO_POSITION_INFORMATION;
 	qfinfo.generic.in.file.handle = _h1;
-	status = smb2_getinfo_file(tree, mem_ctx, &qfinfo);
+	status = smb2_getinfo_file(cli->tree, mem_ctx, &qfinfo);
 	torture_assert_ntstatus_equal_goto(tctx, status,
 					   NT_STATUS_USER_SESSION_DELETED,
 					   ret, done, "smb2_getinfo_file "
@@ -122,7 +122,7 @@ bool test_session_reconnect1(struct torture_context *tctx, struct smb2_tree *tre
 
 done:
 	if (h1 != NULL) {
-		smb2_util_close(tree, *h1);
+		smb2_util_close(cli->tree, *h1);
 	}
 	if (h2 != NULL) {
 		smb2_util_close(tree2, *h2);
@@ -131,9 +131,9 @@ done:
 	if (tree2 != NULL) {
 		smb2_util_unlink(tree2, fname);
 	}
-	smb2_util_unlink(tree, fname);
+	smb2_util_unlink(cli->tree, fname);
 
-	talloc_free(tree);
+	talloc_free(cli->tree);
 	talloc_free(tree2);
 
 	talloc_free(mem_ctx);
@@ -144,7 +144,7 @@ done:
 /**
  * basic test for doing a session reconnect on one connection
  */
-bool test_session_reconnect2(struct torture_context *tctx, struct smb2_tree *tree)
+bool test_session_reconnect2(struct torture_context *tctx, struct smb2cli_state *cli)
 {
 	NTSTATUS status;
 	TALLOC_CTX *mem_ctx = talloc_new(tctx);
@@ -161,14 +161,14 @@ bool test_session_reconnect2(struct torture_context *tctx, struct smb2_tree *tre
 	snprintf(fname, sizeof(fname), "session_reconnect_%s.dat",
 		 generate_random_str(tctx, 8));
 
-	smb2_util_unlink(tree, fname);
+	smb2_util_unlink(cli->tree, fname);
 
 	smb2_oplock_create_share(&io1, fname,
 				 smb2_util_share_access(""),
 				 smb2_util_oplock_level("b"));
 	io1.in.create_options |= NTCREATEX_OPTIONS_DELETE_ON_CLOSE;
 
-	status = smb2_create(tree, mem_ctx, &io1);
+	status = smb2_create(cli->tree, mem_ctx, &io1);
 	torture_assert_ntstatus_ok_goto(tctx, status, ret, done,
 					"smb2_create failed");
 	_h1 = io1.out.file.handle;
@@ -179,9 +179,9 @@ bool test_session_reconnect2(struct torture_context *tctx, struct smb2_tree *tre
 					"oplock_level incorrect");
 
 	/* disconnect, reconnect and then do durable reopen */
-	previous_session_id = smb2cli_session_current_id(tree->session->smbXcli);
+	previous_session_id = smb2cli_session_current_id(cli->cli->tree->session->smbXcli);
 
-	torture_assert(tctx, torture_smb2_session_setup(tctx, tree->session->transport,
+	torture_assert(tctx, torture_smb2_session_setup(tctx, cli->cli->tree->session->transport,
 				previous_session_id, tctx, &session2),
 				"session reconnect (on the same connection) failed");
 
@@ -190,7 +190,7 @@ bool test_session_reconnect2(struct torture_context *tctx, struct smb2_tree *tre
 	ZERO_STRUCT(qfinfo);
 	qfinfo.generic.level = RAW_FILEINFO_POSITION_INFORMATION;
 	qfinfo.generic.in.file.handle = _h1;
-	status = smb2_getinfo_file(tree, mem_ctx, &qfinfo);
+	status = smb2_getinfo_file(cli->tree, mem_ctx, &qfinfo);
 	torture_assert_ntstatus_equal_goto(tctx, status,
 					   NT_STATUS_USER_SESSION_DELETED,
 					   ret, done, "smb2_getinfo_file "
@@ -199,10 +199,10 @@ bool test_session_reconnect2(struct torture_context *tctx, struct smb2_tree *tre
 
 done:
 	if (h1 != NULL) {
-		smb2_util_close(tree, *h1);
+		smb2_util_close(cli->tree, *h1);
 	}
 
-	talloc_free(tree);
+	talloc_free(cli->tree);
 	talloc_free(session2);
 
 	talloc_free(mem_ctx);
@@ -210,7 +210,7 @@ done:
 	return ret;
 }
 
-bool test_session_reauth1(struct torture_context *tctx, struct smb2_tree *tree)
+bool test_session_reauth1(struct torture_context *tctx, struct smb2cli_state *cli)
 {
 	NTSTATUS status;
 	TALLOC_CTX *mem_ctx = talloc_new(tctx);
@@ -225,13 +225,13 @@ bool test_session_reauth1(struct torture_context *tctx, struct smb2_tree *tree)
 	snprintf(fname, sizeof(fname), "session_reauth1_%s.dat",
 		 generate_random_str(tctx, 8));
 
-	smb2_util_unlink(tree, fname);
+	smb2_util_unlink(cli->tree, fname);
 
 	smb2_oplock_create_share(&io1, fname,
 				 smb2_util_share_access(""),
 				 smb2_util_oplock_level("b"));
 
-	status = smb2_create(tree, mem_ctx, &io1);
+	status = smb2_create(cli->tree, mem_ctx, &io1);
 	torture_assert_ntstatus_ok_goto(tctx, status, ret, done,
 					"smb2_create failed");
 	_h1 = io1.out.file.handle;
@@ -241,7 +241,7 @@ bool test_session_reauth1(struct torture_context *tctx, struct smb2_tree *tree)
 					smb2_util_oplock_level("b"),
 					"oplock_level incorrect");
 
-	status = smb2_session_setup_spnego(tree->session,
+	status = smb2_session_setup_spnego(cli->cli->tree->session,
 					   popt_get_cmdline_credentials(),
 					   0 /* previous_session_id */);
 	torture_assert_ntstatus_ok_goto(tctx, status, ret, done,
@@ -252,11 +252,11 @@ bool test_session_reauth1(struct torture_context *tctx, struct smb2_tree *tree)
 	ZERO_STRUCT(qfinfo);
 	qfinfo.generic.level = RAW_FILEINFO_POSITION_INFORMATION;
 	qfinfo.generic.in.file.handle = _h1;
-	status = smb2_getinfo_file(tree, mem_ctx, &qfinfo);
+	status = smb2_getinfo_file(cli->tree, mem_ctx, &qfinfo);
 	torture_assert_ntstatus_ok_goto(tctx, status, ret, done,
 					"smb2_getinfo_file failed");
 
-	status = smb2_session_setup_spnego(tree->session,
+	status = smb2_session_setup_spnego(cli->cli->tree->session,
 					   popt_get_cmdline_credentials(),
 					   0 /* previous_session_id */);
 	torture_assert_ntstatus_ok_goto(tctx, status, ret, done,
@@ -267,25 +267,25 @@ bool test_session_reauth1(struct torture_context *tctx, struct smb2_tree *tree)
 	ZERO_STRUCT(qfinfo);
 	qfinfo.generic.level = RAW_FILEINFO_POSITION_INFORMATION;
 	qfinfo.generic.in.file.handle = _h1;
-	status = smb2_getinfo_file(tree, mem_ctx, &qfinfo);
+	status = smb2_getinfo_file(cli->tree, mem_ctx, &qfinfo);
 	torture_assert_ntstatus_ok_goto(tctx, status, ret, done,
 					"smb2_getinfo_file failed");
 
 done:
 	if (h1 != NULL) {
-		smb2_util_close(tree, *h1);
+		smb2_util_close(cli->tree, *h1);
 	}
 
-	smb2_util_unlink(tree, fname);
+	smb2_util_unlink(cli->tree, fname);
 
-	talloc_free(tree);
+	talloc_free(cli->tree);
 
 	talloc_free(mem_ctx);
 
 	return ret;
 }
 
-bool test_session_reauth2(struct torture_context *tctx, struct smb2_tree *tree)
+bool test_session_reauth2(struct torture_context *tctx, struct smb2cli_state *cli)
 {
 	NTSTATUS status;
 	TALLOC_CTX *mem_ctx = talloc_new(tctx);
@@ -301,13 +301,13 @@ bool test_session_reauth2(struct torture_context *tctx, struct smb2_tree *tree)
 	snprintf(fname, sizeof(fname), "session_reauth2_%s.dat",
 		 generate_random_str(tctx, 8));
 
-	smb2_util_unlink(tree, fname);
+	smb2_util_unlink(cli->tree, fname);
 
 	smb2_oplock_create_share(&io1, fname,
 				 smb2_util_share_access(""),
 				 smb2_util_oplock_level("b"));
 
-	status = smb2_create(tree, mem_ctx, &io1);
+	status = smb2_create(cli->tree, mem_ctx, &io1);
 	torture_assert_ntstatus_ok_goto(tctx, status, ret, done,
 					"smb2_create failed");
 	_h1 = io1.out.file.handle;
@@ -322,7 +322,7 @@ bool test_session_reauth2(struct torture_context *tctx, struct smb2_tree *tree)
 	anon_creds = cli_credentials_init_anon(mem_ctx);
 	torture_assert(tctx, (anon_creds != NULL), "talloc error");
 
-	status = smb2_session_setup_spnego(tree->session,
+	status = smb2_session_setup_spnego(cli->cli->tree->session,
 					   anon_creds,
 					   0 /* previous_session_id */);
 	torture_assert_ntstatus_ok_goto(tctx, status, ret, done,
@@ -333,13 +333,13 @@ bool test_session_reauth2(struct torture_context *tctx, struct smb2_tree *tree)
 	ZERO_STRUCT(qfinfo);
 	qfinfo.generic.level = RAW_FILEINFO_POSITION_INFORMATION;
 	qfinfo.generic.in.file.handle = _h1;
-	status = smb2_getinfo_file(tree, mem_ctx, &qfinfo);
+	status = smb2_getinfo_file(cli->tree, mem_ctx, &qfinfo);
 	torture_assert_ntstatus_ok_goto(tctx, status, ret, done,
 					"smb2_getinfo_file failed");
 
 	/* re-authenticate as original user again */
 
-	status = smb2_session_setup_spnego(tree->session,
+	status = smb2_session_setup_spnego(cli->cli->tree->session,
 					   popt_get_cmdline_credentials(),
 					   0 /* previous_session_id */);
 	torture_assert_ntstatus_ok_goto(tctx, status, ret, done,
@@ -350,18 +350,18 @@ bool test_session_reauth2(struct torture_context *tctx, struct smb2_tree *tree)
 	ZERO_STRUCT(qfinfo);
 	qfinfo.generic.level = RAW_FILEINFO_POSITION_INFORMATION;
 	qfinfo.generic.in.file.handle = _h1;
-	status = smb2_getinfo_file(tree, mem_ctx, &qfinfo);
+	status = smb2_getinfo_file(cli->tree, mem_ctx, &qfinfo);
 	torture_assert_ntstatus_ok_goto(tctx, status, ret, done,
 					"smb2_getinfo_file failed");
 
 done:
 	if (h1 != NULL) {
-		smb2_util_close(tree, *h1);
+		smb2_util_close(cli->tree, *h1);
 	}
 
-	smb2_util_unlink(tree, fname);
+	smb2_util_unlink(cli->tree, fname);
 
-	talloc_free(tree);
+	talloc_free(cli->tree);
 
 	talloc_free(mem_ctx);
 
@@ -371,7 +371,7 @@ done:
 /**
  * test getting security descriptor after reauth
  */
-bool test_session_reauth3(struct torture_context *tctx, struct smb2_tree *tree)
+bool test_session_reauth3(struct torture_context *tctx, struct smb2cli_state *cli)
 {
 	NTSTATUS status;
 	TALLOC_CTX *mem_ctx = talloc_new(tctx);
@@ -392,13 +392,13 @@ bool test_session_reauth3(struct torture_context *tctx, struct smb2_tree *tree)
 	snprintf(fname, sizeof(fname), "session_reauth3_%s.dat",
 		 generate_random_str(tctx, 8));
 
-	smb2_util_unlink(tree, fname);
+	smb2_util_unlink(cli->tree, fname);
 
 	smb2_oplock_create_share(&io1, fname,
 				 smb2_util_share_access(""),
 				 smb2_util_oplock_level("b"));
 
-	status = smb2_create(tree, mem_ctx, &io1);
+	status = smb2_create(cli->tree, mem_ctx, &io1);
 	torture_assert_ntstatus_ok_goto(tctx, status, ret, done,
 					"smb2_create failed");
 	_h1 = io1.out.file.handle;
@@ -416,7 +416,7 @@ bool test_session_reauth3(struct torture_context *tctx, struct smb2_tree *tree)
 	qfinfo.query_secdesc.in.file.handle = _h1;
 	qfinfo.query_secdesc.in.secinfo_flags = secinfo_flags;
 
-	status = smb2_getinfo_file(tree, mem_ctx, &qfinfo);
+	status = smb2_getinfo_file(cli->tree, mem_ctx, &qfinfo);
 	torture_assert_ntstatus_ok_goto(tctx, status, ret, done,
 					"smb2_getinfo_file failed");
 
@@ -425,7 +425,7 @@ bool test_session_reauth3(struct torture_context *tctx, struct smb2_tree *tree)
 	anon_creds = cli_credentials_init_anon(mem_ctx);
 	torture_assert(tctx, (anon_creds != NULL), "talloc error");
 
-	status = smb2_session_setup_spnego(tree->session,
+	status = smb2_session_setup_spnego(cli->cli->tree->session,
 					   anon_creds,
 					   0 /* previous_session_id */);
 	torture_assert_ntstatus_ok_goto(tctx, status, ret, done,
@@ -439,13 +439,13 @@ bool test_session_reauth3(struct torture_context *tctx, struct smb2_tree *tree)
 	qfinfo.query_secdesc.in.file.handle = _h1;
 	qfinfo.query_secdesc.in.secinfo_flags = secinfo_flags;
 
-	status = smb2_getinfo_file(tree, mem_ctx, &qfinfo);
+	status = smb2_getinfo_file(cli->tree, mem_ctx, &qfinfo);
 	torture_assert_ntstatus_ok_goto(tctx, status, ret, done,
 					"smb2_getinfo_file failed");
 
 	/* re-authenticate as original user again */
 
-	status = smb2_session_setup_spnego(tree->session,
+	status = smb2_session_setup_spnego(cli->tree->session,
 					   popt_get_cmdline_credentials(),
 					   0 /* previous_session_id */);
 	torture_assert_ntstatus_ok_goto(tctx, status, ret, done,
@@ -459,16 +459,16 @@ bool test_session_reauth3(struct torture_context *tctx, struct smb2_tree *tree)
 	qfinfo.query_secdesc.in.file.handle = _h1;
 	qfinfo.query_secdesc.in.secinfo_flags = secinfo_flags;
 
-	status = smb2_getinfo_file(tree, mem_ctx, &qfinfo);
+	status = smb2_getinfo_file(cli->tree, mem_ctx, &qfinfo);
 	torture_assert_ntstatus_ok_goto(tctx, status, ret, done,
 					"smb2_getinfo_file failed");
 
 done:
 	if (h1 != NULL) {
-		smb2_util_close(tree, *h1);
+		smb2_util_close(cli->tree, *h1);
 	}
 
-	smb2_util_unlink(tree, fname);
+	smb2_util_unlink(cli->tree, fname);
 
 	talloc_free(tree);
 
@@ -480,7 +480,7 @@ done:
 /**
  * test setting security descriptor after reauth.
  */
-bool test_session_reauth4(struct torture_context *tctx, struct smb2_tree *tree)
+bool test_session_reauth4(struct torture_context *tctx, struct smb2cli_state *cli)
 {
 	NTSTATUS status;
 	TALLOC_CTX *mem_ctx = talloc_new(tctx);
@@ -505,13 +505,13 @@ bool test_session_reauth4(struct torture_context *tctx, struct smb2_tree *tree)
 	snprintf(fname, sizeof(fname), "session_reauth4_%s.dat",
 		 generate_random_str(tctx, 8));
 
-	smb2_util_unlink(tree, fname);
+	smb2_util_unlink(cli->tree, fname);
 
 	smb2_oplock_create_share(&io1, fname,
 				 smb2_util_share_access(""),
 				 smb2_util_oplock_level("b"));
 
-	status = smb2_create(tree, mem_ctx, &io1);
+	status = smb2_create(cli->tree, mem_ctx, &io1);
 	torture_assert_ntstatus_ok_goto(tctx, status, ret, done,
 					"smb2_create failed");
 	_h1 = io1.out.file.handle;
@@ -529,7 +529,7 @@ bool test_session_reauth4(struct torture_context *tctx, struct smb2_tree *tree)
 	qfinfo.query_secdesc.in.file.handle = _h1;
 	qfinfo.query_secdesc.in.secinfo_flags = secinfo_flags;
 
-	status = smb2_getinfo_file(tree, mem_ctx, &qfinfo);
+	status = smb2_getinfo_file(cli->tree, mem_ctx, &qfinfo);
 	torture_assert_ntstatus_ok_goto(tctx, status, ret, done,
 					"smb2_getinfo_file failed");
 
@@ -540,7 +540,7 @@ bool test_session_reauth4(struct torture_context *tctx, struct smb2_tree *tree)
 	anon_creds = cli_credentials_init_anon(mem_ctx);
 	torture_assert(tctx, (anon_creds != NULL), "talloc error");
 
-	status = smb2_session_setup_spnego(tree->session,
+	status = smb2_session_setup_spnego(cli->cli->tree->session,
 					   anon_creds,
 					   0 /* previous_session_id */);
 	torture_assert_ntstatus_ok_goto(tctx, status, ret, done,
@@ -566,13 +566,13 @@ bool test_session_reauth4(struct torture_context *tctx, struct smb2_tree *tree)
 	sfinfo.set_secdesc.in.secinfo_flags = SECINFO_DACL;
 	sfinfo.set_secdesc.in.sd = sd1;
 
-	status = smb2_setinfo_file(tree, &sfinfo);
+	status = smb2_setinfo_file(cli->tree, &sfinfo);
 	torture_assert_ntstatus_ok_goto(tctx, status, ret, done,
 					"smb2_setinfo_file failed");
 
 	/* re-authenticate as original user again */
 
-	status = smb2_session_setup_spnego(tree->session,
+	status = smb2_session_setup_spnego(cli->tree->session,
 					   popt_get_cmdline_credentials(),
 					   0 /* previous_session_id */);
 	torture_assert_ntstatus_ok_goto(tctx, status, ret, done,
@@ -586,7 +586,7 @@ bool test_session_reauth4(struct torture_context *tctx, struct smb2_tree *tree)
 	qfinfo.query_secdesc.in.file.handle = _h1;
 	qfinfo.query_secdesc.in.secinfo_flags = secinfo_flags;
 
-	status = smb2_getinfo_file(tree, mem_ctx, &qfinfo);
+	status = smb2_getinfo_file(cli->tree, mem_ctx, &qfinfo);
 	torture_assert_ntstatus_ok_goto(tctx, status, ret, done,
 					"smb2_getinfo_file failed");
 
@@ -594,10 +594,10 @@ bool test_session_reauth4(struct torture_context *tctx, struct smb2_tree *tree)
 
 done:
 	if (h1 != NULL) {
-		smb2_util_close(tree, *h1);
+		smb2_util_close(cli->tree, *h1);
 	}
 
-	smb2_util_unlink(tree, fname);
+	smb2_util_unlink(cli->tree, fname);
 
 	talloc_free(tree);
 
@@ -610,7 +610,7 @@ done:
  * test renaming after reauth.
  * compare security descriptors before and after rename/reauth
  */
-bool test_session_reauth5(struct torture_context *tctx, struct smb2_tree *tree)
+bool test_session_reauth5(struct torture_context *tctx, struct smb2cli_state *cli)
 {
 	NTSTATUS status;
 	TALLOC_CTX *mem_ctx = talloc_new(tctx);
@@ -645,7 +645,7 @@ bool test_session_reauth5(struct torture_context *tctx, struct smb2_tree *tree)
 	ok = smb2_util_setup_dir(tctx, tree, dname);
 	torture_assert(tctx, ok, "smb2_util_setup_dir not ok");
 
-	status = torture_smb2_testdir(tree, dname, &_dh1);
+	status = torture_smb2_testdir(cli->tree, dname, &_dh1);
 	torture_assert_ntstatus_ok_goto(tctx, status, ret, done,
 					"torture_smb2_testdir failed");
 	dh1 = &_dh1;
@@ -654,7 +654,7 @@ bool test_session_reauth5(struct torture_context *tctx, struct smb2_tree *tree)
 				 smb2_util_share_access(""),
 				 smb2_util_oplock_level("b"));
 
-	status = smb2_create(tree, mem_ctx, &io1);
+	status = smb2_create(cli->tree, mem_ctx, &io1);
 	torture_assert_ntstatus_ok_goto(tctx, status, ret, done,
 					"smb2_create failed");
 	_h1 = io1.out.file.handle;
@@ -672,7 +672,7 @@ bool test_session_reauth5(struct torture_context *tctx, struct smb2_tree *tree)
 	qfinfo.query_secdesc.in.file.handle = _h1;
 	qfinfo.query_secdesc.in.secinfo_flags = secinfo_flags;
 
-	status = smb2_getinfo_file(tree, mem_ctx, &qfinfo);
+	status = smb2_getinfo_file(cli->tree, mem_ctx, &qfinfo);
 	torture_assert_ntstatus_ok_goto(tctx, status, ret, done,
 					"smb2_getinfo_file failed");
 
@@ -683,7 +683,7 @@ bool test_session_reauth5(struct torture_context *tctx, struct smb2_tree *tree)
 	anon_creds = cli_credentials_init_anon(mem_ctx);
 	torture_assert(tctx, (anon_creds != NULL), "talloc error");
 
-	status = smb2_session_setup_spnego(tree->session,
+	status = smb2_session_setup_spnego(cli->tree->session,
 					   anon_creds,
 					   0 /* previous_session_id */);
 	torture_assert_ntstatus_ok_goto(tctx, status, ret, done,
@@ -693,7 +693,7 @@ bool test_session_reauth5(struct torture_context *tctx, struct smb2_tree *tree)
 
 	snprintf(fname2, sizeof(fname2), "%s\\file2.dat", dname);
 
-	status = smb2_util_unlink(tree, fname2);
+	status = smb2_util_unlink(cli->tree, fname2);
 	torture_assert_ntstatus_ok_goto(tctx, status, ret, done,
 					"smb2_util_unlink failed");
 
@@ -704,7 +704,7 @@ bool test_session_reauth5(struct torture_context *tctx, struct smb2_tree *tree)
 	sfinfo.rename_information.in.overwrite = true;
 	sfinfo.rename_information.in.new_name = fname2;
 
-	status = smb2_setinfo_file(tree, &sfinfo);
+	status = smb2_setinfo_file(cli->tree, &sfinfo);
 	torture_assert_ntstatus_equal_goto(tctx, status,
 					   NT_STATUS_ACCESS_DENIED,
 					   ret, done, "smb2_setinfo_file "
@@ -712,7 +712,7 @@ bool test_session_reauth5(struct torture_context *tctx, struct smb2_tree *tree)
 
 	/* re-authenticate as original user again */
 
-	status = smb2_session_setup_spnego(tree->session,
+	status = smb2_session_setup_spnego(cli->tree->session,
 					   popt_get_cmdline_credentials(),
 					   0 /* previous_session_id */);
 	torture_assert_ntstatus_ok_goto(tctx, status, ret, done,
@@ -738,7 +738,7 @@ bool test_session_reauth5(struct torture_context *tctx, struct smb2_tree *tree)
 	sfinfo.set_secdesc.in.secinfo_flags = secinfo_flags;
 	sfinfo.set_secdesc.in.sd = f_sd1;
 
-	status = smb2_setinfo_file(tree, &sfinfo);
+	status = smb2_setinfo_file(cli->tree, &sfinfo);
 	torture_assert_ntstatus_ok_goto(tctx, status, ret, done,
 					"smb2_setinfo_file failed");
 
@@ -750,7 +750,7 @@ bool test_session_reauth5(struct torture_context *tctx, struct smb2_tree *tree)
 	qfinfo.query_secdesc.in.file.handle = _h1;
 	qfinfo.query_secdesc.in.secinfo_flags = secinfo_flags;
 
-	status = smb2_getinfo_file(tree, mem_ctx, &qfinfo);
+	status = smb2_getinfo_file(cli->tree, mem_ctx, &qfinfo);
 	torture_assert_ntstatus_ok_goto(tctx, status, ret, done,
 					"smb2_getinfo_file failed");
 
@@ -759,7 +759,7 @@ bool test_session_reauth5(struct torture_context *tctx, struct smb2_tree *tree)
 	anon_creds = cli_credentials_init_anon(mem_ctx);
 	torture_assert(tctx, (anon_creds != NULL), "talloc error");
 
-	status = smb2_session_setup_spnego(tree->session,
+	status = smb2_session_setup_spnego(cli->tree->session,
 					   anon_creds,
 					   0 /* previous_session_id */);
 	torture_assert_ntstatus_ok_goto(tctx, status, ret, done,
@@ -773,7 +773,7 @@ bool test_session_reauth5(struct torture_context *tctx, struct smb2_tree *tree)
 	sfinfo.rename_information.in.overwrite = true;
 	sfinfo.rename_information.in.new_name = fname2;
 
-	status = smb2_setinfo_file(tree, &sfinfo);
+	status = smb2_setinfo_file(cli->tree, &sfinfo);
 	torture_assert_ntstatus_equal_goto(tctx, status,
 					   NT_STATUS_ACCESS_DENIED,
 					   ret, done, "smb2_setinfo_file "
@@ -787,7 +787,7 @@ bool test_session_reauth5(struct torture_context *tctx, struct smb2_tree *tree)
 	qfinfo.query_secdesc.in.file.handle = _dh1;
 	qfinfo.query_secdesc.in.secinfo_flags = secinfo_flags;
 
-	status = smb2_getinfo_file(tree, mem_ctx, &qfinfo);
+	status = smb2_getinfo_file(cli->tree, mem_ctx, &qfinfo);
 	torture_assert_ntstatus_ok_goto(tctx, status, ret, done,
 					"smb2_getinfo_file failed");
 
@@ -810,7 +810,7 @@ bool test_session_reauth5(struct torture_context *tctx, struct smb2_tree *tree)
 	sfinfo.set_secdesc.in.secinfo_flags = SECINFO_DACL;
 	sfinfo.set_secdesc.in.sd = d_sd1;
 
-	status = smb2_setinfo_file(tree, &sfinfo);
+	status = smb2_setinfo_file(cli->tree, &sfinfo);
 	torture_assert_ntstatus_ok_goto(tctx, status, ret, done,
 					"smb2_setinfo_file failed");
 
@@ -820,11 +820,11 @@ bool test_session_reauth5(struct torture_context *tctx, struct smb2_tree *tree)
 	qfinfo.query_secdesc.in.file.handle = _dh1;
 	qfinfo.query_secdesc.in.secinfo_flags = secinfo_flags;
 
-	status = smb2_getinfo_file(tree, mem_ctx, &qfinfo);
+	status = smb2_getinfo_file(cli->tree, mem_ctx, &qfinfo);
 	torture_assert_ntstatus_ok_goto(tctx, status, ret, done,
 					"smb2_getinfo_file failed");
 
-	status = smb2_util_close(tree, _dh1);
+	status = smb2_util_close(cli->tree, _dh1);
 	torture_assert_ntstatus_ok_goto(tctx, status, ret, done,
 					"smb2_util_close failed");
 	dh1 = NULL;
@@ -837,7 +837,7 @@ bool test_session_reauth5(struct torture_context *tctx, struct smb2_tree *tree)
 	sfinfo.rename_information.in.overwrite = true;
 	sfinfo.rename_information.in.new_name = fname2;
 
-	status = smb2_setinfo_file(tree, &sfinfo);
+	status = smb2_setinfo_file(cli->tree, &sfinfo);
 	torture_assert_ntstatus_equal_goto(tctx, status,
 					NT_STATUS_ACCESS_DENIED,
 					ret, done, "smb2_setinfo_file "
@@ -845,7 +845,7 @@ bool test_session_reauth5(struct torture_context *tctx, struct smb2_tree *tree)
 
 	/* re-authenticate as original user - again */
 
-	status = smb2_session_setup_spnego(tree->session,
+	status = smb2_session_setup_spnego(cli->tree->session,
 					   popt_get_cmdline_credentials(),
 					   0 /* previous_session_id */);
 	torture_assert_ntstatus_ok_goto(tctx, status, ret, done,
@@ -859,13 +859,13 @@ bool test_session_reauth5(struct torture_context *tctx, struct smb2_tree *tree)
 	sfinfo.rename_information.in.overwrite = true;
 	sfinfo.rename_information.in.new_name = fname2;
 
-	status = smb2_setinfo_file(tree, &sfinfo);
+	status = smb2_setinfo_file(cli->tree, &sfinfo);
 	torture_assert_ntstatus_ok_goto(tctx, status, ret, done,
 					"smb2_setinfo_file failed");
 
 	/* closs the file, check it is gone and reopen under the new name */
 
-	status = smb2_util_close(tree, _h1);
+	status = smb2_util_close(cli->tree, _h1);
 	torture_assert_ntstatus_ok_goto(tctx, status, ret, done,
 					"smb2_util_close failed");
 	ZERO_STRUCT(io1);
@@ -878,7 +878,7 @@ bool test_session_reauth5(struct torture_context *tctx, struct smb2_tree *tree)
 				  smb2_util_oplock_level("b"),
 				  0 /* leasekey */, 0 /* leasestate */);
 
-	status = smb2_create(tree, mem_ctx, &io1);
+	status = smb2_create(cli->tree, mem_ctx, &io1);
 	torture_assert_ntstatus_equal_goto(tctx, status,
 					NT_STATUS_OBJECT_NAME_NOT_FOUND,
 					ret, done, "smb2_create "
@@ -894,7 +894,7 @@ bool test_session_reauth5(struct torture_context *tctx, struct smb2_tree *tree)
 				  smb2_util_oplock_level("b"),
 				  0 /* leasekey */, 0 /* leasestate */);
 
-	status = smb2_create(tree, mem_ctx, &io1);
+	status = smb2_create(cli->tree, mem_ctx, &io1);
 	torture_assert_ntstatus_ok_goto(tctx, status, ret, done,
 					"smb2_create failed");
 	_h1 = io1.out.file.handle;
@@ -912,19 +912,19 @@ bool test_session_reauth5(struct torture_context *tctx, struct smb2_tree *tree)
 	qfinfo.query_secdesc.in.file.handle = _h1;
 	qfinfo.query_secdesc.in.secinfo_flags = secinfo_flags;
 
-	status = smb2_getinfo_file(tree, mem_ctx, &qfinfo);
+	status = smb2_getinfo_file(cli->tree, mem_ctx, &qfinfo);
 	torture_assert_ntstatus_ok_goto(tctx, status, ret, done,
 					"smb2_getinfo_file failed");
 
 done:
 	if (dh1 != NULL) {
-		smb2_util_close(tree, *dh1);
+		smb2_util_close(cli->tree, *dh1);
 	}
 	if (h1 != NULL) {
-		smb2_util_close(tree, *h1);
+		smb2_util_close(cli->tree, *h1);
 	}
 
-	smb2_deltree(tree, dname);
+	smb2_deltree(cli->tree, dname);
 
 	talloc_free(tree);
 
@@ -938,7 +938,7 @@ done:
  * hence triggering the error path in reauth.
  * The invalid reauth deletes the session.
  */
-bool test_session_reauth6(struct torture_context *tctx, struct smb2_tree *tree)
+bool test_session_reauth6(struct torture_context *tctx, struct smb2cli_state *cli)
 {
 	NTSTATUS status;
 	TALLOC_CTX *mem_ctx = talloc_new(tctx);
@@ -961,20 +961,20 @@ bool test_session_reauth6(struct torture_context *tctx, struct smb2_tree *tree)
 			     "Can't test failing session setup with kerberos.");
 	}
 
-	encrypted = smb2cli_tcon_is_encryption_on(tree->smbXcli);
+	encrypted = smb2cli_tcon_is_encryption_on(cli->tree->smbXcli);
 
 	/* Add some random component to the file name. */
 	snprintf(fname, sizeof(fname), "session_reauth1_%s.dat",
 		 generate_random_str(tctx, 8));
 
-	smb2_util_unlink(tree, fname);
+	smb2_util_unlink(cli->tree, fname);
 
 	smb2_oplock_create_share(&io1, fname,
 				 smb2_util_share_access(""),
 				 smb2_util_oplock_level("b"));
 	io1.in.create_options |= NTCREATEX_OPTIONS_DELETE_ON_CLOSE;
 
-	status = smb2_create(tree, mem_ctx, &io1);
+	status = smb2_create(cli->tree, mem_ctx, &io1);
 	torture_assert_ntstatus_ok_goto(tctx, status, ret, done,
 					"smb2_create failed");
 	_h1 = io1.out.file.handle;
@@ -1001,7 +1001,7 @@ bool test_session_reauth6(struct torture_context *tctx, struct smb2_tree *tree)
 					  CRED_SPECIFIED);
 	torture_assert(tctx, ok, "cli_credentials_set_password not ok");
 
-	status = smb2_session_setup_spnego(tree->session,
+	status = smb2_session_setup_spnego(cli->tree->session,
 					   broken_creds,
 					   0 /* previous_session_id */);
 	torture_assert_ntstatus_equal_goto(tctx, status,
@@ -1024,17 +1024,17 @@ bool test_session_reauth6(struct torture_context *tctx, struct smb2_tree *tree)
 				 smb2_util_share_access(""),
 				 smb2_util_oplock_level("b"));
 
-	status = smb2_create(tree, mem_ctx, &io1);
+	status = smb2_create(cli->tree, mem_ctx, &io1);
 	torture_assert_ntstatus_equal_goto(tctx, status, expected,
 					ret, done, "smb2_create "
 					"returned unexpected status");
 
 done:
 	if (h1 != NULL) {
-		smb2_util_close(tree, *h1);
+		smb2_util_close(cli->tree, *h1);
 	}
 
-	smb2_util_unlink(tree, fname);
+	smb2_util_unlink(cli->tree, fname);
 
 	talloc_free(tree);
 
@@ -1097,7 +1097,7 @@ static bool test_session_expire1i(struct torture_context *tctx,
 					"smb2_connect failed");
 
 	if (force_encryption) {
-		status = smb2cli_session_encryption_on(tree->session->smbXcli);
+		status = smb2cli_session_encryption_on(cli->tree->session->smbXcli);
 		torture_assert_ntstatus_ok_goto(tctx, status, ret, done,
 					"smb2cli_session_encryption_on failed");
 	}
@@ -1106,14 +1106,14 @@ static bool test_session_expire1i(struct torture_context *tctx,
 	snprintf(fname, sizeof(fname), "session_expire1_%s.dat",
 		 generate_random_str(tctx, 8));
 
-	smb2_util_unlink(tree, fname);
+	smb2_util_unlink(cli->tree, fname);
 
 	smb2_oplock_create_share(&io1, fname,
 				 smb2_util_share_access(""),
 				 smb2_util_oplock_level("b"));
 	io1.in.create_options |= NTCREATEX_OPTIONS_DELETE_ON_CLOSE;
 
-	status = smb2_create(tree, tctx, &io1);
+	status = smb2_create(cli->tree, tctx, &io1);
 	torture_assert_ntstatus_ok_goto(tctx, status, ret, done,
 					"smb2_create failed");
 	_h1 = io1.out.file.handle;
@@ -1134,7 +1134,7 @@ static bool test_session_expire1i(struct torture_context *tctx,
 		torture_comment(tctx, "query info => OK\n");
 
 		ZERO_STRUCT(qfinfo.access_information.out);
-		status = smb2_getinfo_file(tree, tctx, &qfinfo);
+		status = smb2_getinfo_file(cli->tree, tctx, &qfinfo);
 		torture_assert_ntstatus_ok_goto(tctx, status, ret, done,
 						"smb2_getinfo_file failed");
 
@@ -1143,7 +1143,7 @@ static bool test_session_expire1i(struct torture_context *tctx,
 
 		torture_comment(tctx, "query info => EXPIRED\n");
 		ZERO_STRUCT(qfinfo.access_information.out);
-		status = smb2_getinfo_file(tree, tctx, &qfinfo);
+		status = smb2_getinfo_file(cli->tree, tctx, &qfinfo);
 		torture_assert_ntstatus_equal_goto(tctx, status,
 					NT_STATUS_NETWORK_SESSION_EXPIRED,
 					ret, done, "smb2_getinfo_file "
@@ -1157,22 +1157,22 @@ static bool test_session_expire1i(struct torture_context *tctx,
 
 		if (!force_encryption) {
 			smb2cli_session_require_signed_response(
-				tree->session->smbXcli, true);
+				cli->tree->session->smbXcli, true);
 		}
 
 		torture_comment(tctx, "reauth => OK\n");
-		status = smb2_session_setup_spnego(tree->session,
+		status = smb2_session_setup_spnego(cli->tree->session,
 						   credentials,
 						   0 /* previous_session_id */);
 		torture_assert_ntstatus_ok_goto(tctx, status, ret, done,
 					"smb2_session_setup_spnego failed");
 
 		smb2cli_session_require_signed_response(
-			tree->session->smbXcli, false);
+			cli->tree->session->smbXcli, false);
 	}
 
 	ZERO_STRUCT(qfinfo.access_information.out);
-	status = smb2_getinfo_file(tree, tctx, &qfinfo);
+	status = smb2_getinfo_file(cli->tree, tctx, &qfinfo);
 	torture_assert_ntstatus_ok_goto(tctx, status, ret, done,
 					"smb2_getinfo_file failed");
 
@@ -1181,7 +1181,7 @@ done:
 	cli_credentials_invalidate_ccache(credentials, CRED_SPECIFIED);
 
 	if (h1 != NULL) {
-		smb2_util_close(tree, *h1);
+		smb2_util_close(cli->tree, *h1);
 	}
 
 	talloc_free(tree);
@@ -1284,20 +1284,20 @@ static bool test_session_expire2i(struct torture_context *tctx,
 					"smb2_connect failed");
 
 	if (force_encryption) {
-		status = smb2cli_session_encryption_on(tree->session->smbXcli);
+		status = smb2cli_session_encryption_on(cli->tree->session->smbXcli);
 		torture_assert_ntstatus_ok_goto(tctx, status, ret, done,
 					"smb2cli_session_encryption_on failed");
 	}
 
-	caps = smb2cli_conn_server_capabilities(tree->session->transport->conn);
+	caps = smb2cli_conn_server_capabilities(cli->tree->session->transport->conn);
 
 	/* Add some random component to the file name. */
 	snprintf(fname, sizeof(fname), "session_expire2_%s.dat",
 		 generate_random_str(tctx, 8));
 
-	smb2_util_unlink(tree, fname);
+	smb2_util_unlink(cli->tree, fname);
 
-	status = smb2_util_roothandle(tree, &dh);
+	status = smb2_util_roothandle(cli->tree, &dh);
 	torture_assert_ntstatus_ok_goto(tctx, status, ret, done,
 					"smb2_util_roothandle failed");
 
@@ -1306,7 +1306,7 @@ static bool test_session_expire2i(struct torture_context *tctx,
 				 smb2_util_oplock_level("b"));
 	io1.in.create_options |= NTCREATEX_OPTIONS_DELETE_ON_CLOSE;
 
-	status = smb2_create(tree, tctx, &io1);
+	status = smb2_create(cli->tree, tctx, &io1);
 	torture_assert_ntstatus_ok_goto(tctx, status, ret, done,
 					"smb2_create failed");
 	_h1 = io1.out.file.handle;
@@ -1326,7 +1326,7 @@ static bool test_session_expire2i(struct torture_context *tctx,
 	torture_comment(tctx, "query info => OK\n");
 
 	ZERO_STRUCT(qfinfo.access_information.out);
-	status = smb2_getinfo_file(tree, tctx, &qfinfo);
+	status = smb2_getinfo_file(cli->tree, tctx, &qfinfo);
 	torture_assert_ntstatus_ok_goto(tctx, status, ret, done,
 					"smb2_getinfo_file failed");
 
@@ -1341,7 +1341,7 @@ static bool test_session_expire2i(struct torture_context *tctx,
 				  SMB2_LOCK_FLAG_FAIL_IMMEDIATELY;
 	el.offset		= 0x0000000000000000;
 	el.length		= 0x0000000000000001;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	torture_assert_ntstatus_ok_goto(tctx, status, ret, done,
 					"smb2_lock lock failed");
 
@@ -1352,7 +1352,7 @@ static bool test_session_expire2i(struct torture_context *tctx,
 	ntf1.in.buffer_size	= 128;
 	ntf1.in.completion_filter= FILE_NOTIFY_CHANGE_ATTRIBUTES;
 	ntf1.in.unknown		= 0x00000000;
-	req = smb2_notify_send(tree, &ntf1);
+	req = smb2_notify_send(cli->tree, &ntf1);
 
 	while (!req->cancel.can_cancel && req->state <= SMB2_REQUEST_RECV) {
 		if (tevent_loop_once(tctx->ev) != 0) {
@@ -1368,7 +1368,7 @@ static bool test_session_expire2i(struct torture_context *tctx,
 
 	torture_comment(tctx, "query info => EXPIRED\n");
 	ZERO_STRUCT(qfinfo.access_information.out);
-	status = smb2_getinfo_file(tree, tctx, &qfinfo);
+	status = smb2_getinfo_file(cli->tree, tctx, &qfinfo);
 	torture_assert_ntstatus_equal_goto(tctx, status,
 				NT_STATUS_NETWORK_SESSION_EXPIRED,
 				ret, done, "smb2_getinfo_file "
@@ -1380,7 +1380,7 @@ static bool test_session_expire2i(struct torture_context *tctx,
 	sfinfo.end_of_file_info.level = RAW_SFILEINFO_END_OF_FILE_INFORMATION;
 	sfinfo.end_of_file_info.in.file.handle = *h1;
 	sfinfo.end_of_file_info.in.size = 1;
-	status = smb2_setinfo_file(tree, &sfinfo);
+	status = smb2_setinfo_file(cli->tree, &sfinfo);
 	torture_assert_ntstatus_equal_goto(tctx, status,
 				NT_STATUS_NETWORK_SESSION_EXPIRED,
 				ret, done, "smb2_setinfo_file "
@@ -1389,7 +1389,7 @@ static bool test_session_expire2i(struct torture_context *tctx,
 	torture_comment(tctx, "flush => EXPIRED\n");
 	ZERO_STRUCT(flsh);
 	flsh.in.file.handle = *h1;
-	status = smb2_flush(tree, &flsh);
+	status = smb2_flush(cli->tree, &flsh);
 	torture_assert_ntstatus_equal_goto(tctx, status,
 				NT_STATUS_NETWORK_SESSION_EXPIRED,
 				ret, done, "smb2_flush "
@@ -1400,14 +1400,14 @@ static bool test_session_expire2i(struct torture_context *tctx,
 	rd.in.file.handle = *h1;
 	rd.in.length      = 5;
 	rd.in.offset      = 0;
-	status = smb2_read(tree, tctx, &rd);
+	status = smb2_read(cli->tree, tctx, &rd);
 	torture_assert_ntstatus_equal_goto(tctx, status,
 				NT_STATUS_NETWORK_SESSION_EXPIRED,
 				ret, done, "smb2_read "
 				"returned unexpected status");
 
 	torture_comment(tctx, "write => EXPIRED\n");
-	status = smb2_util_write(tree, *h1, &wd, 0, 1);
+	status = smb2_util_write(cli->tree, *h1, &wd, 0, 1);
 	torture_assert_ntstatus_equal_goto(tctx, status,
 				NT_STATUS_NETWORK_SESSION_EXPIRED,
 				ret, done, "smb2_util_write "
@@ -1419,7 +1419,7 @@ static bool test_session_expire2i(struct torture_context *tctx,
 	ctl.in.function = FSCTL_SRV_ENUM_SNAPS;
 	ctl.in.max_output_response = 16;
 	ctl.in.flags = SMB2_IOCTL_FLAG_IS_FSCTL;
-	status = smb2_ioctl(tree, tctx, &ctl);
+	status = smb2_ioctl(cli->tree, tctx, &ctl);
 	torture_assert_ntstatus_equal_goto(tctx, status,
 				NT_STATUS_NETWORK_SESSION_EXPIRED,
 				ret, done, "smb2_ioctl "
@@ -1428,7 +1428,7 @@ static bool test_session_expire2i(struct torture_context *tctx,
 	torture_comment(tctx, "oplock ack => EXPIRED\n");
 	ZERO_STRUCT(oack);
 	oack.in.file.handle = *h1;
-	status = smb2_break(tree, &oack);
+	status = smb2_break(cli->tree, &oack);
 	torture_assert_ntstatus_equal_goto(tctx, status,
 				NT_STATUS_NETWORK_SESSION_EXPIRED,
 				ret, done, "smb2_break "
@@ -1440,7 +1440,7 @@ static bool test_session_expire2i(struct torture_context *tctx,
 		lack.in.lease.lease_version = 1;
 		lack.in.lease.lease_key.data[0] = 1;
 		lack.in.lease.lease_key.data[1] = 2;
-		status = smb2_lease_break_ack(tree, &lack);
+		status = smb2_lease_break_ack(cli->tree, &lack);
 		torture_assert_ntstatus_equal_goto(tctx, status,
 					NT_STATUS_NETWORK_SESSION_EXPIRED,
 					ret, done, "smb2_break "
@@ -1454,7 +1454,7 @@ static bool test_session_expire2i(struct torture_context *tctx,
 	fnd.in.continue_flags	= SMB2_CONTINUE_FLAG_SINGLE;
 	fnd.in.max_response_size= 0x100;
 	fnd.in.level		= SMB2_FIND_BOTH_DIRECTORY_INFO;
-	status = smb2_find_level(tree, tree, &fnd, &count, &d);
+	status = smb2_find_level(cli->tree, tree, &fnd, &count, &d);
 	torture_assert_ntstatus_equal_goto(tctx, status,
 				NT_STATUS_NETWORK_SESSION_EXPIRED,
 				ret, done, "smb2_find_level "
@@ -1470,7 +1470,7 @@ static bool test_session_expire2i(struct torture_context *tctx,
 	ntf2.in.buffer_size	= 128;
 	ntf2.in.completion_filter= FILE_NOTIFY_CHANGE_ATTRIBUTES;
 	ntf2.in.unknown		= 0x00000000;
-	status = smb2_notify(tree, tctx, &ntf2);
+	status = smb2_notify(cli->tree, tctx, &ntf2);
 	torture_assert_ntstatus_equal_goto(tctx, status,
 				NT_STATUS_NETWORK_SESSION_EXPIRED,
 				ret, done, "smb2_notify "
@@ -1486,9 +1486,9 @@ static bool test_session_expire2i(struct torture_context *tctx,
 				"returned unexpected status");
 
 	torture_comment(tctx, "tcon => EXPIRED\n");
-	tree2 = smb2_tree_init(tree->session, tctx, false);
+	tree2 = smb2_tree_init(cli->tree->session, tctx, false);
 	torture_assert(tctx, tree2 != NULL, "smb2_tree_init");
-	timeout_msec = tree->session->transport->options.request_timeout * 1000;
+	timeout_msec = cli->tree->session->transport->options.request_timeout * 1000;
 	subreq = smb2cli_tcon_send(tree2, tctx->ev,
 				   tree2->session->transport->conn,
 				   timeout_msec,
@@ -1508,7 +1508,7 @@ static bool test_session_expire2i(struct torture_context *tctx,
 				"returned unexpected status");
 
 	torture_comment(tctx, "create => EXPIRED\n");
-	status = smb2_util_roothandle(tree, &dh2);
+	status = smb2_util_roothandle(cli->tree, &dh2);
 	torture_assert_ntstatus_equal_goto(tctx, status,
 				NT_STATUS_NETWORK_SESSION_EXPIRED,
 				ret, done, "smb2_util_roothandle"
@@ -1527,12 +1527,12 @@ static bool test_session_expire2i(struct torture_context *tctx,
 
 	torture_comment(tctx, "1st unlock => OK\n");
 	el.flags		= SMB2_LOCK_FLAG_UNLOCK;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	torture_assert_ntstatus_ok_goto(tctx, status, ret, done,
 					"smb2_lock unlock failed");
 
 	torture_comment(tctx, "2nd unlock => RANGE_NOT_LOCKED\n");
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	torture_assert_ntstatus_equal_goto(tctx, status,
 				NT_STATUS_RANGE_NOT_LOCKED,
 				ret, done, "smb2_lock 2nd unlock"
@@ -1541,31 +1541,31 @@ static bool test_session_expire2i(struct torture_context *tctx,
 	torture_comment(tctx, "lock => EXPIRED\n");
 	el.flags		= SMB2_LOCK_FLAG_EXCLUSIVE |
 				  SMB2_LOCK_FLAG_FAIL_IMMEDIATELY;
-	status = smb2_lock(tree, &lck);
+	status = smb2_lock(cli->tree, &lck);
 	torture_assert_ntstatus_equal_goto(tctx, status,
 				NT_STATUS_NETWORK_SESSION_EXPIRED,
 				ret, done, "smb2_util_roothandle"
 				"returned unexpected status");
 
 	torture_comment(tctx, "close => OK\n");
-	status = smb2_util_close(tree, *h1);
+	status = smb2_util_close(cli->tree, *h1);
 	h1 = NULL;
 	torture_assert_ntstatus_ok_goto(tctx, status, ret, done,
 					"smb2_close failed");
 
 	torture_comment(tctx, "echo without session => OK\n");
-	status = smb2_keepalive(tree->session->transport);
+	status = smb2_keepalive(cli->tree->session->transport);
 	torture_assert_ntstatus_ok_goto(tctx, status, ret, done,
 					"smb2_keepalive without session failed");
 
 	torture_comment(tctx, "echo with session => OK\n");
-	req = smb2_keepalive_send(tree->session->transport, tree->session);
+	req = smb2_keepalive_send(cli->tree->session->transport, cli->tree->session);
 	status = smb2_keepalive_recv(req);
 	torture_assert_ntstatus_ok_goto(tctx, status, ret, done,
 					"smb2_keepalive with session failed");
 
 	torture_comment(tctx, "logoff => OK\n");
-	status = smb2_logoff(tree->session);
+	status = smb2_logoff(cli->tree->session);
 	torture_assert_ntstatus_ok_goto(tctx, status, ret, done,
 					"smb2_logoff failed");
 
@@ -1574,7 +1574,7 @@ done:
 	cli_credentials_invalidate_ccache(credentials, CRED_SPECIFIED);
 
 	if (h1 != NULL) {
-		smb2_util_close(tree, *h1);
+		smb2_util_close(cli->tree, *h1);
 	}
 
 	talloc_free(tree);
@@ -1638,20 +1638,20 @@ static bool test_session_expire_disconnect(struct torture_context *tctx)
 	torture_assert_ntstatus_ok_goto(tctx, status, ret, done,
 					"smb2_connect failed");
 
-	smbXcli_session_set_disconnect_expired(tree->session->smbXcli);
+	smbXcli_session_set_disconnect_expired(cli->tree->session->smbXcli);
 
 	/* Add some random component to the file name. */
 	snprintf(fname, sizeof(fname), "session_expire1_%s.dat",
 		 generate_random_str(tctx, 8));
 
-	smb2_util_unlink(tree, fname);
+	smb2_util_unlink(cli->tree, fname);
 
 	smb2_oplock_create_share(&io1, fname,
 				 smb2_util_share_access(""),
 				 smb2_util_oplock_level("b"));
 	io1.in.create_options |= NTCREATEX_OPTIONS_DELETE_ON_CLOSE;
 
-	status = smb2_create(tree, tctx, &io1);
+	status = smb2_create(cli->tree, tctx, &io1);
 	torture_assert_ntstatus_ok_goto(tctx, status, ret, done,
 					"smb2_create failed");
 	_h1 = io1.out.file.handle;
@@ -1671,7 +1671,7 @@ static bool test_session_expire_disconnect(struct torture_context *tctx)
 	torture_comment(tctx, "query info => OK\n");
 
 	ZERO_STRUCT(qfinfo.access_information.out);
-	status = smb2_getinfo_file(tree, tctx, &qfinfo);
+	status = smb2_getinfo_file(cli->tree, tctx, &qfinfo);
 	torture_assert_ntstatus_ok_goto(tctx, status, ret, done,
 					"smb2_getinfo_file failed");
 
@@ -1680,13 +1680,13 @@ static bool test_session_expire_disconnect(struct torture_context *tctx)
 
 	torture_comment(tctx, "query info => EXPIRED\n");
 	ZERO_STRUCT(qfinfo.access_information.out);
-	status = smb2_getinfo_file(tree, tctx, &qfinfo);
+	status = smb2_getinfo_file(cli->tree, tctx, &qfinfo);
 	torture_assert_ntstatus_equal_goto(tctx, status,
 					   NT_STATUS_NETWORK_SESSION_EXPIRED,
 					   ret, done, "smb2_getinfo_file "
 					   "returned unexpected status");
 
-	connected = smbXcli_conn_is_connected(tree->session->transport->conn);
+	connected = smbXcli_conn_is_connected(cli->tree->session->transport->conn);
 	torture_assert_goto(tctx, !connected, ret, done, "connected\n");
 
 	ret = true;
@@ -1694,7 +1694,7 @@ done:
 	cli_credentials_invalidate_ccache(credentials, CRED_SPECIFIED);
 
 	if (h1 != NULL) {
-		smb2_util_close(tree, *h1);
+		smb2_util_close(cli->tree, *h1);
 	}
 
 	talloc_free(tree);
@@ -1702,7 +1702,7 @@ done:
 	return ret;
 }
 
-bool test_session_bind1(struct torture_context *tctx, struct smb2_tree *tree1)
+bool test_session_bind1(struct torture_context *tctx, struct smb2cli_state *cli1)
 {
 	const char *host = torture_setting_string(tctx, "host", NULL);
 	const char *share = torture_setting_string(tctx, "share", NULL);

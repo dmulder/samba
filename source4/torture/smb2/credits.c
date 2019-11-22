@@ -33,7 +33,7 @@
  * This passes against Windows 2016
  **/
 static bool test_session_setup_credits_granted(struct torture_context *tctx,
-					       struct smb2_tree *_tree)
+					       struct smb2cli_state *_cli)
 {
 	struct smbcli_options options;
 	struct smb2_transport *transport = NULL;
@@ -42,13 +42,13 @@ static bool test_session_setup_credits_granted(struct torture_context *tctx,
 	NTSTATUS status;
 	bool ret = true;
 
-	transport = _tree->session->transport;
+	transport = _cli->tree->session->transport;
 	options = transport->options;
 
-	status = smb2_logoff(_tree->session);
+	status = smb2_logoff(_cli->tree->session);
 	torture_assert_ntstatus_ok_goto(tctx, status, ret, done,
 					"smb2_logoff failed\n");
-	TALLOC_FREE(_tree);
+	TALLOC_FREE(_cli->tree);
 
 	options.max_credits = 65535;
 
@@ -78,7 +78,7 @@ done:
  * This passes against Windows 2016
  **/
 static bool test_single_req_credits_granted(struct torture_context *tctx,
-					    struct smb2_tree *_tree)
+					    struct smb2cli_state *_cli)
 {
 	struct smbcli_options options;
 	struct smb2_transport *transport = NULL;
@@ -90,15 +90,15 @@ static bool test_single_req_credits_granted(struct torture_context *tctx,
 	NTSTATUS status;
 	bool ret = true;
 
-	smb2_util_unlink(_tree, fname);
+	smb2_util_unlink(_cli->tree, fname);
 
-	transport = _tree->session->transport;
+	transport = _cli->tree->session->transport;
 	options = transport->options;
 
-	status = smb2_logoff(_tree->session);
+	status = smb2_logoff(_cli->tree->session);
 	torture_assert_ntstatus_ok_goto(tctx, status, ret, done,
 					"smb2_logoff failed\n");
-	TALLOC_FREE(_tree);
+	TALLOC_FREE(_cli->tree);
 
 	options.max_credits = 1;
 
@@ -150,7 +150,7 @@ done:
 }
 
 static bool test_crediting_skipped_mid(struct torture_context *tctx,
-				       struct smb2_tree *_tree)
+				       struct smb2cli_state *_cli)
 {
 	struct smbcli_options options;
 	struct smb2_transport *transport = NULL;
@@ -164,14 +164,14 @@ static bool test_crediting_skipped_mid(struct torture_context *tctx,
 	bool ret = true;
 	int i;
 
-	smb2_util_unlink(_tree, fname);
+	smb2_util_unlink(_cli->tree, fname);
 
-	transport = _tree->session->transport;
+	transport = _cli->tree->session->transport;
 	options = transport->options;
 
-	status = smb2_logoff(_tree->session);
+	status = smb2_logoff(_cli->tree->session);
 	torture_assert_ntstatus_ok_goto(tctx, status, ret, done, "smb2_logoff failed\n");
-	TALLOC_FREE(_tree);
+	TALLOC_FREE(_cli->tree);
 
 	options.max_credits = 8192;
 

@@ -48,7 +48,7 @@
 	union smb_fileinfo _q; \
 	_q.access_information.level = RAW_FILEINFO_ACCESS_INFORMATION; \
 	_q.access_information.in.file.handle = (_fh); \
-	status = smb2_getinfo_file(tree, tctx, &_q); \
+	status = smb2_getinfo_file(cli->tree, tctx, &_q); \
 	CHECK_STATUS(status, NT_STATUS_OK); \
 	/* Handle a Vista bug where SEC_STD_SYNCHRONIZE doesn't come back. */ \
 	if ((((flags) & CHECK_ACCESS_IGNORE) == CHECK_ACCESS_IGNORE) && \
@@ -93,7 +93,7 @@
   mapping bits
   Note: This test was copied from raw/acls.c.
 */
-static bool test_creator_sid(struct torture_context *tctx, struct smb2_tree *tree)
+static bool test_creator_sid(struct torture_context *tctx, struct smb2cli_state *cli)
 {
 	NTSTATUS status;
 	struct smb2_create io;
@@ -105,7 +105,7 @@ static bool test_creator_sid(struct torture_context *tctx, struct smb2_tree *tre
 	struct security_descriptor *sd, *sd_orig, *sd2;
 	const char *owner_sid;
 
-	if (!smb2_util_setup_dir(tctx, tree, BASEDIR))
+	if (!smb2_util_setup_dir(tctx, cli->tree, BASEDIR))
 		return false;
 
 	torture_comment(tctx, "TESTING SID_CREATOR_OWNER\n");
@@ -125,7 +125,7 @@ static bool test_creator_sid(struct torture_context *tctx, struct smb2_tree *tre
 	io.in.security_flags = 0;
 	io.in.fname = fname;
 
-	status = smb2_create(tree, tctx, &io);
+	status = smb2_create(cli->tree, tctx, &io);
 	CHECK_STATUS(status, NT_STATUS_OK);
 	handle = io.out.file.handle;
 
@@ -133,7 +133,7 @@ static bool test_creator_sid(struct torture_context *tctx, struct smb2_tree *tre
 	q.query_secdesc.level = RAW_FILEINFO_SEC_DESC;
 	q.query_secdesc.in.file.handle = handle;
 	q.query_secdesc.in.secinfo_flags = SECINFO_DACL | SECINFO_OWNER;
-	status = smb2_getinfo_file(tree, tctx, &q);
+	status = smb2_getinfo_file(cli->tree, tctx, &q);
 	CHECK_STATUS(status, NT_STATUS_OK);
 	sd_orig = q.query_secdesc.out.sd;
 
@@ -153,27 +153,27 @@ static bool test_creator_sid(struct torture_context *tctx, struct smb2_tree *tre
 	set.set_secdesc.in.secinfo_flags = SECINFO_DACL;
 	set.set_secdesc.in.sd = sd;
 
-	status = smb2_setinfo_file(tree, &set);
+	status = smb2_setinfo_file(cli->tree, &set);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	torture_comment(tctx, "try open for write\n");
 	io.in.desired_access = SEC_FILE_WRITE_DATA;
-	status = smb2_create(tree, tctx, &io);
+	status = smb2_create(cli->tree, tctx, &io);
 	CHECK_STATUS(status, NT_STATUS_ACCESS_DENIED);
 
 	torture_comment(tctx, "try open for read\n");
 	io.in.desired_access = SEC_FILE_READ_DATA;
-	status = smb2_create(tree, tctx, &io);
+	status = smb2_create(cli->tree, tctx, &io);
 	CHECK_STATUS(status, NT_STATUS_ACCESS_DENIED);
 
 	torture_comment(tctx, "try open for generic write\n");
 	io.in.desired_access = SEC_GENERIC_WRITE;
-	status = smb2_create(tree, tctx, &io);
+	status = smb2_create(cli->tree, tctx, &io);
 	CHECK_STATUS(status, NT_STATUS_ACCESS_DENIED);
 
 	torture_comment(tctx, "try open for generic read\n");
 	io.in.desired_access = SEC_GENERIC_READ;
-	status = smb2_create(tree, tctx, &io);
+	status = smb2_create(cli->tree, tctx, &io);
 	CHECK_STATUS(status, NT_STATUS_ACCESS_DENIED);
 
 	torture_comment(tctx, "set a sec desc allowing no write by owner\n");
@@ -189,39 +189,39 @@ static bool test_creator_sid(struct torture_context *tctx, struct smb2_tree *tre
 	set.set_secdesc.in.file.handle = handle;
 	set.set_secdesc.in.secinfo_flags = SECINFO_DACL;
 	set.set_secdesc.in.sd = sd;
-	status = smb2_setinfo_file(tree, &set);
+	status = smb2_setinfo_file(cli->tree, &set);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	torture_comment(tctx, "check that sd has been mapped correctly\n");
-	status = smb2_getinfo_file(tree, tctx, &q);
+	status = smb2_getinfo_file(cli->tree, tctx, &q);
 	CHECK_STATUS(status, NT_STATUS_OK);
 	CHECK_SECURITY_DESCRIPTOR(q.query_secdesc.out.sd, sd);
 
 	torture_comment(tctx, "try open for write\n");
 	io.in.desired_access = SEC_FILE_WRITE_DATA;
-	status = smb2_create(tree, tctx, &io);
+	status = smb2_create(cli->tree, tctx, &io);
 	CHECK_STATUS(status, NT_STATUS_ACCESS_DENIED);
 
 	torture_comment(tctx, "try open for read\n");
 	io.in.desired_access = SEC_FILE_READ_DATA;
-	status = smb2_create(tree, tctx, &io);
+	status = smb2_create(cli->tree, tctx, &io);
 	CHECK_STATUS(status, NT_STATUS_OK);
 	CHECK_ACCESS_FLAGS(io.out.file.handle,
 			   SEC_FILE_READ_DATA);
-	smb2_util_close(tree, io.out.file.handle);
+	smb2_util_close(cli->tree, io.out.file.handle);
 
 	torture_comment(tctx, "try open for generic write\n");
 	io.in.desired_access = SEC_GENERIC_WRITE;
-	status = smb2_create(tree, tctx, &io);
+	status = smb2_create(cli->tree, tctx, &io);
 	CHECK_STATUS(status, NT_STATUS_ACCESS_DENIED);
 
 	torture_comment(tctx, "try open for generic read\n");
 	io.in.desired_access = SEC_GENERIC_READ;
-	status = smb2_create(tree, tctx, &io);
+	status = smb2_create(cli->tree, tctx, &io);
 	CHECK_STATUS(status, NT_STATUS_OK);
 	CHECK_ACCESS_FLAGS(io.out.file.handle,
 			   SEC_RIGHTS_FILE_READ);
-	smb2_util_close(tree, io.out.file.handle);
+	smb2_util_close(cli->tree, io.out.file.handle);
 
 	torture_comment(tctx, "set a sec desc allowing generic read by owner\n");
 	sd = security_descriptor_dacl_create(tctx,
@@ -233,7 +233,7 @@ static bool test_creator_sid(struct torture_context *tctx, struct smb2_tree *tre
 					NULL);
 
 	set.set_secdesc.in.sd = sd;
-	status = smb2_setinfo_file(tree, &set);
+	status = smb2_setinfo_file(cli->tree, &set);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	torture_comment(tctx, "check that generic read has been mapped correctly\n");
@@ -245,47 +245,47 @@ static bool test_creator_sid(struct torture_context *tctx, struct smb2_tree *tre
 					 0,
 					 NULL);
 
-	status = smb2_getinfo_file(tree, tctx, &q);
+	status = smb2_getinfo_file(cli->tree, tctx, &q);
 	CHECK_STATUS(status, NT_STATUS_OK);
 	CHECK_SECURITY_DESCRIPTOR(q.query_secdesc.out.sd, sd2);
 
 	torture_comment(tctx, "try open for write\n");
 	io.in.desired_access = SEC_FILE_WRITE_DATA;
-	status = smb2_create(tree, tctx, &io);
+	status = smb2_create(cli->tree, tctx, &io);
 	CHECK_STATUS(status, NT_STATUS_ACCESS_DENIED);
 
 	torture_comment(tctx, "try open for read\n");
 	io.in.desired_access = SEC_FILE_READ_DATA;
-	status = smb2_create(tree, tctx, &io);
+	status = smb2_create(cli->tree, tctx, &io);
 	CHECK_STATUS(status, NT_STATUS_OK);
 	CHECK_ACCESS_FLAGS(io.out.file.handle,
 			   SEC_FILE_READ_DATA);
-	smb2_util_close(tree, io.out.file.handle);
+	smb2_util_close(cli->tree, io.out.file.handle);
 
 	torture_comment(tctx, "try open for generic write\n");
 	io.in.desired_access = SEC_GENERIC_WRITE;
-	status = smb2_create(tree, tctx, &io);
+	status = smb2_create(cli->tree, tctx, &io);
 	CHECK_STATUS(status, NT_STATUS_ACCESS_DENIED);
 
 	torture_comment(tctx, "try open for generic read\n");
 	io.in.desired_access = SEC_GENERIC_READ;
-	status = smb2_create(tree, tctx, &io);
+	status = smb2_create(cli->tree, tctx, &io);
 	CHECK_STATUS(status, NT_STATUS_OK);
 	CHECK_ACCESS_FLAGS(io.out.file.handle, SEC_RIGHTS_FILE_READ);
-	smb2_util_close(tree, io.out.file.handle);
+	smb2_util_close(cli->tree, io.out.file.handle);
 
 
 	torture_comment(tctx, "put back original sd\n");
 	set.set_secdesc.in.sd = sd_orig;
-	status = smb2_setinfo_file(tree, &set);
+	status = smb2_setinfo_file(cli->tree, &set);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 
 done:
-	smb2_util_close(tree, handle);
-	smb2_deltree(tree, BASEDIR);
-	smb2_tdis(tree);
-	smb2_logoff(tree->session);
+	smb2_util_close(cli->tree, handle);
+	smb2_deltree(cli->tree, BASEDIR);
+	smb2_tdis(cli->tree);
+	smb2_logoff(cli->tree->session);
 	return ret;
 }
 
@@ -295,7 +295,7 @@ done:
   SEC_FILE_xx bits
   Note: This test was copied from raw/acls.c.
 */
-static bool test_generic_bits(struct torture_context *tctx, struct smb2_tree *tree)
+static bool test_generic_bits(struct torture_context *tctx, struct smb2cli_state *cli)
 {
 	NTSTATUS status;
 	struct smb2_create io;
@@ -332,7 +332,7 @@ static bool test_generic_bits(struct torture_context *tctx, struct smb2_tree *tr
 	bool has_restore_privilege = false;
 	bool has_take_ownership_privilege = false;
 
-	if (!smb2_util_setup_dir(tctx, tree, BASEDIR))
+	if (!smb2_util_setup_dir(tctx, cli->tree, BASEDIR))
 		return false;
 
 	torture_comment(tctx, "TESTING FILE GENERIC BITS\n");
@@ -354,7 +354,7 @@ static bool test_generic_bits(struct torture_context *tctx, struct smb2_tree *tr
 	io.in.impersonation_level = NTCREATEX_IMPERSONATION_ANONYMOUS;
 	io.in.security_flags = 0;
 	io.in.fname = fname;
-	status = smb2_create(tree, tctx, &io);
+	status = smb2_create(cli->tree, tctx, &io);
 	CHECK_STATUS(status, NT_STATUS_OK);
 	handle = io.out.file.handle;
 
@@ -362,7 +362,7 @@ static bool test_generic_bits(struct torture_context *tctx, struct smb2_tree *tr
 	q.query_secdesc.level = RAW_FILEINFO_SEC_DESC;
 	q.query_secdesc.in.file.handle = handle;
 	q.query_secdesc.in.secinfo_flags = SECINFO_DACL | SECINFO_OWNER;
-	status = smb2_getinfo_file(tree, tctx, &q);
+	status = smb2_getinfo_file(cli->tree, tctx, &q);
 	CHECK_STATUS(status, NT_STATUS_OK);
 	sd_orig = q.query_secdesc.out.sd;
 
@@ -419,7 +419,7 @@ static bool test_generic_bits(struct torture_context *tctx, struct smb2_tree *tr
 		set.set_secdesc.in.secinfo_flags = SECINFO_DACL | SECINFO_OWNER;
 		set.set_secdesc.in.sd = sd;
 
-		status = smb2_setinfo_file(tree, &set);
+		status = smb2_setinfo_file(cli->tree, &set);
 		CHECK_STATUS(status, NT_STATUS_OK);
 
 		sd2 = security_descriptor_dacl_create(tctx,
@@ -430,16 +430,16 @@ static bool test_generic_bits(struct torture_context *tctx, struct smb2_tree *tr
 						 0,
 						 NULL);
 
-		status = smb2_getinfo_file(tree, tctx, &q);
+		status = smb2_getinfo_file(cli->tree, tctx, &q);
 		CHECK_STATUS(status, NT_STATUS_OK);
 		CHECK_SECURITY_DESCRIPTOR(q.query_secdesc.out.sd, sd2);
 
 		io.in.desired_access = SEC_FLAG_MAXIMUM_ALLOWED;
-		status = smb2_create(tree, tctx, &io);
+		status = smb2_create(cli->tree, tctx, &io);
 		CHECK_STATUS(status, NT_STATUS_OK);
 		CHECK_ACCESS_FLAGS(io.out.file.handle,
 				   expected_mask | file_mappings[i].specific_bits);
-		smb2_util_close(tree, io.out.file.handle);
+		smb2_util_close(cli->tree, io.out.file.handle);
 
 		if (!has_take_ownership_privilege) {
 			continue;
@@ -460,7 +460,7 @@ static bool test_generic_bits(struct torture_context *tctx, struct smb2_tree *tr
 		set.set_secdesc.in.secinfo_flags = SECINFO_DACL | SECINFO_OWNER;
 		set.set_secdesc.in.sd = sd;
 
-		status = smb2_setinfo_file(tree, &set);
+		status = smb2_setinfo_file(cli->tree, &set);
 		CHECK_STATUS(status, NT_STATUS_OK);
 
 		sd2 = security_descriptor_dacl_create(tctx,
@@ -471,25 +471,25 @@ static bool test_generic_bits(struct torture_context *tctx, struct smb2_tree *tr
 						 0,
 						 NULL);
 
-		status = smb2_getinfo_file(tree, tctx, &q);
+		status = smb2_getinfo_file(cli->tree, tctx, &q);
 		CHECK_STATUS(status, NT_STATUS_OK);
 		CHECK_SECURITY_DESCRIPTOR(q.query_secdesc.out.sd, sd2);
 
 		io.in.desired_access = SEC_FLAG_MAXIMUM_ALLOWED;
-		status = smb2_create(tree, tctx, &io);
+		status = smb2_create(cli->tree, tctx, &io);
 		CHECK_STATUS(status, NT_STATUS_OK);
 		CHECK_ACCESS_FLAGS(io.out.file.handle,
 				   expected_mask_anon | file_mappings[i].specific_bits);
-		smb2_util_close(tree, io.out.file.handle);
+		smb2_util_close(cli->tree, io.out.file.handle);
 	}
 
 	torture_comment(tctx, "put back original sd\n");
 	set.set_secdesc.in.sd = sd_orig;
-	status = smb2_setinfo_file(tree, &set);
+	status = smb2_setinfo_file(cli->tree, &set);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
-	smb2_util_close(tree, handle);
-	smb2_util_unlink(tree, fname);
+	smb2_util_close(cli->tree, handle);
+	smb2_util_unlink(cli->tree, fname);
 
 
 	torture_comment(tctx, "TESTING DIR GENERIC BITS\n");
@@ -511,7 +511,7 @@ static bool test_generic_bits(struct torture_context *tctx, struct smb2_tree *tr
 	io.in.impersonation_level = NTCREATEX_IMPERSONATION_ANONYMOUS;
 	io.in.security_flags = 0;
 	io.in.fname = fname;
-	status = smb2_create(tree, tctx, &io);
+	status = smb2_create(cli->tree, tctx, &io);
 	CHECK_STATUS(status, NT_STATUS_OK);
 	handle = io.out.file.handle;
 
@@ -519,7 +519,7 @@ static bool test_generic_bits(struct torture_context *tctx, struct smb2_tree *tr
 	q.query_secdesc.level = RAW_FILEINFO_SEC_DESC;
 	q.query_secdesc.in.file.handle = handle;
 	q.query_secdesc.in.secinfo_flags = SECINFO_DACL | SECINFO_OWNER;
-	status = smb2_getinfo_file(tree, tctx, &q);
+	status = smb2_getinfo_file(cli->tree, tctx, &q);
 	CHECK_STATUS(status, NT_STATUS_OK);
 	sd_orig = q.query_secdesc.out.sd;
 
@@ -576,7 +576,7 @@ static bool test_generic_bits(struct torture_context *tctx, struct smb2_tree *tr
 		set.set_secdesc.in.secinfo_flags = SECINFO_DACL | SECINFO_OWNER;
 		set.set_secdesc.in.sd = sd;
 
-		status = smb2_setinfo_file(tree, &set);
+		status = smb2_setinfo_file(cli->tree, &set);
 		CHECK_STATUS(status, NT_STATUS_OK);
 
 		sd2 = security_descriptor_dacl_create(tctx,
@@ -587,16 +587,16 @@ static bool test_generic_bits(struct torture_context *tctx, struct smb2_tree *tr
 						 0,
 						 NULL);
 
-		status = smb2_getinfo_file(tree, tctx, &q);
+		status = smb2_getinfo_file(cli->tree, tctx, &q);
 		CHECK_STATUS(status, NT_STATUS_OK);
 		CHECK_SECURITY_DESCRIPTOR(q.query_secdesc.out.sd, sd2);
 
 		io.in.desired_access = SEC_FLAG_MAXIMUM_ALLOWED;
-		status = smb2_create(tree, tctx, &io);
+		status = smb2_create(cli->tree, tctx, &io);
 		CHECK_STATUS(status, NT_STATUS_OK);
 		CHECK_ACCESS_FLAGS(io.out.file.handle,
 				   expected_mask | dir_mappings[i].specific_bits);
-		smb2_util_close(tree, io.out.file.handle);
+		smb2_util_close(cli->tree, io.out.file.handle);
 
 		if (!has_take_ownership_privilege) {
 			continue;
@@ -617,7 +617,7 @@ static bool test_generic_bits(struct torture_context *tctx, struct smb2_tree *tr
 		set.set_secdesc.in.secinfo_flags = SECINFO_DACL | SECINFO_OWNER;
 		set.set_secdesc.in.sd = sd;
 
-		status = smb2_setinfo_file(tree, &set);
+		status = smb2_setinfo_file(cli->tree, &set);
 		CHECK_STATUS(status, NT_STATUS_OK);
 
 		sd2 = security_descriptor_dacl_create(tctx,
@@ -628,31 +628,31 @@ static bool test_generic_bits(struct torture_context *tctx, struct smb2_tree *tr
 						 0,
 						 NULL);
 
-		status = smb2_getinfo_file(tree, tctx, &q);
+		status = smb2_getinfo_file(cli->tree, tctx, &q);
 		CHECK_STATUS(status, NT_STATUS_OK);
 		CHECK_SECURITY_DESCRIPTOR(q.query_secdesc.out.sd, sd2);
 
 		io.in.desired_access = SEC_FLAG_MAXIMUM_ALLOWED;
-		status = smb2_create(tree, tctx, &io);
+		status = smb2_create(cli->tree, tctx, &io);
 		CHECK_STATUS(status, NT_STATUS_OK);
 		CHECK_ACCESS_FLAGS(io.out.file.handle,
 				   expected_mask_anon | dir_mappings[i].specific_bits);
-		smb2_util_close(tree, io.out.file.handle);
+		smb2_util_close(cli->tree, io.out.file.handle);
 	}
 
 	torture_comment(tctx, "put back original sd\n");
 	set.set_secdesc.in.sd = sd_orig;
-	status = smb2_setinfo_file(tree, &set);
+	status = smb2_setinfo_file(cli->tree, &set);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
-	smb2_util_close(tree, handle);
-	smb2_util_unlink(tree, fname);
+	smb2_util_close(cli->tree, handle);
+	smb2_util_unlink(cli->tree, fname);
 
 done:
-	smb2_util_close(tree, handle);
-	smb2_deltree(tree, BASEDIR);
-	smb2_tdis(tree);
-	smb2_logoff(tree->session);
+	smb2_util_close(cli->tree, handle);
+	smb2_deltree(cli->tree, BASEDIR);
+	smb2_tdis(cli->tree);
+	smb2_logoff(cli->tree->session);
 	return ret;
 }
 
@@ -661,7 +661,7 @@ done:
   see what access bits the owner of a file always gets
   Note: This test was copied from raw/acls.c.
 */
-static bool test_owner_bits(struct torture_context *tctx, struct smb2_tree *tree)
+static bool test_owner_bits(struct torture_context *tctx, struct smb2cli_state *cli)
 {
 	NTSTATUS status;
 	struct smb2_create io;
@@ -675,7 +675,7 @@ static bool test_owner_bits(struct torture_context *tctx, struct smb2_tree *tree
 	const char *owner_sid;
 	uint32_t expected_bits;
 
-	if (!smb2_util_setup_dir(tctx, tree, BASEDIR))
+	if (!smb2_util_setup_dir(tctx, cli->tree, BASEDIR))
 		return false;
 
 	torture_comment(tctx, "TESTING FILE OWNER BITS\n");
@@ -697,7 +697,7 @@ static bool test_owner_bits(struct torture_context *tctx, struct smb2_tree *tree
 	io.in.impersonation_level = NTCREATEX_IMPERSONATION_ANONYMOUS;
 	io.in.security_flags = 0;
 	io.in.fname = fname;
-	status = smb2_create(tree, tctx, &io);
+	status = smb2_create(cli->tree, tctx, &io);
 	CHECK_STATUS(status, NT_STATUS_OK);
 	handle = io.out.file.handle;
 
@@ -705,7 +705,7 @@ static bool test_owner_bits(struct torture_context *tctx, struct smb2_tree *tree
 	q.query_secdesc.level = RAW_FILEINFO_SEC_DESC;
 	q.query_secdesc.in.file.handle = handle;
 	q.query_secdesc.in.secinfo_flags = SECINFO_DACL | SECINFO_OWNER;
-	status = smb2_getinfo_file(tree, tctx, &q);
+	status = smb2_getinfo_file(cli->tree, tctx, &q);
 	CHECK_STATUS(status, NT_STATUS_OK);
 	sd_orig = q.query_secdesc.out.sd;
 
@@ -748,7 +748,7 @@ static bool test_owner_bits(struct torture_context *tctx, struct smb2_tree *tree
 	set.set_secdesc.in.secinfo_flags = SECINFO_DACL;
 	set.set_secdesc.in.sd = sd;
 
-	status = smb2_setinfo_file(tree, &set);
+	status = smb2_setinfo_file(cli->tree, &set);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	expected_bits = SEC_FILE_WRITE_DATA | SEC_FILE_READ_ATTRIBUTE;
@@ -756,7 +756,7 @@ static bool test_owner_bits(struct torture_context *tctx, struct smb2_tree *tree
 	for (i=0;i<16;i++) {
 		uint32_t bit = (1<<i);
 		io.in.desired_access = bit;
-		status = smb2_create(tree, tctx, &io);
+		status = smb2_create(cli->tree, tctx, &io);
 		if (expected_bits & bit) {
 			if (!NT_STATUS_IS_OK(status)) {
 				torture_warning(tctx, "failed with access mask 0x%08x of expected 0x%08x\n",
@@ -764,7 +764,7 @@ static bool test_owner_bits(struct torture_context *tctx, struct smb2_tree *tree
 			}
 			CHECK_STATUS(status, NT_STATUS_OK);
 			CHECK_ACCESS_FLAGS(io.out.file.handle, bit);
-			smb2_util_close(tree, io.out.file.handle);
+			smb2_util_close(cli->tree, io.out.file.handle);
 		} else {
 			if (NT_STATUS_IS_OK(status)) {
 				torture_warning(tctx, "open succeeded with access mask 0x%08x of "
@@ -777,15 +777,15 @@ static bool test_owner_bits(struct torture_context *tctx, struct smb2_tree *tree
 
 	torture_comment(tctx, "put back original sd\n");
 	set.set_secdesc.in.sd = sd_orig;
-	status = smb2_setinfo_file(tree, &set);
+	status = smb2_setinfo_file(cli->tree, &set);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 done:
-	smb2_util_close(tree, handle);
-	smb2_util_unlink(tree, fname);
-	smb2_deltree(tree, BASEDIR);
-	smb2_tdis(tree);
-	smb2_logoff(tree->session);
+	smb2_util_close(cli->tree, handle);
+	smb2_util_unlink(cli->tree, fname);
+	smb2_deltree(cli->tree, BASEDIR);
+	smb2_tdis(cli->tree);
+	smb2_logoff(cli->tree->session);
 	return ret;
 }
 
@@ -795,7 +795,7 @@ done:
   test the inheritance of ACL flags onto new files and directories
   Note: This test was copied from raw/acls.c.
 */
-static bool test_inheritance(struct torture_context *tctx, struct smb2_tree *tree)
+static bool test_inheritance(struct torture_context *tctx, struct smb2cli_state *cli)
 {
 	NTSTATUS status;
 	struct smb2_create io;
@@ -919,7 +919,7 @@ static bool test_inheritance(struct torture_context *tctx, struct smb2_tree *tre
 		}
 	};
 
-	if (!smb2_util_setup_dir(tctx, tree, BASEDIR))
+	if (!smb2_util_setup_dir(tctx, cli->tree, BASEDIR))
 		return false;
 
 	torture_comment(tctx, "TESTING ACL INHERITANCE\n");
@@ -937,7 +937,7 @@ static bool test_inheritance(struct torture_context *tctx, struct smb2_tree *tre
 	io.in.security_flags = 0;
 	io.in.fname = dname;
 
-	status = smb2_create(tree, tctx, &io);
+	status = smb2_create(cli->tree, tctx, &io);
 	CHECK_STATUS(status, NT_STATUS_OK);
 	handle = io.out.file.handle;
 
@@ -945,7 +945,7 @@ static bool test_inheritance(struct torture_context *tctx, struct smb2_tree *tre
 	q.query_secdesc.level = RAW_FILEINFO_SEC_DESC;
 	q.query_secdesc.in.file.handle = handle;
 	q.query_secdesc.in.secinfo_flags = SECINFO_DACL | SECINFO_OWNER;
-	status = smb2_getinfo_file(tree, tctx, &q);
+	status = smb2_getinfo_file(cli->tree, tctx, &q);
 	CHECK_STATUS(status, NT_STATUS_OK);
 	sd_orig = q.query_secdesc.out.sd;
 
@@ -999,21 +999,21 @@ static bool test_inheritance(struct torture_context *tctx, struct smb2_tree *tre
 		set.set_secdesc.in.file.handle = handle;
 		set.set_secdesc.in.secinfo_flags = SECINFO_DACL;
 		set.set_secdesc.in.sd = sd;
-		status = smb2_setinfo_file(tree, &set);
+		status = smb2_setinfo_file(cli->tree, &set);
 		CHECK_STATUS(status, NT_STATUS_OK);
 
 		io.in.fname = fname1;
 		io.in.create_options = 0;
-		status = smb2_create(tree, tctx, &io);
+		status = smb2_create(cli->tree, tctx, &io);
 		CHECK_STATUS(status, NT_STATUS_OK);
 		handle2 = io.out.file.handle;
 
 		q.query_secdesc.in.file.handle = handle2;
-		status = smb2_getinfo_file(tree, tctx, &q);
+		status = smb2_getinfo_file(cli->tree, tctx, &q);
 		CHECK_STATUS(status, NT_STATUS_OK);
 
-		smb2_util_close(tree, handle2);
-		smb2_util_unlink(tree, fname1);
+		smb2_util_close(cli->tree, handle2);
+		smb2_util_unlink(cli->tree, fname1);
 
 		if (!(test_flags[i].parent_flags & SEC_ACE_FLAG_OBJECT_INHERIT)) {
 			if (!security_descriptor_equal(q.query_secdesc.out.sd, sd_def1) &&
@@ -1050,16 +1050,16 @@ static bool test_inheritance(struct torture_context *tctx, struct smb2_tree *tre
 	check_dir:
 		io.in.fname = fname2;
 		io.in.create_options = NTCREATEX_OPTIONS_DIRECTORY;
-		status = smb2_create(tree, tctx, &io);
+		status = smb2_create(cli->tree, tctx, &io);
 		CHECK_STATUS(status, NT_STATUS_OK);
 		handle2 = io.out.file.handle;
 
 		q.query_secdesc.in.file.handle = handle2;
-		status = smb2_getinfo_file(tree, tctx, &q);
+		status = smb2_getinfo_file(cli->tree, tctx, &q);
 		CHECK_STATUS(status, NT_STATUS_OK);
 
-		smb2_util_close(tree, handle2);
-		smb2_util_rmdir(tree, fname2);
+		smb2_util_close(cli->tree, handle2);
+		smb2_util_rmdir(cli->tree, fname2);
 
 		if (!(test_flags[i].parent_flags & SEC_ACE_FLAG_CONTAINER_INHERIT) &&
 		    (!(test_flags[i].parent_flags & SEC_ACE_FLAG_OBJECT_INHERIT) ||
@@ -1147,14 +1147,14 @@ static bool test_inheritance(struct torture_context *tctx, struct smb2_tree *tre
 	set.set_secdesc.in.file.handle = handle;
 	set.set_secdesc.in.secinfo_flags = SECINFO_DACL;
 	set.set_secdesc.in.sd = sd;
-	status = smb2_setinfo_file(tree, &set);
+	status = smb2_setinfo_file(cli->tree, &set);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	/* Check DACL we just set. */
 	torture_comment(tctx, "checking new sd\n");
 	q.query_secdesc.in.file.handle = handle;
 	q.query_secdesc.in.secinfo_flags = SECINFO_DACL;
-	status = smb2_getinfo_file(tree, tctx, &q);
+	status = smb2_getinfo_file(cli->tree, tctx, &q);
 	CHECK_STATUS(status, NT_STATUS_OK);
 	CHECK_SECURITY_DESCRIPTOR(q.query_secdesc.out.sd, sd);
 
@@ -1162,16 +1162,16 @@ static bool test_inheritance(struct torture_context *tctx, struct smb2_tree *tre
 	io.in.create_options = 0;
 	io.in.desired_access = SEC_RIGHTS_FILE_ALL;
 	io.in.create_disposition = NTCREATEX_DISP_CREATE;
-	status = smb2_create(tree, tctx, &io);
+	status = smb2_create(cli->tree, tctx, &io);
 	CHECK_STATUS(status, NT_STATUS_OK);
 	handle2 = io.out.file.handle;
 	CHECK_ACCESS_FLAGS(handle2, SEC_RIGHTS_FILE_ALL);
 
 	q.query_secdesc.in.file.handle = handle2;
 	q.query_secdesc.in.secinfo_flags = SECINFO_DACL | SECINFO_OWNER;
-	status = smb2_getinfo_file(tree, tctx, &q);
+	status = smb2_getinfo_file(cli->tree, tctx, &q);
 	CHECK_STATUS(status, NT_STATUS_OK);
-	smb2_util_close(tree, handle2);
+	smb2_util_close(cli->tree, handle2);
 
 	sd2 = security_descriptor_dacl_create(tctx,
 					 0, owner_sid, NULL,
@@ -1184,13 +1184,13 @@ static bool test_inheritance(struct torture_context *tctx, struct smb2_tree *tre
 
 	io.in.create_disposition = NTCREATEX_DISP_OPEN;
 	io.in.desired_access = SEC_RIGHTS_FILE_ALL;
-	status = smb2_create(tree, tctx, &io);
+	status = smb2_create(cli->tree, tctx, &io);
 	if (NT_STATUS_IS_OK(status)) {
 		torture_warning(tctx, "failed: w2k3 ACL bug (allowed open when ACL should deny)\n");
 		ret = false;
 		handle2 = io.out.file.handle;
 		CHECK_ACCESS_FLAGS(handle2, SEC_RIGHTS_FILE_ALL);
-		smb2_util_close(tree, handle2);
+		smb2_util_close(cli->tree, handle2);
 	} else {
 		if (torture_setting_bool(tctx, "hide_on_access_denied",
 					 false)) {
@@ -1203,7 +1203,7 @@ static bool test_inheritance(struct torture_context *tctx, struct smb2_tree *tre
 	torture_comment(tctx, "trying without execute\n");
 	io.in.create_disposition = NTCREATEX_DISP_OPEN;
 	io.in.desired_access = SEC_RIGHTS_FILE_ALL & ~SEC_FILE_EXECUTE;
-	status = smb2_create(tree, tctx, &io);
+	status = smb2_create(cli->tree, tctx, &io);
 	if (torture_setting_bool(tctx, "hide_on_access_denied", false)) {
 		CHECK_STATUS(status, NT_STATUS_OBJECT_NAME_NOT_FOUND);
 	} else {
@@ -1213,7 +1213,7 @@ static bool test_inheritance(struct torture_context *tctx, struct smb2_tree *tre
 	torture_comment(tctx, "and with full permissions again\n");
 	io.in.create_disposition = NTCREATEX_DISP_OPEN;
 	io.in.desired_access = SEC_RIGHTS_FILE_ALL;
-	status = smb2_create(tree, tctx, &io);
+	status = smb2_create(cli->tree, tctx, &io);
 	if (torture_setting_bool(tctx, "hide_on_access_denied", false)) {
 		CHECK_STATUS(status, NT_STATUS_OBJECT_NAME_NOT_FOUND);
 	} else {
@@ -1221,24 +1221,24 @@ static bool test_inheritance(struct torture_context *tctx, struct smb2_tree *tre
 	}
 
 	io.in.desired_access = SEC_FILE_WRITE_DATA;
-	status = smb2_create(tree, tctx, &io);
+	status = smb2_create(cli->tree, tctx, &io);
 	CHECK_STATUS(status, NT_STATUS_OK);
 	handle2 = io.out.file.handle;
 	CHECK_ACCESS_FLAGS(handle2, SEC_FILE_WRITE_DATA);
-	smb2_util_close(tree, handle2);
+	smb2_util_close(cli->tree, handle2);
 
 	torture_comment(tctx, "put back original sd\n");
 	set.set_secdesc.level = RAW_SFILEINFO_SEC_DESC;
 	set.set_secdesc.in.file.handle = handle;
 	set.set_secdesc.in.secinfo_flags = SECINFO_DACL;
 	set.set_secdesc.in.sd = sd_orig;
-	status = smb2_setinfo_file(tree, &set);
+	status = smb2_setinfo_file(cli->tree, &set);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
-	smb2_util_close(tree, handle);
+	smb2_util_close(cli->tree, handle);
 
 	io.in.desired_access = SEC_RIGHTS_FILE_ALL;
-	status = smb2_create(tree, tctx, &io);
+	status = smb2_create(cli->tree, tctx, &io);
 	if (torture_setting_bool(tctx, "hide_on_access_denied", false)) {
 		CHECK_STATUS(status, NT_STATUS_OBJECT_NAME_NOT_FOUND);
 	} else {
@@ -1246,14 +1246,14 @@ static bool test_inheritance(struct torture_context *tctx, struct smb2_tree *tre
 	}
 
 	io.in.desired_access = SEC_FILE_WRITE_DATA;
-	status = smb2_create(tree, tctx, &io);
+	status = smb2_create(cli->tree, tctx, &io);
 	CHECK_STATUS(status, NT_STATUS_OK);
 	handle2 = io.out.file.handle;
 	CHECK_ACCESS_FLAGS(handle2, SEC_FILE_WRITE_DATA);
-	smb2_util_close(tree, handle2);
+	smb2_util_close(cli->tree, handle2);
 
-	smb2_util_unlink(tree, fname1);
-	smb2_util_rmdir(tree, dname);
+	smb2_util_unlink(cli->tree, fname1);
+	smb2_util_rmdir(cli->tree, dname);
 
 done:
 	if (sd_orig != NULL) {
@@ -1261,18 +1261,18 @@ done:
 		set.set_secdesc.in.file.handle = handle;
 		set.set_secdesc.in.secinfo_flags = SECINFO_DACL;
 		set.set_secdesc.in.sd = sd_orig;
-		status = smb2_setinfo_file(tree, &set);
+		status = smb2_setinfo_file(cli->tree, &set);
 	}
 
-	smb2_util_close(tree, handle);
-	smb2_deltree(tree, BASEDIR);
-	smb2_tdis(tree);
-	smb2_logoff(tree->session);
+	smb2_util_close(cli->tree, handle);
+	smb2_deltree(cli->tree, BASEDIR);
+	smb2_tdis(cli->tree);
+	smb2_logoff(cli->tree->session);
 	return ret;
 }
 
 static bool test_inheritance_flags(struct torture_context *tctx,
-    struct smb2_tree *tree)
+    struct smb2cli_state *cli)
 {
 	NTSTATUS status;
 	struct smb2_create io;
@@ -1345,7 +1345,7 @@ static bool test_inheritance_flags(struct torture_context *tctx,
 		torture_comment(tctx, "\n");
 	}
 
-	if (!smb2_util_setup_dir(tctx, tree, BASEDIR))
+	if (!smb2_util_setup_dir(tctx, cli->tree, BASEDIR))
 		return false;
 
 	torture_comment(tctx, "TESTING ACL INHERITANCE FLAGS\n");
@@ -1364,7 +1364,7 @@ static bool test_inheritance_flags(struct torture_context *tctx,
 	io.in.fname = dname;
 
 	torture_comment(tctx, "creating initial directory %s\n", dname);
-	status = smb2_create(tree, tctx, &io);
+	status = smb2_create(cli->tree, tctx, &io);
 	CHECK_STATUS(status, NT_STATUS_OK);
 	handle = io.out.file.handle;
 
@@ -1372,7 +1372,7 @@ static bool test_inheritance_flags(struct torture_context *tctx,
 	q.query_secdesc.level = RAW_FILEINFO_SEC_DESC;
 	q.query_secdesc.in.file.handle = handle;
 	q.query_secdesc.in.secinfo_flags = SECINFO_DACL | SECINFO_OWNER;
-	status = smb2_getinfo_file(tree, tctx, &q);
+	status = smb2_getinfo_file(cli->tree, tctx, &q);
 	CHECK_STATUS(status, NT_STATUS_OK);
 	sd_orig = q.query_secdesc.out.sd;
 
@@ -1400,7 +1400,7 @@ static bool test_inheritance_flags(struct torture_context *tctx,
 		set.set_secdesc.in.file.handle = handle;
 		set.set_secdesc.in.secinfo_flags = SECINFO_DACL;
 		set.set_secdesc.in.sd = sd;
-		status = smb2_setinfo_file(tree, &set);
+		status = smb2_setinfo_file(cli->tree, &set);
 		CHECK_STATUS(status, NT_STATUS_OK);
 
 		/*
@@ -1417,7 +1417,7 @@ static bool test_inheritance_flags(struct torture_context *tctx,
 
 		q.query_secdesc.in.file.handle = handle;
 		q.query_secdesc.in.secinfo_flags = SECINFO_DACL;
-		status = smb2_getinfo_file(tree, tctx, &q);
+		status = smb2_getinfo_file(cli->tree, tctx, &q);
 		CHECK_STATUS(status, NT_STATUS_OK);
 		CHECK_SECURITY_DESCRIPTOR(q.query_secdesc.out.sd, sd);
 
@@ -1428,14 +1428,14 @@ static bool test_inheritance_flags(struct torture_context *tctx,
 		io.in.file_attributes = FILE_ATTRIBUTE_NORMAL;
 		io.in.desired_access = SEC_RIGHTS_FILE_ALL;
 		io.in.create_disposition = NTCREATEX_DISP_CREATE;
-		status = smb2_create(tree, tctx, &io);
+		status = smb2_create(cli->tree, tctx, &io);
 		CHECK_STATUS(status, NT_STATUS_OK);
 		handle2 = io.out.file.handle;
 		CHECK_ACCESS_FLAGS(handle2, SEC_RIGHTS_FILE_ALL);
 
 		q.query_secdesc.in.file.handle = handle2;
 		q.query_secdesc.in.secinfo_flags = SECINFO_DACL | SECINFO_OWNER;
-		status = smb2_getinfo_file(tree, tctx, &q);
+		status = smb2_getinfo_file(cli->tree, tctx, &q);
 		CHECK_STATUS(status, NT_STATUS_OK);
 
 		torture_comment(tctx, "  checking sd on file %s\n", fname1);
@@ -1472,7 +1472,7 @@ static bool test_inheritance_flags(struct torture_context *tctx,
 			set.set_secdesc.in.file.handle = handle2;
 			set.set_secdesc.in.secinfo_flags = SECINFO_DACL;
 			set.set_secdesc.in.sd = sd2;
-			status = smb2_setinfo_file(tree, &set);
+			status = smb2_setinfo_file(cli->tree, &set);
 			CHECK_STATUS(status, NT_STATUS_OK);
 
 			/* Check DACL we just set. */
@@ -1482,21 +1482,21 @@ static bool test_inheritance_flags(struct torture_context *tctx,
 
 			q.query_secdesc.in.file.handle = handle2;
 			q.query_secdesc.in.secinfo_flags = SECINFO_DACL | SECINFO_OWNER;
-			status = smb2_getinfo_file(tree, tctx, &q);
+			status = smb2_getinfo_file(cli->tree, tctx, &q);
 			CHECK_STATUS(status, NT_STATUS_OK);
 
 			CHECK_SECURITY_DESCRIPTOR(q.query_secdesc.out.sd, sd2);
 		}
 
-		smb2_util_close(tree, handle2);
-		smb2_util_unlink(tree, fname1);
+		smb2_util_close(cli->tree, handle2);
+		smb2_util_unlink(cli->tree, fname1);
 	}
 
 done:
-	smb2_util_close(tree, handle);
-	smb2_deltree(tree, BASEDIR);
-	smb2_tdis(tree);
-	smb2_logoff(tree->session);
+	smb2_util_close(cli->tree, handle);
+	smb2_deltree(cli->tree, BASEDIR);
+	smb2_tdis(cli->tree);
+	smb2_logoff(cli->tree->session);
 	return ret;
 }
 
@@ -1506,7 +1506,7 @@ done:
  * flags are not altered.
  */
 static bool test_sd_flags_vs_chown(struct torture_context *tctx,
-				   struct smb2_tree *tree)
+				   struct smb2cli_state *cli)
 {
 	NTSTATUS status;
 	struct smb2_create io;
@@ -1590,7 +1590,7 @@ static bool test_sd_flags_vs_chown(struct torture_context *tctx,
 		torture_comment(tctx, "\n");
 	}
 
-	if (!smb2_util_setup_dir(tctx, tree, BASEDIR))
+	if (!smb2_util_setup_dir(tctx, cli->tree, BASEDIR))
 		return false;
 
 	torture_comment(tctx, "TESTING ACL INHERITANCE FLAGS\n");
@@ -1609,7 +1609,7 @@ static bool test_sd_flags_vs_chown(struct torture_context *tctx,
 	io.in.fname = dname;
 
 	torture_comment(tctx, "creating initial directory %s\n", dname);
-	status = smb2_create(tree, tctx, &io);
+	status = smb2_create(cli->tree, tctx, &io);
 	CHECK_STATUS(status, NT_STATUS_OK);
 	handle = io.out.file.handle;
 
@@ -1617,7 +1617,7 @@ static bool test_sd_flags_vs_chown(struct torture_context *tctx,
 	q.query_secdesc.level = RAW_FILEINFO_SEC_DESC;
 	q.query_secdesc.in.file.handle = handle;
 	q.query_secdesc.in.secinfo_flags = SECINFO_DACL | SECINFO_OWNER;
-	status = smb2_getinfo_file(tree, tctx, &q);
+	status = smb2_getinfo_file(cli->tree, tctx, &q);
 	CHECK_STATUS(status, NT_STATUS_OK);
 	sd_orig = q.query_secdesc.out.sd;
 
@@ -1646,7 +1646,7 @@ static bool test_sd_flags_vs_chown(struct torture_context *tctx,
 		set.set_secdesc.in.file.handle = handle;
 		set.set_secdesc.in.secinfo_flags = SECINFO_DACL;
 		set.set_secdesc.in.sd = sd;
-		status = smb2_setinfo_file(tree, &set);
+		status = smb2_setinfo_file(cli->tree, &set);
 		CHECK_STATUS(status, NT_STATUS_OK);
 
 		/*
@@ -1663,7 +1663,7 @@ static bool test_sd_flags_vs_chown(struct torture_context *tctx,
 
 		q.query_secdesc.in.file.handle = handle;
 		q.query_secdesc.in.secinfo_flags = SECINFO_DACL;
-		status = smb2_getinfo_file(tree, tctx, &q);
+		status = smb2_getinfo_file(cli->tree, tctx, &q);
 		CHECK_STATUS(status, NT_STATUS_OK);
 		CHECK_SECURITY_DESCRIPTOR(q.query_secdesc.out.sd, sd);
 
@@ -1674,14 +1674,14 @@ static bool test_sd_flags_vs_chown(struct torture_context *tctx,
 		io.in.file_attributes = FILE_ATTRIBUTE_NORMAL;
 		io.in.desired_access = SEC_RIGHTS_FILE_ALL;
 		io.in.create_disposition = NTCREATEX_DISP_CREATE;
-		status = smb2_create(tree, tctx, &io);
+		status = smb2_create(cli->tree, tctx, &io);
 		CHECK_STATUS(status, NT_STATUS_OK);
 		handle2 = io.out.file.handle;
 		CHECK_ACCESS_FLAGS(handle2, SEC_RIGHTS_FILE_ALL);
 
 		q.query_secdesc.in.file.handle = handle2;
 		q.query_secdesc.in.secinfo_flags = SECINFO_DACL | SECINFO_OWNER;
-		status = smb2_getinfo_file(tree, tctx, &q);
+		status = smb2_getinfo_file(cli->tree, tctx, &q);
 		CHECK_STATUS(status, NT_STATUS_OK);
 
 		torture_comment(tctx, "  checking sd on file %s\n", fname1);
@@ -1718,7 +1718,7 @@ static bool test_sd_flags_vs_chown(struct torture_context *tctx,
 			set.set_secdesc.in.file.handle = handle2;
 			set.set_secdesc.in.secinfo_flags = SECINFO_DACL;
 			set.set_secdesc.in.sd = sd2;
-			status = smb2_setinfo_file(tree, &set);
+			status = smb2_setinfo_file(cli->tree, &set);
 			CHECK_STATUS(status, NT_STATUS_OK);
 
 			/* Check DACL we just set. */
@@ -1728,7 +1728,7 @@ static bool test_sd_flags_vs_chown(struct torture_context *tctx,
 
 			q.query_secdesc.in.file.handle = handle2;
 			q.query_secdesc.in.secinfo_flags = SECINFO_DACL | SECINFO_OWNER;
-			status = smb2_getinfo_file(tree, tctx, &q);
+			status = smb2_getinfo_file(cli->tree, tctx, &q);
 			CHECK_STATUS(status, NT_STATUS_OK);
 
 			CHECK_SECURITY_DESCRIPTOR(q.query_secdesc.out.sd, sd2);
@@ -1745,7 +1745,7 @@ static bool test_sd_flags_vs_chown(struct torture_context *tctx,
 			set.set_secdesc.in.file.handle = handle2;
 			set.set_secdesc.in.secinfo_flags = SECINFO_OWNER;
 			set.set_secdesc.in.sd = owner_sd;
-			status = smb2_setinfo_file(tree, &set);
+			status = smb2_setinfo_file(cli->tree, &set);
 			CHECK_STATUS(status, NT_STATUS_OK);
 
 			owner_sd->owner_sid = owner_sid;
@@ -1753,27 +1753,27 @@ static bool test_sd_flags_vs_chown(struct torture_context *tctx,
 			set.set_secdesc.in.file.handle = handle2;
 			set.set_secdesc.in.secinfo_flags = SECINFO_OWNER;
 			set.set_secdesc.in.sd = owner_sd;
-			status = smb2_setinfo_file(tree, &set);
+			status = smb2_setinfo_file(cli->tree, &set);
 			CHECK_STATUS(status, NT_STATUS_OK);
 
 			q.query_secdesc.in.file.handle = handle2;
 			q.query_secdesc.in.secinfo_flags = SECINFO_DACL | SECINFO_OWNER;
-			status = smb2_getinfo_file(tree, tctx, &q);
+			status = smb2_getinfo_file(cli->tree, tctx, &q);
 			CHECK_STATUS(status, NT_STATUS_OK);
 
 			CHECK_SECURITY_DESCRIPTOR(q.query_secdesc.out.sd, sd2);
 			torture_assert_goto(tctx, ret, ret, done, "CHECK_SECURITY_DESCRIPTOR failed\n");
 		}
 
-		smb2_util_close(tree, handle2);
-		smb2_util_unlink(tree, fname1);
+		smb2_util_close(cli->tree, handle2);
+		smb2_util_unlink(cli->tree, fname1);
 	}
 
 done:
-	smb2_util_close(tree, handle);
-	smb2_deltree(tree, BASEDIR);
-	smb2_tdis(tree);
-	smb2_logoff(tree->session);
+	smb2_util_close(cli->tree, handle);
+	smb2_deltree(cli->tree, BASEDIR);
+	smb2_tdis(cli->tree);
+	smb2_logoff(cli->tree->session);
 	return ret;
 }
 
@@ -1782,7 +1782,7 @@ done:
   Note: This test was copied from raw/acls.c.
 */
 static bool test_inheritance_dynamic(struct torture_context *tctx,
-    struct smb2_tree *tree)
+    struct smb2cli_state *cli)
 {
 	NTSTATUS status;
 	struct smb2_create io;
@@ -1798,7 +1798,7 @@ static bool test_inheritance_dynamic(struct torture_context *tctx,
 
 	torture_comment(tctx, "TESTING DYNAMIC ACL INHERITANCE\n");
 
-	if (!smb2_util_setup_dir(tctx, tree, BASEDIR))
+	if (!smb2_util_setup_dir(tctx, cli->tree, BASEDIR))
 		return false;
 
 	ZERO_STRUCT(io);
@@ -1814,7 +1814,7 @@ static bool test_inheritance_dynamic(struct torture_context *tctx,
 	io.in.security_flags = 0;
 	io.in.fname = dname;
 
-	status = smb2_create(tree, tctx, &io);
+	status = smb2_create(cli->tree, tctx, &io);
 	CHECK_STATUS(status, NT_STATUS_OK);
 	handle = io.out.file.handle;
 
@@ -1822,7 +1822,7 @@ static bool test_inheritance_dynamic(struct torture_context *tctx,
 	q.query_secdesc.level = RAW_FILEINFO_SEC_DESC;
 	q.query_secdesc.in.file.handle = handle;
 	q.query_secdesc.in.secinfo_flags = SECINFO_DACL | SECINFO_OWNER;
-	status = smb2_getinfo_file(tree, tctx, &q);
+	status = smb2_getinfo_file(cli->tree, tctx, &q);
 	CHECK_STATUS(status, NT_STATUS_OK);
 	sd_orig = q.query_secdesc.out.sd;
 
@@ -1843,7 +1843,7 @@ static bool test_inheritance_dynamic(struct torture_context *tctx,
 	set.set_secdesc.in.file.handle = handle;
 	set.set_secdesc.in.secinfo_flags = SECINFO_DACL;
 	set.set_secdesc.in.sd = sd;
-	status = smb2_setinfo_file(tree, &set);
+	status = smb2_setinfo_file(cli->tree, &set);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	torture_comment(tctx, "create a file with an inherited acl\n");
@@ -1851,22 +1851,22 @@ static bool test_inheritance_dynamic(struct torture_context *tctx,
 	io.in.create_options = 0;
 	io.in.desired_access = SEC_FILE_READ_ATTRIBUTE;
 	io.in.create_disposition = NTCREATEX_DISP_CREATE;
-	status = smb2_create(tree, tctx, &io);
+	status = smb2_create(cli->tree, tctx, &io);
 	CHECK_STATUS(status, NT_STATUS_OK);
 	handle2 = io.out.file.handle;
-	smb2_util_close(tree, handle2);
+	smb2_util_close(cli->tree, handle2);
 
 	torture_comment(tctx, "try and access file with base rights - should be OK\n");
 	io.in.desired_access = SEC_FILE_WRITE_DATA;
 	io.in.create_disposition = NTCREATEX_DISP_OPEN;
-	status = smb2_create(tree, tctx, &io);
+	status = smb2_create(cli->tree, tctx, &io);
 	CHECK_STATUS(status, NT_STATUS_OK);
 	handle2 = io.out.file.handle;
-	smb2_util_close(tree, handle2);
+	smb2_util_close(cli->tree, handle2);
 
 	torture_comment(tctx, "try and access file with extra rights - should be denied\n");
 	io.in.desired_access = SEC_FILE_WRITE_DATA | SEC_FILE_EXECUTE;
-	status = smb2_create(tree, tctx, &io);
+	status = smb2_create(cli->tree, tctx, &io);
 	CHECK_STATUS(status, NT_STATUS_ACCESS_DENIED);
 
 	torture_comment(tctx, "update parent sd\n");
@@ -1880,20 +1880,20 @@ static bool test_inheritance_dynamic(struct torture_context *tctx,
 	sd->type |= SEC_DESC_DACL_AUTO_INHERITED | SEC_DESC_DACL_AUTO_INHERIT_REQ;
 
 	set.set_secdesc.in.sd = sd;
-	status = smb2_setinfo_file(tree, &set);
+	status = smb2_setinfo_file(cli->tree, &set);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	torture_comment(tctx, "try and access file with base rights - should be OK\n");
 	io.in.desired_access = SEC_FILE_WRITE_DATA;
-	status = smb2_create(tree, tctx, &io);
+	status = smb2_create(cli->tree, tctx, &io);
 	CHECK_STATUS(status, NT_STATUS_OK);
 	handle2 = io.out.file.handle;
-	smb2_util_close(tree, handle2);
+	smb2_util_close(cli->tree, handle2);
 
 
 	torture_comment(tctx, "try and access now - should be OK if dynamic inheritance works\n");
 	io.in.desired_access = SEC_FILE_WRITE_DATA | SEC_FILE_EXECUTE;
-	status = smb2_create(tree, tctx, &io);
+	status = smb2_create(cli->tree, tctx, &io);
 	if (NT_STATUS_EQUAL(status, NT_STATUS_ACCESS_DENIED)) {
 		torture_comment(tctx, "Server does not have dynamic inheritance\n");
 	}
@@ -1902,7 +1902,7 @@ static bool test_inheritance_dynamic(struct torture_context *tctx,
 	}
 	CHECK_STATUS(status, NT_STATUS_ACCESS_DENIED);
 
-	smb2_util_unlink(tree, fname1);
+	smb2_util_unlink(cli->tree, fname1);
 
 done:
 	torture_comment(tctx, "put back original sd\n");
@@ -1910,13 +1910,13 @@ done:
 	set.set_secdesc.in.file.handle = handle;
 	set.set_secdesc.in.secinfo_flags = SECINFO_DACL;
 	set.set_secdesc.in.sd = sd_orig;
-	status = smb2_setinfo_file(tree, &set);
+	status = smb2_setinfo_file(cli->tree, &set);
 
-	smb2_util_close(tree, handle);
-	smb2_util_rmdir(tree, dname);
-	smb2_deltree(tree, BASEDIR);
-	smb2_tdis(tree);
-	smb2_logoff(tree->session);
+	smb2_util_close(cli->tree, handle);
+	smb2_util_rmdir(cli->tree, dname);
+	smb2_deltree(cli->tree, BASEDIR);
+	smb2_tdis(cli->tree);
+	smb2_logoff(cli->tree->session);
 
 	return ret;
 }
@@ -1952,7 +1952,7 @@ done:
 #if 0
 /* test what access mask is needed for getting and setting security_descriptors */
 /* Note: This test was copied from raw/acls.c. */
-static bool test_sd_get_set(struct torture_context *tctx, struct smb2_tree *tree)
+static bool test_sd_get_set(struct torture_context *tctx, struct smb2cli_state *cli)
 {
 	NTSTATUS status;
 	bool ret = true;
@@ -1986,7 +1986,7 @@ static bool test_sd_get_set(struct torture_context *tctx, struct smb2_tree *tree
 	uint64_t get_sacl_bits  = SEC_FLAG_SYSTEM_SECURITY;
 	uint64_t set_sacl_bits  = SEC_FLAG_SYSTEM_SECURITY;
 
-	if (!smb2_util_setup_dir(tctx, tree, BASEDIR))
+	if (!smb2_util_setup_dir(tctx, cli->tree, BASEDIR))
 		return false;
 
 	torture_comment(tctx, "TESTING ACCESS MASKS FOR SD GET/SET\n");
@@ -2014,11 +2014,11 @@ static bool test_sd_get_set(struct torture_context *tctx, struct smb2_tree *tree
 	io.in.security_flags = 0;
 	io.in.fname = fname;
 	io.in.sec_desc = sd;
-	status = smb2_create(tree, tctx, &io);
+	status = smb2_create(cli->tree, tctx, &io);
 	CHECK_STATUS(status, NT_STATUS_OK);
 	handle = io.out.file.handle;
 
-	status = smb2_util_close(tree, handle);
+	status = smb2_util_close(cli->tree, handle);
 	CHECK_STATUS(status, NT_STATUS_OK);
 
 	/*
@@ -2034,14 +2034,14 @@ static bool test_sd_get_set(struct torture_context *tctx, struct smb2_tree *tree
 		io.level = RAW_OPEN_SMB2;
 		io.in.desired_access = desired;
 		io.in.create_disposition = NTCREATEX_DISP_OPEN;
-		status = smb2_create(tree, tctx, &io);
+		status = smb2_create(cli->tree, tctx, &io);
 		CHECK_STATUS_FOR_BIT_ACTION(status, open_bits, goto next);
 		handle = io.out.file.handle;
 
 		/* then check what access was granted */
 		fi.access_information.level		= RAW_FILEINFO_ACCESS_INFORMATION;
 		fi.access_information.in.file.handle	= handle;
-		status = smb2_getinfo_file(tree, tctx, &fi);
+		status = smb2_getinfo_file(cli->tree, tctx, &fi);
 		CHECK_STATUS(status, NT_STATUS_OK);
 		granted = fi.access_information.out.access_flags;
 
@@ -2050,7 +2050,7 @@ static bool test_sd_get_set(struct torture_context *tctx, struct smb2_tree *tree
 		fi.query_secdesc.level			= RAW_FILEINFO_SEC_DESC;
 		fi.query_secdesc.in.file.handle		= handle;
 		fi.query_secdesc.in.secinfo_flags	= SECINFO_OWNER;
-		status = smb2_getinfo_file(tree, tctx, &fi);
+		status = smb2_getinfo_file(cli->tree, tctx, &fi);
 		CHECK_STATUS_FOR_BIT(status, get_owner_bits, SEC_STD_READ_CONTROL);
 		if (fi.query_secdesc.out.sd) {
 			sd_owner = fi.query_secdesc.out.sd;
@@ -2061,7 +2061,7 @@ static bool test_sd_get_set(struct torture_context *tctx, struct smb2_tree *tree
 		si.set_secdesc.in.file.handle		= handle;
 		si.set_secdesc.in.secinfo_flags		= SECINFO_OWNER;
 		si.set_secdesc.in.sd			= sd_owner;
-		status = smb2_setinfo_file(tree, &si);
+		status = smb2_setinfo_file(cli->tree, &si);
 		CHECK_STATUS_FOR_BIT(status, set_owner_bits, SEC_STD_WRITE_OWNER);
 
 		/* test the group */
@@ -2069,7 +2069,7 @@ static bool test_sd_get_set(struct torture_context *tctx, struct smb2_tree *tree
 		fi.query_secdesc.level			= RAW_FILEINFO_SEC_DESC;
 		fi.query_secdesc.in.file.handle		= handle;
 		fi.query_secdesc.in.secinfo_flags	= SECINFO_GROUP;
-		status = smb2_getinfo_file(tree, tctx, &fi);
+		status = smb2_getinfo_file(cli->tree, tctx, &fi);
 		CHECK_STATUS_FOR_BIT(status, get_group_bits, SEC_STD_READ_CONTROL);
 		if (fi.query_secdesc.out.sd) {
 			sd_group = fi.query_secdesc.out.sd;
@@ -2080,7 +2080,7 @@ static bool test_sd_get_set(struct torture_context *tctx, struct smb2_tree *tree
 		si.set_secdesc.in.file.handle		= handle;
 		si.set_secdesc.in.secinfo_flags		= SECINFO_GROUP;
 		si.set_secdesc.in.sd			= sd_group;
-		status = smb2_setinfo_file(tree, &si);
+		status = smb2_setinfo_file(cli->tree, &si);
 		CHECK_STATUS_FOR_BIT(status, set_group_bits, SEC_STD_WRITE_OWNER);
 
 		/* test the DACL */
@@ -2088,7 +2088,7 @@ static bool test_sd_get_set(struct torture_context *tctx, struct smb2_tree *tree
 		fi.query_secdesc.level			= RAW_FILEINFO_SEC_DESC;
 		fi.query_secdesc.in.file.handle		= handle;
 		fi.query_secdesc.in.secinfo_flags	= SECINFO_DACL;
-		status = smb2_getinfo_file(tree, tctx, &fi);
+		status = smb2_getinfo_file(cli->tree, tctx, &fi);
 		CHECK_STATUS_FOR_BIT(status, get_dacl_bits, SEC_STD_READ_CONTROL);
 		if (fi.query_secdesc.out.sd) {
 			sd_dacl = fi.query_secdesc.out.sd;
@@ -2099,7 +2099,7 @@ static bool test_sd_get_set(struct torture_context *tctx, struct smb2_tree *tree
 		si.set_secdesc.in.file.handle		= handle;
 		si.set_secdesc.in.secinfo_flags		= SECINFO_DACL;
 		si.set_secdesc.in.sd			= sd_dacl;
-		status = smb2_setinfo_file(tree, &si);
+		status = smb2_setinfo_file(cli->tree, &si);
 		CHECK_STATUS_FOR_BIT(status, set_dacl_bits, SEC_STD_WRITE_DAC);
 
 		/* test the SACL */
@@ -2107,7 +2107,7 @@ static bool test_sd_get_set(struct torture_context *tctx, struct smb2_tree *tree
 		fi.query_secdesc.level			= RAW_FILEINFO_SEC_DESC;
 		fi.query_secdesc.in.file.handle		= handle;
 		fi.query_secdesc.in.secinfo_flags	= SECINFO_SACL;
-		status = smb2_getinfo_file(tree, tctx, &fi);
+		status = smb2_getinfo_file(cli->tree, tctx, &fi);
 		CHECK_STATUS_FOR_BIT(status, get_sacl_bits, SEC_FLAG_SYSTEM_SECURITY);
 		if (fi.query_secdesc.out.sd) {
 			sd_sacl = fi.query_secdesc.out.sd;
@@ -2118,22 +2118,22 @@ static bool test_sd_get_set(struct torture_context *tctx, struct smb2_tree *tree
 		si.set_secdesc.in.file.handle		= handle;
 		si.set_secdesc.in.secinfo_flags		= SECINFO_SACL;
 		si.set_secdesc.in.sd			= sd_sacl;
-		status = smb2_setinfo_file(tree, &si);
+		status = smb2_setinfo_file(cli->tree, &si);
 		CHECK_STATUS_FOR_BIT(status, set_sacl_bits, SEC_FLAG_SYSTEM_SECURITY);
 
 		/* close the handle */
-		status = smb2_util_close(tree, handle);
+		status = smb2_util_close(cli->tree, handle);
 		CHECK_STATUS(status, NT_STATUS_OK);
 next:
 		continue;
 	}
 
 done:
-	smb2_util_close(tree, handle);
-	smb2_util_unlink(tree, fname);
-	smb2_deltree(tree, BASEDIR);
-	smb2_tdis(tree);
-	smb2_logoff(tree->session);
+	smb2_util_close(cli->tree, handle);
+	smb2_util_unlink(cli->tree, fname);
+	smb2_deltree(cli->tree, BASEDIR);
+	smb2_tdis(cli->tree);
+	smb2_logoff(cli->tree->session);
 
 	return ret;
 }
@@ -2174,9 +2174,9 @@ static bool torture_smb2_con_share(struct torture_context *tctx,
 }
 
 static bool test_access_based(struct torture_context *tctx,
-				struct smb2_tree *tree)
+				struct smb2cli_state *cli)
 {
-	struct smb2_tree *tree1 = NULL;
+	struct smb2cli_state *cli1 = NULL;
 	NTSTATUS status;
 	struct smb2_create io;
 	const char *fname = BASEDIR "\\testfile";
@@ -2216,7 +2216,7 @@ static bool test_access_based(struct torture_context *tctx,
 	ZERO_STRUCT(fhandle);
 	ZERO_STRUCT(dhandle);
 
-	if (!torture_smb2_con_share(tctx, "hideunread", &tree1)) {
+	if (!torture_smb2_con_share(tctx, "hideunread", &cli1->tree)) {
 		torture_result(tctx, TORTURE_FAIL, "(%s) Unable to connect "
 			"to share 'hideunread'\n",
                        __location__);
@@ -2224,10 +2224,10 @@ static bool test_access_based(struct torture_context *tctx,
 		goto done;
 	}
 
-	flags = smb2cli_tcon_flags(tree1->smbXcli);
+	flags = smb2cli_tcon_flags(cli1->tree->smbXcli);
 
-	smb2_util_unlink(tree1, fname);
-	smb2_deltree(tree1, BASEDIR);
+	smb2_util_unlink(cli1->tree, fname);
+	smb2_deltree(cli1->tree, BASEDIR);
 
 	torture_comment(tctx, "TESTING ACCESS BASED ENUMERATION\n");
 
@@ -2239,7 +2239,7 @@ static bool test_access_based(struct torture_context *tctx,
 		goto done;
 	}
 
-	if (!smb2_util_setup_dir(tctx, tree1, BASEDIR)) {
+	if (!smb2_util_setup_dir(tctx, cli1->tree, BASEDIR)) {
 		torture_result(tctx, TORTURE_FAIL, "(%s) Unable to setup %s\n",
                        __location__, BASEDIR);
 		ret = false;
@@ -2247,9 +2247,9 @@ static bool test_access_based(struct torture_context *tctx,
 	}
 
 	/* Get a handle to the BASEDIR directory. */
-	status = torture_smb2_testdir(tree1, BASEDIR, &dhandle);
+	status = torture_smb2_testdir(cli1->tree, BASEDIR, &dhandle);
 	CHECK_STATUS(status, NT_STATUS_OK);
-	smb2_util_close(tree1, dhandle);
+	smb2_util_close(cli1->tree, dhandle);
 	ZERO_STRUCT(dhandle);
 
 	ZERO_STRUCT(io);
@@ -2265,7 +2265,7 @@ static bool test_access_based(struct torture_context *tctx,
 	io.in.security_flags = 0;
 	io.in.fname = fname;
 
-	status = smb2_create(tree1, tctx, &io);
+	status = smb2_create(cli1->tree, tctx, &io);
 	CHECK_STATUS(status, NT_STATUS_OK);
 	fhandle = io.out.file.handle;
 
@@ -2273,7 +2273,7 @@ static bool test_access_based(struct torture_context *tctx,
 	q.query_secdesc.level = RAW_FILEINFO_SEC_DESC;
 	q.query_secdesc.in.file.handle = fhandle;
 	q.query_secdesc.in.secinfo_flags = SECINFO_DACL | SECINFO_OWNER;
-	status = smb2_getinfo_file(tree1, tctx, &q);
+	status = smb2_getinfo_file(cli1->tree, tctx, &q);
 	CHECK_STATUS(status, NT_STATUS_OK);
 	sd_orig = q.query_secdesc.out.sd;
 
@@ -2302,24 +2302,24 @@ static bool test_access_based(struct torture_context *tctx,
 		set.set_secdesc.in.file.handle = fhandle;
 		set.set_secdesc.in.secinfo_flags = SECINFO_DACL;
 		set.set_secdesc.in.sd = sd;
-		status = smb2_setinfo_file(tree1, &set);
+		status = smb2_setinfo_file(cli1->tree, &set);
 		CHECK_STATUS(status, NT_STATUS_OK);
 
 		/* Now see if we can see the file in a directory listing. */
 
 		/* Re-open dhandle. */
-		status = torture_smb2_testdir(tree1, BASEDIR, &dhandle);
+		status = torture_smb2_testdir(cli1->tree, BASEDIR, &dhandle);
 		CHECK_STATUS(status, NT_STATUS_OK);
 		f.in.file.handle = dhandle;
 
 		count = 0;
 		d = NULL;
-		status = smb2_find_level(tree1, tree1, &f, &count, &d);
+		status = smb2_find_level(cli1->tree, cli1->tree, &f, &count, &d);
 		TALLOC_FREE(d);
 
 		CHECK_STATUS(status, NT_STATUS_OK);
 
-		smb2_util_close(tree1, dhandle);
+		smb2_util_close(cli1->tree, dhandle);
 		ZERO_STRUCT(dhandle);
 
 		if (i == 0) {
@@ -2350,16 +2350,16 @@ static bool test_access_based(struct torture_context *tctx,
 
 done:
 
-	if (tree1) {
-		smb2_util_close(tree1, fhandle);
-		smb2_util_close(tree1, dhandle);
-		smb2_util_unlink(tree1, fname);
-		smb2_deltree(tree1, BASEDIR);
-		smb2_tdis(tree1);
-		smb2_logoff(tree1->session);
+	if (cli1->tree) {
+		smb2_util_close(cli1->tree, fhandle);
+		smb2_util_close(cli1->tree, dhandle);
+		smb2_util_unlink(cli1->tree, fname);
+		smb2_deltree(cli1->tree, BASEDIR);
+		smb2_tdis(cli1->tree);
+		smb2_logoff(cli1->tree->session);
 	}
-	smb2_tdis(tree);
-	smb2_logoff(tree->session);
+	smb2_tdis(cli->tree);
+	smb2_logoff(cli->tree->session);
 	return ret;
 }
 
@@ -2367,7 +2367,7 @@ done:
  * test Owner Rights, S-1-3-4
  */
 static bool test_owner_rights(struct torture_context *tctx,
-			      struct smb2_tree *tree)
+			      struct smb2cli_state *cli)
 {
 	const char *fname = BASEDIR "\\owner_right.txt";
 	struct smb2_create cr;
@@ -2381,9 +2381,9 @@ static bool test_owner_rights(struct torture_context *tctx,
 	NTSTATUS status;
 	bool ret = true;
 
-	smb2_deltree(tree, BASEDIR);
+	smb2_deltree(cli->tree, BASEDIR);
 
-	ret = smb2_util_setup_dir(tctx, tree, BASEDIR);
+	ret = smb2_util_setup_dir(tctx, cli->tree, BASEDIR);
 	torture_assert_goto(tctx, ret, ret, done,
 			    "smb2_util_setup_dir failed\n");
 
@@ -2399,7 +2399,7 @@ static bool test_owner_rights(struct torture_context *tctx,
 		.in.fname = fname,
 	};
 
-	status = smb2_create(tree, tctx, &cr);
+	status = smb2_create(cli->tree, tctx, &cr);
 	torture_assert_ntstatus_ok_goto(tctx, status, ret, done,
 					"smb2_create failed\n");
 	handle = cr.out.file.handle;
@@ -2412,7 +2412,7 @@ static bool test_owner_rights(struct torture_context *tctx,
 		.query_secdesc.in.secinfo_flags = SECINFO_DACL|SECINFO_OWNER,
 	};
 
-	status = smb2_getinfo_file(tree, tctx, &gi);
+	status = smb2_getinfo_file(cli->tree, tctx, &gi);
 	torture_assert_ntstatus_ok_goto(tctx, status, ret, done,
 					"smb2_getinfo_file failed\n");
 
@@ -2447,11 +2447,11 @@ static bool test_owner_rights(struct torture_context *tctx,
 		.set_secdesc.in.sd = sd,
 	};
 
-	status = smb2_setinfo_file(tree, &si);
+	status = smb2_setinfo_file(cli->tree, &si);
 	torture_assert_ntstatus_ok_goto(tctx, status, ret, done,
 					"smb2_setinfo_file failed\n");
 
-	status = smb2_util_close(tree, handle);
+	status = smb2_util_close(cli->tree, handle);
 	torture_assert_ntstatus_ok_goto(tctx, status, ret, done,
 					"smb2_util_close failed\n");
 	ZERO_STRUCT(handle);
@@ -2466,7 +2466,7 @@ static bool test_owner_rights(struct torture_context *tctx,
 		.in.fname = fname,
 	};
 
-	status = smb2_create(tree, tctx, &cr);
+	status = smb2_create(cli->tree, tctx, &cr);
 	torture_assert_ntstatus_ok_goto(tctx, status, ret, done,
 					"smb2_setinfo_file failed\n");
 	handle = cr.out.file.handle;
@@ -2486,16 +2486,16 @@ static bool test_owner_rights(struct torture_context *tctx,
 				      ret, done,
 				      "Wrong maximum access\n");
 
-	status = smb2_util_close(tree, handle);
+	status = smb2_util_close(cli->tree, handle);
 	torture_assert_ntstatus_ok_goto(tctx, status, ret, done,
 					"smb2_util_close failed\n");
 	ZERO_STRUCT(handle);
 
 done:
 	if (!smb2_util_handle_empty(handle)) {
-		smb2_util_close(tree, handle);
+		smb2_util_close(cli->tree, handle);
 	}
-	smb2_deltree(tree, BASEDIR);
+	smb2_deltree(cli->tree, BASEDIR);
 	return ret;
 }
 
@@ -2503,7 +2503,7 @@ done:
  * test Owner Rights with a leading DENY ACE, S-1-3-4
  */
 static bool test_owner_rights_deny(struct torture_context *tctx,
-				struct smb2_tree *tree)
+				struct smb2cli_state *cli)
 {
 	const char *fname = BASEDIR "\\owner_right_deny.txt";
 	struct smb2_create cr;
@@ -2517,9 +2517,9 @@ static bool test_owner_rights_deny(struct torture_context *tctx,
 	NTSTATUS status;
 	bool ret = true;
 
-	smb2_deltree(tree, BASEDIR);
+	smb2_deltree(cli->tree, BASEDIR);
 
-	ret = smb2_util_setup_dir(tctx, tree, BASEDIR);
+	ret = smb2_util_setup_dir(tctx, cli->tree, BASEDIR);
 	torture_assert_goto(tctx, ret, ret, done,
 			"smb2_util_setup_dir failed\n");
 
@@ -2535,7 +2535,7 @@ static bool test_owner_rights_deny(struct torture_context *tctx,
 		.in.fname = fname,
 	};
 
-	status = smb2_create(tree, tctx, &cr);
+	status = smb2_create(cli->tree, tctx, &cr);
 	torture_assert_ntstatus_ok_goto(tctx, status, ret, done,
 					"smb2_create failed\n");
 	handle = cr.out.file.handle;
@@ -2548,7 +2548,7 @@ static bool test_owner_rights_deny(struct torture_context *tctx,
 		.query_secdesc.in.secinfo_flags = SECINFO_DACL|SECINFO_OWNER,
 	};
 
-	status = smb2_getinfo_file(tree, tctx, &gi);
+	status = smb2_getinfo_file(cli->tree, tctx, &gi);
 	torture_assert_ntstatus_ok_goto(tctx, status, ret, done,
 				"smb2_getinfo_file failed\n");
 
@@ -2583,11 +2583,11 @@ static bool test_owner_rights_deny(struct torture_context *tctx,
 		.set_secdesc.in.sd = sd,
 	};
 
-	status = smb2_setinfo_file(tree, &si);
+	status = smb2_setinfo_file(cli->tree, &si);
 	torture_assert_ntstatus_ok_goto(tctx, status, ret, done,
 					"smb2_setinfo_file failed\n");
 
-	status = smb2_util_close(tree, handle);
+	status = smb2_util_close(cli->tree, handle);
 	torture_assert_ntstatus_ok_goto(tctx, status, ret, done,
 					"smb2_util_close failed\n");
 	ZERO_STRUCT(handle);
@@ -2602,7 +2602,7 @@ static bool test_owner_rights_deny(struct torture_context *tctx,
 		.in.fname = fname,
 	};
 
-	status = smb2_create(tree, tctx, &cr);
+	status = smb2_create(cli->tree, tctx, &cr);
 	torture_assert_ntstatus_ok_goto(tctx, status, ret, done,
 					"smb2_setinfo_file failed\n");
 	handle = cr.out.file.handle;
@@ -2621,16 +2621,16 @@ static bool test_owner_rights_deny(struct torture_context *tctx,
 				      ret, done,
 				      "Wrong maximum access\n");
 
-	status = smb2_util_close(tree, handle);
+	status = smb2_util_close(cli->tree, handle);
 	torture_assert_ntstatus_ok_goto(tctx, status, ret, done,
 					"smb2_util_close failed\n");
 	ZERO_STRUCT(handle);
 
 done:
 	if (!smb2_util_handle_empty(handle)) {
-		smb2_util_close(tree, handle);
+		smb2_util_close(cli->tree, handle);
 	}
-	smb2_deltree(tree, BASEDIR);
+	smb2_deltree(cli->tree, BASEDIR);
 	return ret;
 }
 
@@ -2638,7 +2638,7 @@ done:
  * test Owner Rights with a trailing DENY ACE, S-1-3-4
  */
 static bool test_owner_rights_deny1(struct torture_context *tctx,
-				struct smb2_tree *tree)
+				struct smb2cli_state *cli)
 {
 	const char *fname = BASEDIR "\\owner_right_deny1.txt";
 	struct smb2_create cr;
@@ -2652,9 +2652,9 @@ static bool test_owner_rights_deny1(struct torture_context *tctx,
 	NTSTATUS status;
 	bool ret = true;
 
-	smb2_deltree(tree, BASEDIR);
+	smb2_deltree(cli->tree, BASEDIR);
 
-	ret = smb2_util_setup_dir(tctx, tree, BASEDIR);
+	ret = smb2_util_setup_dir(tctx, cli->tree, BASEDIR);
 	torture_assert_goto(tctx, ret, ret, done,
 			"smb2_util_setup_dir failed\n");
 
@@ -2670,7 +2670,7 @@ static bool test_owner_rights_deny1(struct torture_context *tctx,
 		.in.fname = fname,
 	};
 
-	status = smb2_create(tree, tctx, &cr);
+	status = smb2_create(cli->tree, tctx, &cr);
 	torture_assert_ntstatus_ok_goto(tctx, status, ret, done,
 					"smb2_create failed\n");
 	handle = cr.out.file.handle;
@@ -2683,7 +2683,7 @@ static bool test_owner_rights_deny1(struct torture_context *tctx,
 		.query_secdesc.in.secinfo_flags = SECINFO_DACL|SECINFO_OWNER,
 	};
 
-	status = smb2_getinfo_file(tree, tctx, &gi);
+	status = smb2_getinfo_file(cli->tree, tctx, &gi);
 	torture_assert_ntstatus_ok_goto(tctx, status, ret, done,
 				"smb2_getinfo_file failed\n");
 
@@ -2725,11 +2725,11 @@ static bool test_owner_rights_deny1(struct torture_context *tctx,
 		.set_secdesc.in.sd = sd,
 	};
 
-	status = smb2_setinfo_file(tree, &si);
+	status = smb2_setinfo_file(cli->tree, &si);
 	torture_assert_ntstatus_ok_goto(tctx, status, ret, done,
 					"smb2_setinfo_file failed\n");
 
-	status = smb2_util_close(tree, handle);
+	status = smb2_util_close(cli->tree, handle);
 	torture_assert_ntstatus_ok_goto(tctx, status, ret, done,
 					"smb2_util_close failed\n");
 	ZERO_STRUCT(handle);
@@ -2744,7 +2744,7 @@ static bool test_owner_rights_deny1(struct torture_context *tctx,
 		.in.fname = fname,
 	};
 
-	status = smb2_create(tree, tctx, &cr);
+	status = smb2_create(cli->tree, tctx, &cr);
 	torture_assert_ntstatus_ok_goto(tctx, status, ret, done,
 					"smb2_setinfo_file failed\n");
 	handle = cr.out.file.handle;
@@ -2763,16 +2763,16 @@ static bool test_owner_rights_deny1(struct torture_context *tctx,
 				ret, done,
 				"Wrong maximum access\n");
 
-	status = smb2_util_close(tree, handle);
+	status = smb2_util_close(cli->tree, handle);
 	torture_assert_ntstatus_ok_goto(tctx, status, ret, done,
 					"smb2_util_close failed\n");
 	ZERO_STRUCT(handle);
 
 done:
 	if (!smb2_util_handle_empty(handle)) {
-		smb2_util_close(tree, handle);
+		smb2_util_close(cli->tree, handle);
 	}
-	smb2_deltree(tree, BASEDIR);
+	smb2_deltree(cli->tree, BASEDIR);
 	return ret;
 }
 
@@ -2781,7 +2781,7 @@ done:
  * by a previous ALLOW ACE.
  */
 static bool test_deny1(struct torture_context *tctx,
-		       struct smb2_tree *tree)
+		       struct smb2cli_state *cli)
 {
 	const char *fname = BASEDIR "\\test_deny1.txt";
 	struct smb2_create cr;
@@ -2795,9 +2795,9 @@ static bool test_deny1(struct torture_context *tctx,
 	NTSTATUS status;
 	bool ret = true;
 
-	smb2_deltree(tree, BASEDIR);
+	smb2_deltree(cli->tree, BASEDIR);
 
-	ret = smb2_util_setup_dir(tctx, tree, BASEDIR);
+	ret = smb2_util_setup_dir(tctx, cli->tree, BASEDIR);
 	torture_assert_goto(tctx, ret, ret, done,
 			"smb2_util_setup_dir failed\n");
 
@@ -2811,7 +2811,7 @@ static bool test_deny1(struct torture_context *tctx,
 		.in.fname = fname,
 	};
 
-	status = smb2_create(tree, tctx, &cr);
+	status = smb2_create(cli->tree, tctx, &cr);
 	torture_assert_ntstatus_ok_goto(tctx, status, ret, done,
 					"smb2_create failed\n");
 	handle = cr.out.file.handle;
@@ -2824,7 +2824,7 @@ static bool test_deny1(struct torture_context *tctx,
 		.query_secdesc.in.secinfo_flags = SECINFO_DACL|SECINFO_OWNER,
 	};
 
-	status = smb2_getinfo_file(tree, tctx, &gi);
+	status = smb2_getinfo_file(cli->tree, tctx, &gi);
 	torture_assert_ntstatus_ok_goto(tctx, status, ret, done,
 				"smb2_getinfo_file failed\n");
 
@@ -2860,11 +2860,11 @@ static bool test_deny1(struct torture_context *tctx,
 		.set_secdesc.in.sd = sd,
 	};
 
-	status = smb2_setinfo_file(tree, &si);
+	status = smb2_setinfo_file(cli->tree, &si);
 	torture_assert_ntstatus_ok_goto(tctx, status, ret, done,
 					"smb2_setinfo_file failed\n");
 
-	status = smb2_util_close(tree, handle);
+	status = smb2_util_close(cli->tree, handle);
 	torture_assert_ntstatus_ok_goto(tctx, status, ret, done,
 					"smb2_util_close failed\n");
 	ZERO_STRUCT(handle);
@@ -2879,7 +2879,7 @@ static bool test_deny1(struct torture_context *tctx,
 		.in.fname = fname,
 	};
 
-	status = smb2_create(tree, tctx, &cr);
+	status = smb2_create(cli->tree, tctx, &cr);
 	torture_assert_ntstatus_ok_goto(tctx, status, ret, done,
 					"smb2_create failed\n");
 	handle = cr.out.file.handle;
@@ -2901,16 +2901,16 @@ static bool test_deny1(struct torture_context *tctx,
 				      ret, done,
 				      "Wrong maximum access\n");
 
-	status = smb2_util_close(tree, handle);
+	status = smb2_util_close(cli->tree, handle);
 	torture_assert_ntstatus_ok_goto(tctx, status, ret, done,
 					"smb2_util_close failed\n");
 	ZERO_STRUCT(handle);
 
 done:
 	if (!smb2_util_handle_empty(handle)) {
-		smb2_util_close(tree, handle);
+		smb2_util_close(cli->tree, handle);
 	}
-	smb2_deltree(tree, BASEDIR);
+	smb2_deltree(cli->tree, BASEDIR);
 	return ret;
 }
 
@@ -2923,7 +2923,7 @@ done:
  * effective permissions.
  */
 static bool test_mxac_not_granted(struct torture_context *tctx,
-				  struct smb2_tree *tree)
+				  struct smb2cli_state *cli)
 {
 	const char *fname = BASEDIR "\\test_mxac_not_granted.txt";
 	struct smb2_create cr;
@@ -2936,9 +2936,9 @@ static bool test_mxac_not_granted(struct torture_context *tctx,
 	NTSTATUS status;
 	bool ret = true;
 
-	smb2_deltree(tree, BASEDIR);
+	smb2_deltree(cli->tree, BASEDIR);
 
-	ret = smb2_util_setup_dir(tctx, tree, BASEDIR);
+	ret = smb2_util_setup_dir(tctx, cli->tree, BASEDIR);
 	torture_assert_goto(tctx, ret, ret, done,
 			"smb2_util_setup_dir failed\n");
 
@@ -2954,7 +2954,7 @@ static bool test_mxac_not_granted(struct torture_context *tctx,
 		.in.fname = fname,
 	};
 
-	status = smb2_create(tree, tctx, &cr);
+	status = smb2_create(cli->tree, tctx, &cr);
 	torture_assert_ntstatus_ok_goto(tctx, status, ret, done,
 					"smb2_create failed\n");
 	handle = cr.out.file.handle;
@@ -2967,7 +2967,7 @@ static bool test_mxac_not_granted(struct torture_context *tctx,
 		.query_secdesc.in.secinfo_flags = SECINFO_DACL|SECINFO_OWNER,
 	};
 
-	status = smb2_getinfo_file(tree, tctx, &gi);
+	status = smb2_getinfo_file(cli->tree, tctx, &gi);
 	torture_assert_ntstatus_ok_goto(tctx, status, ret, done,
 				"smb2_getinfo_file failed\n");
 
@@ -2990,11 +2990,11 @@ static bool test_mxac_not_granted(struct torture_context *tctx,
 		.set_secdesc.in.sd = sd,
 	};
 
-	status = smb2_setinfo_file(tree, &si);
+	status = smb2_setinfo_file(cli->tree, &si);
 	torture_assert_ntstatus_ok_goto(tctx, status, ret, done,
 					"smb2_setinfo_file failed\n");
 
-	status = smb2_util_close(tree, handle);
+	status = smb2_util_close(cli->tree, handle);
 	torture_assert_ntstatus_ok_goto(tctx, status, ret, done,
 					"smb2_util_close failed\n");
 	ZERO_STRUCT(handle);
@@ -3009,7 +3009,7 @@ static bool test_mxac_not_granted(struct torture_context *tctx,
 		.in.fname = fname,
 	};
 
-	status = smb2_create(tree, tctx, &cr);
+	status = smb2_create(cli->tree, tctx, &cr);
 	torture_assert_ntstatus_equal_goto(tctx, status,
 					   NT_STATUS_ACCESS_DENIED,
 					   ret, done,
@@ -3017,9 +3017,9 @@ static bool test_mxac_not_granted(struct torture_context *tctx,
 
 done:
 	if (!smb2_util_handle_empty(handle)) {
-		smb2_util_close(tree, handle);
+		smb2_util_close(cli->tree, handle);
 	}
-	smb2_deltree(tree, BASEDIR);
+	smb2_deltree(cli->tree, BASEDIR);
 	return ret;
 }
 
