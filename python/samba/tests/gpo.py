@@ -24,7 +24,7 @@ from samba.gpclass import check_refresh_gpo_list, check_safe_path, \
     check_guid, parse_gpext_conf, atomic_write_conf, get_deleted_gpos_list
 from subprocess import Popen, PIPE
 from tempfile import NamedTemporaryFile, TemporaryDirectory
-from samba.gp_sec_ext import gp_sec_ext
+from samba.gp_sec_ext import gp_krb_ext, gp_sec_ext
 from samba.gp_scripts_ext import gp_scripts_ext
 import logging
 from samba.credentials import Credentials
@@ -280,7 +280,7 @@ class GPOTests(tests.TestCase):
         machine_creds.set_machine_account()
 
         # Initialize the group policy extension
-        ext = gp_sec_ext(logger, self.lp, machine_creds, store)
+        ext = gp_krb_ext(logger, self.lp, machine_creds, store)
 
         ads = gpo.ADS_STRUCT(self.server, self.lp, machine_creds)
         if ads.connect():
