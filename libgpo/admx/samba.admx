@@ -10,6 +10,9 @@
     <category name="CAT_7D8D7DC8_5A9D_4BE1_8227_F09CDD5AFFC6" displayName="$(string.CAT_7D8D7DC8_5A9D_4BE1_8227_F09CDD5AFFC6)">
       <parentCategory ref="CAT_3338C1DD_8A00_4273_8547_158D8B8C19E9" />
     </category>
+    <category name="CAT_9DEF582D_447A_47E9_A1F5_363558D03FA9" displayName="$(string.CAT_9DEF582D_447A_47E9_A1F5_363558D03FA9)">
+      <parentCategory ref="CAT_7D8D7DC8_5A9D_4BE1_8227_F09CDD5AFFC6" />
+    </category>
   </categories>
   <policies>
     <policy name="POL_9320E11F_AC80_4A7D_A5C8_1C0F3F727061" class="Machine" displayName="$(string.POL_9320E11F_AC80_4A7D_A5C8_1C0F3F727061)" explainText="$(string.POL_9320E11F_AC80_4A7D_A5C8_1C0F3F727061_Help)" presentation="$(presentation.POL_9320E11F_AC80_4A7D_A5C8_1C0F3F727061)" key="Software\Policies\Samba\Unix Settings">
@@ -17,6 +20,14 @@
       <supportedOn ref="windows:SUPPORTED_WindowsVista" />
       <elements>
         <list id="LST_2E9A4684_3C0E_415B_8FD6_D4AF68BC8AC6" key="Software\Policies\Samba\Unix Settings\Daily Scripts" valueName="Daily Scripts" />
+      </elements>
+    </policy>
+    <policy name="POL_38DA04F0_3FD6_4425_8924_1CEEA685FD07" class="Machine" displayName="$(string.POL_38DA04F0_3FD6_4425_8924_1CEEA685FD07)" explainText="$(string.POL_38DA04F0_3FD6_4425_8924_1CEEA685FD07_Help)" presentation="$(presentation.POL_38DA04F0_3FD6_4425_8924_1CEEA685FD07)" key="Software\Policies\Samba\Unix Settings\Messages" valueName="motd">
+      <parentCategory ref="CAT_9DEF582D_447A_47E9_A1F5_363558D03FA9" />
+      <supportedOn ref="windows:SUPPORTED_WindowsVista" />
+      <disabledValue />
+      <elements>
+        <text id="TXT_609C208A_3B4D_48F1_8A15_C0DF08EAD4D6" key="Software\Policies\Samba\Unix Settings\Messages" valueName="motd" />
       </elements>
     </policy>
   </policies>
