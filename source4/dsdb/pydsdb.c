@@ -50,6 +50,7 @@
 	} \
 	dn = pyldb_Dn_AS_DN(py_ldb_dn);
 
+#if AD_DC_BUILD_IS_ENABLED
 static PyObject *py_ldb_get_exception(void)
 {
 	PyObject *mod = PyImport_ImportModule("ldb");
@@ -1332,6 +1333,7 @@ static PyObject *py_dsdb_garbage_collect_tombstones(PyObject *self, PyObject *ar
 	return Py_BuildValue("(II)", num_objects_removed,
 			    num_links_removed);
 }
+#endif
 
 static PyObject *py_dsdb_load_udv_v2(PyObject *self, PyObject *args)
 {
@@ -1401,6 +1403,7 @@ static PyObject *py_dsdb_load_udv_v2(PyObject *self, PyObject *args)
 }
 
 static PyMethodDef py_dsdb_methods[] = {
+#if AD_DC_BUILD_IS_ENABLED
 	{ "_samdb_server_site_name", (PyCFunction)py_samdb_server_site_name,
 		METH_VARARGS, "Get the server site name as a string"},
 	{ "_dsdb_convert_schema_to_openldap",
@@ -1478,6 +1481,7 @@ static PyMethodDef py_dsdb_methods[] = {
 	{ "_dsdb_allocate_rid", (PyCFunction)py_dsdb_allocate_rid, METH_VARARGS,
 		"_dsdb_allocate_rid(samdb)"
 		" -> RID" },
+#endif
 	{ "_dsdb_load_udv_v2", (PyCFunction)py_dsdb_load_udv_v2, METH_VARARGS, NULL },
 	{0}
 };

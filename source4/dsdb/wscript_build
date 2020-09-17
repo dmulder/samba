@@ -80,5 +80,5 @@ bld.SAMBA_PYTHON('python_dsdb',
                  deps='samdb %s dcerpc com_err %s %s dsdb_garbage_collect_tombstones scavenge_dns_records' %\
                  (pyldb_util, pyrpc_util, pyparam_util),
                  realname='samba/dsdb.so',
-                 enabled=bld.AD_DC_BUILD_IS_ENABLED()
+                 cflags='-DAD_DC_BUILD_IS_ENABLED=%d' % (1 if bld.AD_DC_BUILD_IS_ENABLED() else 0)
                  )
