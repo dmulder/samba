@@ -46,6 +46,7 @@
 	} \
 	dn = pyldb_Dn_AS_DN(py_ldb_dn);
 
+#if AD_DC_BUILD_IS_ENABLED
 static PyObject *py_dnsp_DnssrvRpcRecord_get_list(struct dnsp_DnssrvRpcRecord *records,
 						  uint16_t num_records)
 {
@@ -338,13 +339,16 @@ static PyMethodDef py_dsdb_dns_methods[] = {
 		METH_VARARGS, "Return the DNS database entry as a python structure from an Ldb.MessageElement of type dnsRecord"},
 	{0}
 };
+#endif
 
 static struct PyModuleDef moduledef = {
     PyModuleDef_HEAD_INIT,
     .m_name = "dsdb_dns",
     .m_doc = "Python bindings for the DNS objects in the directory service databases.",
     .m_size = -1,
+#if AD_DC_BUILD_IS_ENABLED
     .m_methods = py_dsdb_dns_methods,
+#endif
 };
 
 MODULE_INIT_FUNC(dsdb_dns)

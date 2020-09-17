@@ -84,4 +84,4 @@ bld.SAMBA_PYTHON('python_dsdb_dns',
                  deps='samdb %s %s dnsserver_common %s' % (
                      pyldb_util, pyrpc_util, pytalloc_util),
                  realname='samba/dsdb_dns.so',
-                 enabled=bld.AD_DC_BUILD_IS_ENABLED())
+                 cflags='-DAD_DC_BUILD_IS_ENABLED=%d' % (1 if bld.AD_DC_BUILD_IS_ENABLED() else 0))
